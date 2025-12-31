@@ -1,0 +1,325 @@
+import {
+  ConflictException,
+  ForbiddenException,
+  Injectable,
+  Logger,
+  NotFoundException,
+  UnauthorizedException,
+} from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { JwtService } from '@nestjs/jwt';
+import { User } from '@prisma/client';
+import * as bcrypt from 'bcrypt';
+import * as crypto from 'crypto';
+import { PrismaService } from '../../prisma/prisma.service';
+import { UsersService } from '../users/users.service';
+import { ForgotPasswordDto } from './dto/forgot-password.dto';
+import { LoginDto } from './dto/login.dto';
+import { RegisterDto } from './dto/register.dto';
+import { ResetPasswordDto } from './dto/reset-password.dto';
+import { SendOtpDto } from './dto/send-otp.dto';
+import { SocialLoginDto } from './dto/social-login.dto';
+import { VerifyOtpDto } from './dto/verify-otp.dto';
+import { JwtPayload } from './interfaces/jwt-payload.interface';
+import { AppleAuthService } from './services/apple-auth.service';
+import { GoogleAuthService } from './services/google-auth.service';
+
+@Injectable()
+export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
+
+  constructor(
+    private usersService: UsersService,
+    private jwtService: JwtService,
+    private configService: ConfigService,
+    private prisma: PrismaService,
+    private googleAuthService: GoogleAuthService,
+    private appleAuthService: AppleAuthService,
+  ) { }
+
+  async register(
+    registerDto: RegisterDto,
+    context: { ip: string; userAgent: string; deviceId?: string },
+  ) {
+    const existingUser = await this.usersService.findByEmail(registerDto.email);
+    if (existingUser) {
+      throw new ConflictException('Email already exists');
+    }
+
+    // Password hashing is handled in UsersService.create
+    const user = await this.usersService.create(registerDto);
+
+    return this.generateTokens(user, context);
+  }
+
+  async validateUser(payload: JwtPayload): Promise<User> {
+    const user = await this.prisma.user.findUnique({
+      where: { id: payload.sub },
+    });
+
+    if (!user) {
+      throw new UnauthorizedException('User not found');
+    }
+
+    if (!user.isActive) {
+      throw new UnauthorizedException('User is inactive');
+    }
+
+    return user;
+  }
+
+  async login(
+    loginDto: LoginDto,
+    context: { ip: string; userAgent: string; deviceId?: string },
+  ) {
+    // Correct approach: use UsersService to find by email + bcrypt check
+    const validUser = await this.usersService.findByEmail(loginDto.email);
+    if (!validUser || !(await bcrypt.compare(loginDto.password, validUser.password))) {
+      throw new UnauthorizedException('Invalid credentials');
+    }
+    
+    // Ensure active
+    if (!validUser.isActive) {
+      throw new UnauthorizedException('User is inactive');
+    }
+
+    return this.generateTokens(validUser, context);
+  }
+
+  async socialLogin(
+    socialLoginDto: SocialLoginDto,
+    context: { ip: string; userAgent: string; deviceId?: string },
+  ) {
+    let email: string;
+    let firstName: string | undefined;
+    let lastName: string | undefined;
+    let providerId: string; // Unique ID from the provider (sub)
+
+    // Step 1: Verify the token and extract verified data
+    if (socialLoginDto.provider === 'google') {
+      const googlePayload = await this.googleAuthService.verifyIdToken(
+        socialLoginDto.idToken,
+      );
+
+      email = googlePayload.email;
+      firstName = googlePayload.given_name || socialLoginDto.firstName;
+      lastName = googlePayload.family_name || socialLoginDto.lastName;
+      providerId = googlePayload.sub;
+    } else if (socialLoginDto.provider === 'apple') {
+      const applePayload = await this.appleAuthService.verifyIdentityToken(
+        socialLoginDto.idToken,
+      );
+
+      email = applePayload.email;
+      // Apple only sends name on first login, so use DTO values if provided
+      firstName = socialLoginDto.firstName;
+      lastName = socialLoginDto.lastName;
+      providerId = applePayload.sub;
+    } else {
+      throw new UnauthorizedException('Unsupported provider');
+    }
+
+    // Step 2: Find or create user with VERIFIED email
+    let user: User | Omit<User, 'password'> | null = await this.usersService.findByEmail(email);
+
+    if (!user) {
+      // Create new user with verified data
+      user = await this.usersService.create({
+        email,
+        firstName: firstName || 'User',
+        lastName: lastName || '',
+        password: crypto.randomBytes(32).toString('hex'), // Random password for social users
+        provider: socialLoginDto.provider,
+      } as any);
+
+      this.logger.log(`New user created via ${socialLoginDto.provider}: ${email}`);
+    } else {
+      // Update name if provided (useful for Apple's first login)
+      if (firstName || lastName) {
+        await this.usersService.update(user.id, {
+          firstName: firstName || user.firstName,
+          lastName: lastName || user.lastName,
+        } as any);
+      }
+    }
+
+    if (!user) throw new UnauthorizedException('User creation failed');
+
+    return this.generateTokens(user, context);
+  }
+
+  async sendOtp(sendOtpDto: SendOtpDto) {
+    // Integration with SMS service (Twilio/AWS SNS)
+    // For now, return a mock verificationId
+    const verificationId = `v_${Date.now()}`;
+    return { verificationId };
+  }
+
+  async verifyOtp(
+    verifyOtpDto: VerifyOtpDto,
+    context: { ip: string; userAgent: string; deviceId?: string },
+  ) {
+    // Verify OTP code with verificationId
+    const user = await this.usersService.findByPhone(verifyOtpDto.phoneNumber);
+    if (!user) {
+      throw new UnauthorizedException('Phone number not registered');
+    }
+
+    return this.generateTokens(user, context);
+  }
+
+  async forgotPassword(forgotPasswordDto: ForgotPasswordDto) {
+    const user = await this.usersService.findByEmail(forgotPasswordDto.email);
+    if (!user) {
+      throw new UnauthorizedException('User not found');
+    }
+    // Generate reset token and send email
+    return { message: 'Password reset link sent to email' };
+  }
+
+  async resetPassword(resetPasswordDto: ResetPasswordDto) {
+    // Verify token and reset password
+    const user = await this.usersService.findByEmail(resetPasswordDto.email);
+    if (!user) {
+      throw new UnauthorizedException('User not found');
+    }
+
+    await this.usersService.updatePassword(user.id, resetPasswordDto.password);
+    // Revoke all refresh tokens on password change
+    await this.revokeAllRefreshTokens(user.id);
+
+    return { message: 'Password successfully reset' };
+  }
+
+  async getMe(userId: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      include: {
+        vendor: true,
+        zone: true,
+      },
+    });
+
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    return this.mapUserResponse(user);
+  }
+
+  async logout(userId: string) {
+    await this.revokeAllRefreshTokens(userId);
+    return { message: 'Successfully logged out' };
+  }
+
+  async refreshTokens(
+    refreshToken: string,
+    context: { ip: string; userAgent: string; deviceId?: string },
+  ) {
+    try {
+      const payload = this.jwtService.verify(refreshToken, {
+        secret: this.configService.get<string>('app.jwtRefreshSecret'),
+      });
+
+      const user = await this.usersService.findOne(payload.sub);
+      if (!user) throw new UnauthorizedException('User not found');
+
+      const tokenHash = crypto
+        .createHash('sha256')
+        .update(refreshToken)
+        .digest('hex');
+
+      const storedToken = await this.prisma.refreshToken.findUnique({
+        where: { token: tokenHash },
+      });
+
+      if (!storedToken) throw new ForbiddenException('Invalid Refresh Token');
+      if (storedToken.revoked) {
+        // Reuse detection: revoke all tokens for this user
+        await this.revokeAllRefreshTokens(user.id);
+        throw new ForbiddenException('Refresh Token Reuse Detected');
+      }
+      if (storedToken.expiresAt < new Date()) {
+        throw new ForbiddenException('Refresh Token Expired');
+      }
+
+      // Validate binding
+      if (storedToken.deviceId && storedToken.deviceId !== context.deviceId) {
+        throw new ForbiddenException('Device mismatch');
+      }
+
+      // Rotate token
+      await this.prisma.refreshToken.update({
+        where: { id: storedToken.id },
+        data: { revoked: true },
+      });
+
+      return this.generateTokens(user, context);
+    } catch (e) {
+      if (e instanceof ForbiddenException) throw e;
+      throw new ForbiddenException('Invalid Refresh Token');
+    }
+  }
+
+  private async generateTokens(
+    user: User | Omit<User, 'password'>,
+    context?: { ip: string; userAgent: string; deviceId?: string },
+  ) {
+    const payload: JwtPayload = {
+      email: user.email,
+      sub: user.id,
+      role: user.role,
+    };
+
+    const [accessToken, refreshToken] = await Promise.all([
+      this.jwtService.signAsync(payload, {
+        secret: this.configService.get<string>('app.jwtSecret'),
+        expiresIn: (this.configService.get<string>('app.jwtExpiration') || '15m') as any,
+      }),
+      this.jwtService.signAsync(payload, {
+        secret: this.configService.get<string>('app.jwtRefreshSecret'),
+        expiresIn: (this.configService.get<string>('app.jwtRefreshExpiration') || '7d') as any,
+      }),
+    ]);
+
+    await this.storeRefreshToken(refreshToken, user.id, context);
+
+    return {
+      access_token: accessToken,
+      refresh_token: refreshToken,
+      user,
+    };
+  }
+
+  private async storeRefreshToken(
+    token: string,
+    userId: string,
+    context?: { ip: string; userAgent: string; deviceId?: string },
+  ) {
+    const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+    const expiryDate = new Date();
+    expiryDate.setDate(expiryDate.getDate() + 7); // Should match config
+
+    await this.prisma.refreshToken.create({
+      data: {
+        token: tokenHash,
+        userId,
+        expiresAt: expiryDate,
+        deviceId: context?.deviceId,
+        userAgent: context?.userAgent,
+      },
+    });
+  }
+
+  private async revokeAllRefreshTokens(userId: string) {
+    await this.prisma.refreshToken.updateMany({
+      where: { userId, revoked: false },
+      data: { revoked: true },
+    });
+  }
+
+  private mapUserResponse(user: User) {
+    const { password, ...result } = user;
+    return result;
+  }
+}

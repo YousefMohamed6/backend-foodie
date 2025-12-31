@@ -1,0 +1,969 @@
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
+}
+
+datasource db {
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  extensions = [postgis]
+}
+
+enum UserRole {
+  CUSTOMER @map("customer")
+  VENDOR   @map("vendor")
+  DRIVER   @map("driver")
+  ADMIN    @map("admin")
+}
+
+enum PaymentMethod {
+  wallet
+  card
+  cash
+  online
+}
+
+enum OrderStatus {
+  PLACED         @map("Order Placed")
+  ACCEPTED       @map("Order Accepted")
+  REJECTED       @map("Order Rejected")
+  CANCELLED      @map("Order Cancelled")
+  DRIVER_PENDING @map("Driver Pending")
+  COMPLETED      @map("Order Completed")
+}
+
+model User {
+  id                String   @id @default(uuid())
+  firstName         String
+  lastName          String
+  email             String   @unique
+  phoneNumber       String?
+  countryCode       String?
+  password          String
+  profilePictureURL String?
+  fcmToken          String?
+  role              UserRole @default(CUSTOMER)
+  isActive          Boolean  @default(true) @map("is_active")
+  isDocumentVerify  Boolean  @default(false)
+
+  vendorId String? @map("vendor_id")
+  vendor   Vendor? @relation("UserVendor", fields: [vendorId], references: [id])
+
+  // Inverse relation for Vendor author
+  vendorAuthorOf Vendor? @relation("VendorAuthor")
+
+  zoneId String?
+  zone   Zone?   @relation(fields: [zoneId], references: [id])
+
+  subscriptionPlanId     String?
+  subscriptionPlan       SubscriptionPlan? @relation(fields: [subscriptionPlanId], references: [id])
+  subscriptionExpiryDate DateTime?
+
+  appIdentifier String?
+  provider      String?
+
+  referralCode String? @unique
+  referredBy   String?
+
+  customerProfile CustomerProfile?
+  driverProfile   DriverProfile?
+
+  ordersAsAuthor     Order[]             @relation("OrderAuthor")
+  ordersAsDriver     Order[]             @relation("OrderDriver")
+  walletTransactions WalletTransaction[]
+  reviews            Review[]
+  reviewsAsDriver    Review[] @relation("ReviewDriver")
+  subscriptions      Subscription[]
+  cashbackRedeems    CashbackRedeem[]
+  withdrawMethod     WithdrawMethod?
+
+  notifications Notification[]
+  chatMessages  ChatMessage[]
+  chatChannels  ChatChannel[]  @relation("UserChannels")
+
+  referralsAsReferrer Referral[]        @relation("Referrer")
+  referralsAsReferred Referral[]        @relation("Referred")
+  favoriteVendors     FavoriteVendor[]
+  favoriteProducts    FavoriteProduct[]
+  userGiftCards       UserGiftCard[]
+  dineInBookings      DineInBooking[]
+  refreshTokens       RefreshToken[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("users")
+}
+
+model CustomerProfile {
+  id           String    @id @default(uuid())
+  userId       String    @unique
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  walletAmount Decimal   @default(0) @map("wallet_amount") @db.Decimal(10, 2)
+  addresses    Address[]
+
+  @@map("customer_profiles")
+}
+
+model DriverProfile {
+  id           String       @id @default(uuid())
+  userId       String       @unique
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  isOnline     Boolean      @default(false)
+  status       DriverStatus @default(OFFLINE)
+  vehicleType  String?
+  licensePlate String?
+
+  // Canonical Location Source of Truth
+  currentLat Decimal? @db.Decimal(10, 8)
+  currentLng Decimal? @db.Decimal(11, 8)
+  rotation   Decimal? @db.Decimal(5, 2)
+
+  carName       String?
+  carNumber     String?
+  carPictureURL String?
+
+  rating      Decimal          @default(0) @db.Decimal(2, 1)
+  totalOrders Int              @default(0)
+  documents   DriverDocument[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("driver_profiles")
+}
+
+model Vendor {
+  id String @id @default(uuid())
+
+  authorId String @unique
+  author   User   @relation("VendorAuthor", fields: [authorId], references: [id])
+
+  users User[] @relation("UserVendor")
+
+  title       String
+  description String? @db.Text
+  photo       String?
+  logo        String?
+
+  categories Category[] @relation("VendorCategories")
+
+  vendorTypeId String?
+  vendorType   VendorType? @relation(fields: [vendorTypeId], references: [id])
+
+  latitude  Decimal @db.Decimal(10, 8)
+  longitude Decimal @db.Decimal(11, 8)
+  address   String?
+
+  zoneId String?
+  zone   Zone?   @relation(fields: [zoneId], references: [id])
+
+  phoneNumber String? @map("phone_number")
+  fcmToken    String?
+
+  isActive       Boolean @default(true) @map("is_active")
+  isDineInActive Boolean @default(false) @map("is_dine_in_active")
+
+  walletAmount Decimal @default(0) @db.Decimal(10, 2)
+  reviewsSum   Decimal @default(0) @db.Decimal(10, 2)
+  reviewsCount Int     @default(0)
+
+  restaurantMenuPhotos VendorMenuPhoto[]
+  photos               VendorPhoto[]
+  restaurantCost       String?
+  hidePhotos           Boolean           @default(false) @map("hide_photos")
+
+  subscriptionPlanId      String?
+  subscriptionPlan        SubscriptionPlan? @relation(fields: [subscriptionPlanId], references: [id])
+  subscriptionExpiryDate  DateTime?
+  subscriptionTotalOrders Int?              @default(0)
+  isSelfDelivery          Boolean           @default(false)
+
+  products        Product[]
+  orders          Order[]
+  categoriesOwned Category[]       @relation("CategoryVendor")
+  coupons         Coupon[]
+  reviews         Review[]
+  favoriteVendors FavoriteVendor[]
+  stories         Story[]
+  dineInBookings  DineInBooking[]
+  advertisements  Advertisement[]
+  schedules  VendorSchedule[]
+  commission VendorCommission?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("vendors")
+}
+
+model VendorSchedule {
+  id        String  @id @default(uuid())
+  vendorId  String
+  vendor    Vendor  @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  day       Int // 0-6 (Sunday-Saturday)
+  openTime  String  @map("open_time")
+  closeTime String  @map("close_time")
+  isActive  Boolean @default(true) @map("is_active")
+
+  @@map("vendor_schedules")
+}
+
+model VendorCommission {
+  id       String  @id @default(uuid())
+  vendorId String  @unique
+  vendor   Vendor  @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  amount   Decimal @map("commission_amount") @db.Decimal(10, 2)
+  type     String  @default("percentage") // "fixed" or "percentage"
+
+  @@map("vendor_commissions")
+}
+
+model VendorPhoto {
+  id       String @id @default(uuid())
+  url      String @map("photo")
+  vendorId String
+  vendor   Vendor @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+
+  @@map("vendor_photos")
+}
+
+model VendorMenuPhoto {
+  id       String @id @default(uuid())
+  url      String @map("photo")
+  vendorId String
+  vendor   Vendor @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+
+  @@map("vendor_menu_photos")
+}
+
+model Product {
+  id            String   @id @default(uuid())
+  name          String
+  description   String   @db.Text
+  price         Decimal  @db.Decimal(10, 2)
+  discountPrice Decimal? @map("dis_price") @db.Decimal(10, 2)
+  image         String?  @map("photo")
+  isActive      Boolean  @default(true) @map("is_active")
+  quantity      Int      @default(0)
+
+  categoryId String?   @map("category_id")
+  category   Category? @relation(fields: [categoryId], references: [id])
+
+  vendorId String @map("vendor_id")
+  vendor   Vendor @relation(fields: [vendorId], references: [id])
+
+  takeawayOption Boolean @default(true) @map("takeaway")
+  isVeg          Boolean @default(false) @map("is_veg")
+  calories       String?
+  gram           String?
+  fats           String?
+  proteins       String?
+  itemAttributes ProductAttribute[]
+  isApprove      Boolean @default(true)
+
+  extras           ProductExtra[]
+  reviews          Review[]
+  favoriteProducts FavoriteProduct[]
+  orderItems       OrderItem[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("products")
+}
+
+model ProductExtra {
+  id        String  @id @default(uuid())
+  name      String
+  price     Decimal @db.Decimal(10, 2)
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@map("product_extras")
+}
+
+model ProductAttribute {
+  id        String  @id @default(uuid())
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  key       String
+  value     String
+
+  @@index([productId])
+  @@map("product_attributes")
+}
+
+model Category {
+  id          String  @id @default(uuid())
+  name        String  @map("title")
+  description String? @db.Text
+  image       String? @map("photo")
+
+  vendorId String? @map("vendor_id")
+  vendor   Vendor? @relation("CategoryVendor", fields: [vendorId], references: [id])
+
+  vendors  Vendor[]  @relation("VendorCategories")
+  products Product[]
+
+  isActive         Boolean           @default(true) @map("is_active")
+  showOnHome       Boolean           @default(false) @map("show_on_homepage")
+  reviewAttributes ReviewAttribute[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("categories")
+}
+
+model Order {
+  id String @id @default(uuid())
+
+  authorId String @map("author_id")
+  author   User   @relation("OrderAuthor", fields: [authorId], references: [id])
+
+  vendorId String @map("vendor_id")
+  vendor   Vendor @relation(fields: [vendorId], references: [id])
+
+  driverId String? @map("driver_id")
+  driver   User?   @relation("OrderDriver", fields: [driverId], references: [id])
+
+  items          OrderItem[]
+  address        OrderAddress?
+  paymentMethod  PaymentMethod @map("payment_method")
+  totalAmount    Decimal       @db.Decimal(10, 2)
+  deliveryCharge Decimal       @default(0) @db.Decimal(10, 2)
+  tipAmount      Decimal       @default(0) @map("tip_amount") @db.Decimal(10, 2)
+  notes          String?
+  takeAway       Boolean       @default(false)
+  scheduleTime   DateTime?
+  status         OrderStatus @default(PLACED)
+
+  chatChannels       ChatChannel[]
+  walletTransactions WalletTransaction[]
+
+  createdAt      DateTime    @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("orders")
+}
+
+model OrderAddress {
+  id      String @id @default(uuid())
+  orderId String @unique
+  order   Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  city         String
+  street       String
+  building     String
+  floor        String?
+  apartment    String?
+  landmark     String?
+  instructions String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("order_addresses")
+}
+
+model OrderItem {
+  id        String           @id @default(uuid())
+  orderId   String
+  order     Order            @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId String
+  product   Product          @relation(fields: [productId], references: [id])
+  quantity  Int
+  price     Decimal          @db.Decimal(10, 2)
+  extras    OrderItemExtra[]
+
+  createdAt DateTime @default(now())
+
+  @@index([orderId])
+  @@index([productId])
+  @@map("order_items")
+}
+
+model OrderItemExtra {
+  id          String    @id @default(uuid())
+  name        String
+  price       Decimal   @db.Decimal(10, 2)
+  orderItemId String
+  orderItem   OrderItem @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
+
+  @@map("order_item_extras")
+}
+
+model Address {
+  id           String          @id @default(uuid())
+  customerId   String
+  customer     CustomerProfile @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  label        String
+  addressLine1 String
+  addressLine2 String?
+  city         String
+  state        String
+  zipCode      String
+  latitude     Decimal         @db.Decimal(10, 6)
+  longitude    Decimal         @db.Decimal(10, 6)
+  isDefault    Boolean         @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("addresses")
+}
+
+model VendorType {
+  id          String @id @default(uuid())
+  englishName String
+  arabicName  String
+
+  vendors Vendor[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("vendor_types")
+}
+
+model Zone {
+  id          String  @id @default(uuid())
+  name        String
+  coordinates Json    @map("area")
+  isActive    Boolean @default(true) @map("is_active")
+  latitude    Float?
+  longitude   Float?
+
+  users   User[]
+  vendors Vendor[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("zones")
+}
+
+model SubscriptionPlan {
+  id           String  @id @default(uuid())
+  name         String
+  description  String? @db.Text
+  price        Decimal
+  durationDays Int     @map("duration_days")
+  features     Json?
+  isActive     Boolean @default(true) @map("is_active")
+
+  users   User[]
+  vendors Vendor[]
+
+  subscriptions Subscription[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("subscription_plans")
+}
+
+enum SubscriptionStatus {
+  ACTIVE    @map("active")
+  EXPIRED   @map("expired")
+  CANCELLED @map("cancelled")
+}
+
+model Subscription {
+  id            String             @id @default(uuid())
+  userId        String
+  user          User               @relation(fields: [userId], references: [id])
+  planId        String
+  plan          SubscriptionPlan   @relation(fields: [planId], references: [id])
+  startDate     DateTime
+  endDate       DateTime
+  status        SubscriptionStatus @default(ACTIVE)
+  amountPaid    Decimal            @db.Decimal(10, 2)
+  paymentMethod String?
+  paymentId     String?
+
+  walletTransactions WalletTransaction[]
+
+  createdAt     DateTime           @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("subscriptions")
+}
+
+model Cashback {
+  id             String    @id @default(uuid())
+  name           String
+  description    String?   @db.Text
+  amount         Decimal   @default(0) @map("cashback_value") @db.Decimal(10, 2)
+  type           String    @default("fixed") @map("cashback_type")
+  minOrderAmount Decimal   @default(0) @db.Decimal(10, 2)
+  isActive       Boolean   @default(true) @map("is_active")
+  expiryDate     DateTime?
+
+  redeems CashbackRedeem[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("cashbacks")
+}
+
+model CashbackRedeem {
+  id             String   @id @default(uuid())
+  userId         String
+  user           User     @relation(fields: [userId], references: [id])
+  cashbackId     String
+  cashback       Cashback @relation(fields: [cashbackId], references: [id])
+  orderId        String
+  redeemedAmount Decimal  @db.Decimal(10, 2)
+
+  createdAt DateTime @default(now())
+
+  @@map("cashback_redeems")
+}
+
+enum TransactionType {
+  DEPOSIT    @map("deposit")
+  WITHDRAWAL @map("withdrawal")
+  PAYMENT    @map("payment")
+  REFUND     @map("refund")
+}
+
+model WalletTransaction {
+  id            String           @id @default(uuid())
+  userId        String           @map("user_id")
+  user          User             @relation(fields: [userId], references: [id])
+  amount        Decimal          @db.Decimal(10, 2)
+  type          TransactionType?
+  paymentMethod String?          @map("payment_method")
+  isTopup       Boolean          @default(false) @map("is_top_up")
+
+  orderId String? @map("order_id")
+  order   Order?  @relation(fields: [orderId], references: [id]) // Added FK relation
+
+  subscriptionId  String?  @map("subscription_id")
+  subscription    Subscription? @relation(fields: [subscriptionId], references: [id])
+  paymentStatus   String?  @map("payment_status")
+  transactionUser String   @default("customer")
+  description     String?  @map("note")
+  referenceId     String?
+  metadata        Json?
+  createdAt       DateTime @default(now()) @map("date")
+
+  @@map("wallet_transactions")
+}
+
+model WithdrawMethod {
+  id          String   @id @default(uuid())
+  userId      String   @unique
+  user        User     @relation(fields: [userId], references: [id])
+  provider  String   @default("stripe")
+  config    Json?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("withdraw_methods")
+}
+
+model Coupon {
+  id             String   @id @default(uuid())
+  code           String   @unique
+  description    String?
+  discount       String   @db.Text
+  image          String?
+  discountType   String   @default("percentage")
+  maxDiscount    Decimal? @db.Decimal(10, 2)
+  minOrderAmount Decimal  @default(0) @db.Decimal(10, 2)
+  expiresAt      DateTime
+  isActive       Boolean  @default(true) @map("is_active")
+  isPublic       Boolean  @default(false)
+
+  vendorId String? @map("vendor_id")
+  vendor   Vendor? @relation(fields: [vendorId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("coupons")
+}
+
+model Review {
+  id         String   @id @default(uuid())
+  customerId String   @map("customer_id")
+  customer   User     @relation(fields: [customerId], references: [id])
+  vendorId   String   @map("vendor_id")
+  vendor     Vendor   @relation(fields: [vendorId], references: [id])
+  productId  String?
+  product    Product? @relation(fields: [productId], references: [id])
+  rating     Float
+  comment    String?  @db.Text
+
+  orderId String? @map("order_id")
+  order   Order?  @relation(fields: [orderId], references: [id]) // Ensuring consistency
+
+  driverId String?
+  driver   User?          @relation("ReviewDriver", fields: [driverId], references: [id])
+  ratings  ReviewRating[]
+  images   ReviewImage[]
+
+  createdAt DateTime @default(now())
+
+  @@map("reviews")
+}
+
+model ReviewImage {
+  id       String @id @default(uuid())
+  url      String @map("photo")
+  reviewId String
+  review   Review @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@map("review_images")
+}
+
+enum DriverStatus {
+  AVAILABLE @map("Available")
+  BUSY      @map("Busy")
+  OFFLINE   @map("Offline")
+}
+
+model DriverDocument {
+  id             String        @id @default(uuid())
+  driverId       String        @map("driver_id")
+  driver         DriverProfile @relation(fields: [driverId], references: [id])
+  documentType   String        @map("document_type")
+  frontImage     String        @map("front_image")
+  backImage      String?       @map("back_image")
+  documentNumber String?       @map("document_number")
+  status         String        @default("pending")
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  @@map("driver_documents")
+}
+
+model ChatChannel {
+  id              String        @id @default(uuid())
+  name            String?
+  participants    User[]        @relation("UserChannels")
+  messages        ChatMessage[]
+  lastMessageText String?       @map("last_message")
+  lastMessageTime DateTime?
+  orderId         String? @map("order_id")
+  order           Order?  @relation(fields: [orderId], references: [id])
+  chatType               String?
+  customerId             String?
+  customerName           String?
+  customerProfileImage   String?
+  restaurantId           String?
+  restaurantName         String?
+  restaurantProfileImage String?
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+
+  @@map("chat_channels")
+}
+
+model ChatMessage {
+  id          String      @id @default(uuid())
+  channelId   String
+  channel     ChatChannel @relation(fields: [channelId], references: [id])
+  senderId    String
+  sender      User        @relation(fields: [senderId], references: [id])
+  content     String      @map("message") @db.Text
+  messageType String?
+  receiverId  String?
+  orderId     String?
+  isRead      Boolean     @default(false) @map("seen")
+  createdAt   DateTime    @default(now())
+
+  @@map("chat_messages")
+}
+
+model Notification {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  title     String
+  body      String   @db.Text
+  type      String?
+  metadata  Json?
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@map("notifications")
+}
+
+model Referral {
+  id           String   @id @default(uuid())
+  referrerId   String
+  referrer     User     @relation("Referrer", fields: [referrerId], references: [id])
+  referredId   String
+  referred     User     @relation("Referred", fields: [referredId], references: [id])
+  rewardAmount Decimal  @default(0) @db.Decimal(10, 2)
+  isClaimed    Boolean  @default(false)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@map("referrals")
+}
+
+model GiftCardTemplate {
+  id          String   @id @default(uuid())
+  title       String
+  description String?  @db.Text
+  amount      Decimal  @db.Decimal(10, 2)
+  image       String?
+  isActive    Boolean  @default(true) @map("is_active")
+  expiryDay   Int?     @default(30)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("gift_card_templates")
+}
+
+model UserGiftCard {
+  id         String    @id @default(uuid())
+  userId     String
+  user       User      @relation(fields: [userId], references: [id])
+  code       String    @unique
+  amount     Decimal   @db.Decimal(10, 2)
+  usedAmount Decimal   @default(0) @db.Decimal(10, 2)
+  isRedeemed Boolean   @default(false)
+  redeemedAt DateTime?
+  expiresAt  DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  @@map("user_gift_cards")
+}
+
+model FavoriteVendor {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  vendorId  String
+  vendor    Vendor   @relation(fields: [vendorId], references: [id])
+  createdAt DateTime @default(now())
+
+  @@unique([userId, vendorId])
+  @@map("favorite_vendors")
+}
+
+model FavoriteProduct {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  productId String
+  product   Product  @relation(fields: [productId], references: [id])
+  createdAt DateTime @default(now())
+
+  @@unique([userId, productId])
+  @@map("favorite_products")
+}
+
+model DineInBooking {
+  id             String    @id @default(uuid())
+  authorId       String    @map("author_id")
+  author         User      @relation(fields: [authorId], references: [id])
+  vendorId       String    @map("vendor_id")
+  vendor         Vendor    @relation(fields: [vendorId], references: [id])
+  guestPhone     String?
+  guestFirstName String?
+  guestLastName  String?
+  guestEmail     String?
+  status         String    @default("pending")
+  occasion       String?
+  specialRequest String?
+  date           DateTime?
+  totalGuest     Int       @default(1)
+  firstVisit     Boolean   @default(false)
+  discount       Decimal   @default(0) @db.Decimal(10, 2)
+  discountType   String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@map("dine_in_bookings")
+}
+
+model Setting {
+  key       String   @id
+  value     String   @db.Text
+  updatedAt DateTime @updatedAt
+
+  @@map("settings")
+}
+
+model Story {
+  id             String   @id @default(uuid())
+  vendorId       String   @map("vendor_id")
+  vendor         Vendor   @relation(fields: [vendorId], references: [id])
+  mediaUrl       String   @map("video_url")
+  videoThumbnail String?
+  mediaType      String   @default("image")
+  duration       Int      @default(15)
+  isActive       Boolean  @default(true) @map("is_active")
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@map("stories")
+}
+
+model Banner {
+  id           String   @id @default(uuid())
+  title        String
+  image        String   @map("photo")
+  position     String   @default("top")
+  redirectType String?  @map("redirect_type")
+  redirectId   String?  @map("redirect_id")
+  isActive       Boolean  @default(true) @map("is_active")
+  order        Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@map("banners")
+}
+
+model Advertisement {
+  id           String   @id @default(uuid())
+  title        String
+  description  String?  @db.Text
+  image        String   @map("photo")
+  redirectType String?  @map("redirect_type")
+  redirectId   String?  @map("redirect_id")
+  redirectUrl  String?
+  isActive       Boolean  @default(true) @map("is_active")
+  vendorId     String?
+  vendor       Vendor?  @relation(fields: [vendorId], references: [id])
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@map("advertisements")
+}
+
+model Tax {
+  id        String   @id @default(uuid())
+  country   String?
+  isActive  Boolean  @default(true) @map("is_active")
+  label     String?
+  section   String?
+  tax       String?
+  type      String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("taxes")
+}
+
+model Currency {
+  id        String   @id @default(uuid())
+  code      String?
+  isAfter   Boolean  @default(false)
+  isActive  Boolean  @default(true) @map("is_active")
+  symbol    String?
+  decimal   Int      @default(2)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("currencies")
+}
+
+model Language {
+  id        String   @id @default(uuid())
+  name      String
+  isActive  Boolean  @default(true) @map("is_active")
+  code      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("languages")
+}
+
+model EmailTemplate {
+  id            String   @id @default(uuid())
+  subject       String
+  type          String
+  message       String   @db.Text
+  isSendToAdmin Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@map("email_templates")
+}
+
+model OnBoarding {
+  id          String   @id @default(uuid())
+  title       String
+  description String   @db.Text
+  image       String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("onboarding")
+}
+
+model Document {
+  id        String   @id @default(uuid())
+  title     String
+  frontSide Boolean  @default(false)
+  backSide  Boolean  @default(false)
+  expireAt  Boolean  @default(false)
+  enable    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("documents")
+}
+
+model Attribute {
+  id        String   @id @default(uuid())
+  title     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("attributes")
+}
+
+model ReviewAttribute {
+  id        String   @id @default(uuid())
+  title     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  categories Category[]
+  ratings    ReviewRating[]
+
+  @@map("review_attributes")
+}
+
+model ReviewRating {
+  id     String @id @default(uuid())
+  rating Int
+
+  reviewId String
+  review   Review @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+
+  attributeId String
+  attribute   ReviewAttribute @relation(fields: [attributeId], references: [id], onDelete: Cascade)
+
+  @@map("review_ratings")
+}
+
+model RefreshToken {
+  id        String   @id @default(uuid())
+  token     String   @unique
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  revoked   Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  deviceId  String?
+  userAgent String?
+
+  @@index([userId])
+  @@map("refresh_tokens")
+}

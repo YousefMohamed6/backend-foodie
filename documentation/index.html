@@ -1,0 +1,738 @@
+<!doctype html>
+<html class="no-js" lang="">
+    <head>
+        <meta charset="utf-8">
+        <meta http-equiv="x-ua-compatible" content="ie=edge">
+        <title>backend documentation</title>
+        <meta name="description" content="">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+
+        <link rel="icon" type="image/x-icon" href="./images/favicon.ico">
+	   <link rel="stylesheet" href="./styles/style.css">
+        <link rel="stylesheet" href="./styles/dark.css">
+    </head>
+    <body>
+          <script>
+               // Blocking script to avoid flickering dark mode
+               // Dark mode toggle button
+               var useDark = window.matchMedia('(prefers-color-scheme: dark)');
+               var darkModeState = useDark.matches;
+               var $darkModeToggleSwitchers = document.querySelectorAll('.dark-mode-switch input');
+               var $darkModeToggles = document.querySelectorAll('.dark-mode-switch');
+               var darkModeStateLocal = localStorage.getItem('compodoc_darkmode-state');
+
+               function checkToggle(check) {
+                    for (var i = 0; i < $darkModeToggleSwitchers.length; i++) {
+                         $darkModeToggleSwitchers[i].checked = check;
+                    }
+               }
+
+               function toggleDarkMode(state) {
+                    if (window.localStorage) {
+                         localStorage.setItem('compodoc_darkmode-state', state);
+                    }
+
+                    checkToggle(state);
+
+                    const hasClass = document.body.classList.contains('dark');
+
+                    if (state) {
+                         for (var i = 0; i < $darkModeToggles.length; i++) {
+                              $darkModeToggles[i].classList.add('dark');
+                         }
+                         if (!hasClass) {
+                              document.body.classList.add('dark');
+                         }
+                    } else {
+                         for (var i = 0; i < $darkModeToggles.length; i++) {
+                              $darkModeToggles[i].classList.remove('dark');
+                         }
+                         if (hasClass) {
+                              document.body.classList.remove('dark');
+                         }
+                    }
+               }
+
+               useDark.addEventListener('change', function (evt) {
+                    toggleDarkMode(evt.matches);
+               });
+               if (darkModeStateLocal) {
+                    darkModeState = darkModeStateLocal === 'true';
+               }
+               toggleDarkMode(darkModeState);
+          </script>
+          <script>
+              // --- Iframe navigation tracking for Template Playground ---
+              function sendCurrentUrlToParent() {
+                  if (window.parent && window.parent !== window) {
+                      window.parent.postMessage({
+                          type: 'compodoc-iframe-navigate',
+                          url: window.location.pathname + window.location.hash
+                      }, '*');
+                  }
+              }
+              window.addEventListener('hashchange', sendCurrentUrlToParent, false);
+              window.addEventListener('popstate', sendCurrentUrlToParent, false);
+              window.addEventListener('DOMContentLoaded', sendCurrentUrlToParent, false);
+          </script>
+
+        <div class="navbar navbar-default navbar-fixed-top d-md-none p-0">
+               <div class="d-flex">
+                    <a href="./" class="navbar-brand">backend documentation</a>
+                    <button type="button" class="btn btn-default btn-menu ion-ios-menu" id="btn-menu"></button>
+               </div>
+        </div>
+
+        <div class="xs-menu menu" id="mobile-menu">
+                <div id="book-search-input" role="search"><input type="text" placeholder="Type to search"></div>            <compodoc-menu></compodoc-menu>
+        </div>
+
+        <div class="container-fluid main">
+           <div class="row main">
+               <div class="d-none d-md-block menu">
+                   <compodoc-menu mode="normal"></compodoc-menu>
+               </div>
+               <!-- START CONTENT -->
+               <div class="content readme">
+                   <div class="content-data">
+
+
+<h1>Foodie Vendor Backend Service (NestJS)</h1>
+<p><a href="https://nestjs.com/"><img src="https://img.shields.io/badge/nestjs-%23E0234E.svg?style=for-the-badge&logo=nestjs&logoColor=white" alt="NestJS" class="img-responsive"></a>
+<a href="https://www.prisma.io/"><img src="https://img.shields.io/badge/Prisma-3982CE?style=for-the-badge&logo=Prisma&logoColor=white" alt="Prisma" class="img-responsive"></a>
+<a href="https://www.postgresql.org/"><img src="https://img.shields.io/badge/PostgreSQL-316192?style=for-the-badge&logo=postgresql&logoColor=white" alt="PostgreSQL" class="img-responsive"></a>
+<a href="https://redis.io/"><img src="https://img.shields.io/badge/redis-%23DD0031.svg?style=for-the-badge&logo=redis&logoColor=white" alt="Redis" class="img-responsive"></a>
+<a href="https://www.typescriptlang.org/"><img src="https://img.shields.io/badge/typescript-%23007ACC.svg?style=for-the-badge&logo=typescript&logoColor=white" alt="TypeScript" class="img-responsive"></a></p>
+<p>The production-ready API service powering the Foodie ecosystem. This backend provides secure, scalable, and type-safe endpoints for Vendor, Driver, and Customer applications, with a comprehensive feature set for food delivery operations.</p>
+<hr>
+<h2>🚀 Key Features</h2>
+<h3>🔐 <strong>Security-First Authentication</strong></h3>
+<ul>
+<li><strong>Dual-Token System</strong>: Short-lived access tokens (15m) + long-lived refresh tokens (7d)</li>
+<li><strong>🆕 Secure Social Login*</strong> Cryptographic verification of Google &amp; Apple tokens<ul>
+<li>✅ Token signature validation using Google/Apple public keys</li>
+<li>✅ Prevention of identity spoofing and account takeover</li>
+<li>✅ Native mobile SDK support (no browser required)</li>
+</ul>
+</li>
+<li><strong>Token Rotation</strong>: Automatic refresh token rotation to prevent replay attacks</li>
+<li><strong>Device Binding</strong>: Tokens bound to specific devices via deviceId and userAgent</li>
+<li><strong>Theft Detection</strong>: Automatic revocation of all tokens on suspicious activity</li>
+<li><strong>Bcrypt Hashing</strong>: Secure password storage with salt rounds</li>
+</ul>
+<h3>💰 <strong>Financial Management</strong></h3>
+<ul>
+<li><strong>ACID-Compliant Wallet System</strong>: Secure transaction handling with atomic database transactions</li>
+<li><strong>Multi-Gateway Payments</strong>: Stripe, PayPal, Razorpay, Fawaterak support</li>
+<li><strong>Cashback System</strong>: Automated cashback calculation and distribution</li>
+<li><strong>Gift Cards</strong>: Digital gift card management</li>
+<li><strong>Withdrawal System</strong>: Vendor payout management</li>
+</ul>
+<h3>📍 <strong>Geospatial Services</strong></h3>
+<ul>
+<li><strong>PostGIS Integration</strong>: Advanced location-based queries</li>
+<li><strong>Nearest Vendor Discovery</strong>: Distance-based vendor search</li>
+<li><strong>Delivery Zone Validation</strong>: Polygon-based zone checking</li>
+<li><strong>Dynamic Delivery Charges</strong>: Distance-calculated pricing</li>
+<li><strong>Real-time Driver Tracking</strong>: Live coordinate updates</li>
+</ul>
+<h3>🔔 <strong>Communication &amp; Notifications</strong></h3>
+<ul>
+<li><strong>Push Notifications</strong>: Firebase Cloud Messaging integration</li>
+<li><strong>Email Service</strong>: SMTP, SendGrid, and AWS SES support</li>
+<li><strong>SMS Service</strong>: Twilio integration for OTP and notifications</li>
+<li><strong>Real-time WebSocket</strong>: Order tracking and live chat</li>
+<li><strong>Redis Pub/Sub</strong>: Multi-instance WebSocket scaling</li>
+</ul>
+<h3>📦 <strong>File &amp; Media Management</strong></h3>
+<ul>
+<li><strong>AWS S3 Integration</strong>: Cloud storage for images and videos</li>
+<li><strong>Local Storage Fallback</strong>: Development-friendly file system storage</li>
+<li><strong>Image Processing</strong>: Sharp-powered resizing and optimization</li>
+<li><strong>Video Thumbnails</strong>: FFmpeg-based thumbnail generation</li>
+</ul>
+<h3>🔄 <strong>Background Processing</strong></h3>
+<ul>
+<li><strong>Bull Queues</strong>: Redis-backed job queues</li>
+<li><strong>Email Queue</strong>: Asynchronous email sending</li>
+<li><strong>Notification Queue</strong>: Push notification batching</li>
+<li><strong>Order Processing</strong>: Automated workflow execution</li>
+</ul>
+<h3>📚 <strong>Documentation</strong></h3>
+<ul>
+<li><strong>Interactive Swagger</strong>: Auto-generated OpenAPI documentation</li>
+<li><strong>Compodoc</strong>: Structural documentation with dependency graphs</li>
+<li><strong>Architecture Guides</strong>: Comprehensive technical documentation</li>
+</ul>
+<hr>
+<h2>🛠 Tech Stack</h2>
+<h3>Core Framework</h3>
+<ul>
+<li><strong>NestJS</strong> (v11) - Progressive Node.js framework</li>
+<li><strong>TypeScript</strong> (v5) - Type-safe development</li>
+<li><strong>Node.js</strong> (v18+) - JavaScript runtime</li>
+</ul>
+<h3>Database &amp; ORM</h3>
+<ul>
+<li><strong>PostgreSQL</strong> - Primary relational database</li>
+<li><strong>PostGIS</strong> - Geospatial extension for PostgreSQL</li>
+<li><strong>Prisma</strong> (v5) - Next-generation ORM</li>
+<li><strong>Redis</strong> - Caching, queues, and pub/sub</li>
+</ul>
+<h3>Authentication &amp; Security</h3>
+<ul>
+<li><strong>Passport.js</strong> - Authentication middleware</li>
+<li><strong>JWT</strong> - JSON Web Token implementation</li>
+<li><strong>google-auth-library</strong> - Google token verification</li>
+<li><strong>apple-signin-auth</strong> - Apple token verification</li>
+<li><strong>bcrypt</strong> - Password hashing</li>
+</ul>
+<h3>Real-time &amp; Background Jobs</h3>
+<ul>
+<li><strong>Socket.io</strong> - WebSocket communication</li>
+<li><strong>Bull</strong> - Redis-based job queues</li>
+<li><strong>@socket.io/redis-adapter</strong> - Multi-instance scaling</li>
+</ul>
+<h3>Third-Party Services</h3>
+<ul>
+<li><strong>Firebase Admin SDK</strong> - Push notifications</li>
+<li><strong>Twilio</strong> - SMS service</li>
+<li><strong>Nodemailer</strong> - Email service</li>
+<li><strong>AWS SDK</strong> - S3 file storage</li>
+<li><strong>Sharp</strong> - Image processing</li>
+</ul>
+<h3>Documentation &amp; API</h3>
+<ul>
+<li><strong>Swagger/OpenAPI</strong> - Interactive API docs</li>
+<li><strong>Compodoc</strong> - Code documentation generator</li>
+<li><strong>@nestjs/swagger</strong> - Swagger integration</li>
+</ul>
+<hr>
+<h2>🏗 Project Architecture</h2>
+<p>The project follows a clean, modular architecture with clear separation of concerns:</p>
+<b>Example :</b><div><pre class="line-numbers"><code class="language-none">backend/
+├── src/
+│   ├── modules/              # Feature modules
+│   │   ├── auth/            # Authentication &amp; social login
+│   │   │   ├── services/    # 🆕 GoogleAuthService, AppleAuthService
+│   │   │   ├── strategies/  # JWT, Google OAuth, Apple OAuth
+│   │   │   └── dto/         # Data transfer objects
+│   │   ├── users/           # User management
+│   │   ├── vendors/         # Vendor management
+│   │   ├── products/        # Product catalog
+│   │   ├── orders/          # Order processing
+│   │   ├── wallet/          # Financial transactions
+│   │   ├── drivers/         # Driver management
+│   │   ├── chat/            # Real-time messaging
+│   │   └── ...              # 40+ feature modules
+│   ├── shared/              # Shared services
+│   │   ├── services/        # Email, SMS, FCM, Payment, etc.
+│   │   └── jobs/            # Background job processors
+│   ├── config/              # Configuration files
+│   ├── common/              # Guards, decorators, filters
+│   └── prisma/              # Prisma service
+├── prisma/
+│   ├── schema.prisma        # Database schema (single source of truth)
+│   └── migrations/          # Migration history
+├── documentation/           # Architecture &amp; API docs
+└── test/                    # E2E tests</code></pre></div><h3>Key Modules</h3>
+<table class="table table-bordered compodoc-table">
+<thead>
+<tr>
+<th>Module</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>auth</strong></td>
+<td>Authentication, social login, JWT management</td>
+</tr>
+<tr>
+<td><strong>users</strong></td>
+<td>User profiles, preferences, FCM tokens</td>
+</tr>
+<tr>
+<td><strong>vendors</strong></td>
+<td>Vendor profiles, menus, working hours</td>
+</tr>
+<tr>
+<td><strong>products</strong></td>
+<td>Product catalog, variants, attributes</td>
+</tr>
+<tr>
+<td><strong>orders</strong></td>
+<td>Order lifecycle, status tracking, history</td>
+</tr>
+<tr>
+<td><strong>wallet</strong></td>
+<td>Digital wallet, transactions, withdrawals</td>
+</tr>
+<tr>
+<td><strong>drivers</strong></td>
+<td>Driver profiles, availability, earnings</td>
+</tr>
+<tr>
+<td><strong>payment</strong></td>
+<td>Multi-gateway payment processing</td>
+</tr>
+<tr>
+<td><strong>chat</strong></td>
+<td>Real-time messaging between users</td>
+</tr>
+<tr>
+<td><strong>notifications</strong></td>
+<td>Push, email, and SMS notifications</td>
+</tr>
+<tr>
+<td><strong>maps</strong></td>
+<td>Geolocation, routing, zone validation</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h2>🔒 Security &amp; Authentication</h2>
+<h3>Standard Authentication Flow</h3>
+<ol>
+<li><strong>Registration/Login</strong>: User receives <code>access_token</code> (15m) and <code>refresh_token</code> (7d)</li>
+<li><strong>API Access</strong>: Include <code>Authorization: Bearer &lt;access_token&gt;</code> in requests</li>
+<li><strong>Token Refresh</strong>: Call <code>/api/v1/auth/refresh</code> with <code>refresh_token</code> when access token expires</li>
+<li><strong>Rotation</strong>: Old refresh token is revoked, new pair issued</li>
+<li><strong>Logout</strong>: <code>/api/v1/auth/logout</code> revokes all tokens</li>
+</ol>
+<h3>🆕 Social Login (Google &amp; Apple)</h3>
+<h4>Mobile App Integration (Flutter)</h4>
+<p>The backend now supports <strong>secure social login</strong> for Flutter mobile apps using direct platform authentication:</p>
+<p><strong>Key Features:</strong></p>
+<ul>
+<li>✅ <strong>Cryptographic Verification</strong>: Tokens verified with Google/Apple servers</li>
+<li>✅ <strong>Identity Proven</strong>: Email extracted from verified token, not trusted from client</li>
+<li>✅ <strong>Account Takeover Prevention</strong>: Impossible to spoof identity</li>
+<li>✅ <strong>Mobile SDK Support</strong>: Compatible with <code>google_sign_in</code> and <code>sign_in_with_apple</code></li>
+<li>✅ <strong>No Browser Required</strong>: Native Android/iOS login dialogs</li>
+</ul>
+<p><strong>How It Works:</strong></p>
+<b>Example :</b><div><pre class="line-numbers"><code class="language-none">1. Flutter app → Native Google/Apple login
+2. User authenticates → Receives signed idToken
+3. Flutter sends idToken to backend
+4. Backend verifies token with Google/Apple ✅
+5. If valid → Extract verified email → Login user
+6. If invalid → Reject with 401</code></pre></div><p><strong>Documentation:</strong></p>
+<ul>
+<li>📄 <a href="README_SOCIAL_LOGIN.md"><strong>README_SOCIAL_LOGIN.md</strong></a> - Executive summary</li>
+<li>🔐 <a href="SOCIAL_LOGIN_SECURITY_FIX.md"><strong>SOCIAL_LOGIN_SECURITY_FIX.md</strong></a> - Security improvements</li>
+<li>📱 <a href="FLUTTER_INTEGRATION_GUIDE.md"><strong>FLUTTER_INTEGRATION_GUIDE.md</strong></a> - Flutter setup guide</li>
+<li>🔧 <a href="SOCIAL_LOGIN_IMPLEMENTATION.md"><strong>SOCIAL_LOGIN_IMPLEMENTATION.md</strong></a> - Technical details</li>
+<li>✅ <a href="IMPLEMENTATION_CHECKLIST.md"><strong>IMPLEMENTATION_CHECKLIST.md</strong></a> - Status &amp; checklist</li>
+</ul>
+<hr>
+<h2>🚦 Getting Started</h2>
+<h3>Prerequisites</h3>
+<ul>
+<li><strong>Node.js</strong> (v18 or higher)</li>
+<li><strong>PostgreSQL</strong> (v14+) with PostGIS extension</li>
+<li><strong>Redis</strong> (v6+) for caching and queues</li>
+<li><strong>npm</strong> or <strong>yarn</strong> package manager</li>
+</ul>
+<h3>Installation</h3>
+<h4>1. Clone the Repository</h4>
+<b>Example :</b><div><pre class="line-numbers"><code class="language-bash">git clone &lt;repository-url&gt;
+cd backend</code></pre></div><h4>2. Install Dependencies</h4>
+<b>Example :</b><div><pre class="line-numbers"><code class="language-bash">npm install</code></pre></div><h4>3. Environment Configuration</h4>
+<p>Create a <code>.env</code> file in the root directory:</p>
+<b>Example :</b><div><pre class="line-numbers"><code class="language-env"># Database
+DATABASE_URL=&quot;postgresql://user:password&#64;localhost:5432/foodie_db?schema=public&quot;
+
+# JWT Secrets
+JWT_SECRET=your_super_secret_jwt_key_here
+JWT_REFRESH_SECRET=your_super_secret_refresh_key_here
+JWT_EXPIRATION=15m
+JWT_REFRESH_EXPIRATION=7d
+
+# Application
+PORT=3000
+APP_URL=http://localhost:3000
+
+# Google Maps
+GOOGLE_MAPS_API_KEY=your_google_maps_api_key
+
+# Social Login (REQUIRED for Google/Apple Sign-In)
+# Get Web Client ID from: https://console.cloud.google.com/apis/credentials
+GOOGLE_CLIENT_ID=your_google_web_client_id
+GOOGLE_IOS_CLIENT_ID=your_ios_client_id_if_different
+
+# Get Service ID from: https://developer.apple.com/account/resources/identifiers
+APPLE_CLIENT_ID=your_apple_service_id
+
+# Optional: Email Service
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USER=your_email&#64;gmail.com
+SMTP_PASSWORD=your_app_password
+
+# Optional: SMS Service (Twilio)
+TWILIO_ACCOUNT_SID=your_twilio_sid
+TWILIO_AUTH_TOKEN=your_twilio_token
+TWILIO_PHONE_NUMBER=+1234567890
+
+# Optional: Firebase (Push Notifications)
+FIREBASE_PROJECT_ID=your_firebase_project_id
+FIREBASE_SERVICE_ACCOUNT=&#39;{&quot;type&quot;:&quot;service_account&quot;,...}&#39;
+
+# Optional: AWS S3 (File Storage)
+AWS_ACCESS_KEY_ID=your_aws_key
+AWS_SECRET_ACCESS_KEY=your_aws_secret
+AWS_REGION=us-east-1
+AWS_S3_BUCKET=your_bucket_name
+
+# Optional: Redis
+REDIS_HOST=localhost
+REDIS_PORT=6379
+REDIS_PASSWORD=</code></pre></div><h4>4. Database Setup</h4>
+<b>Example :</b><div><pre class="line-numbers"><code class="language-bash"># Run migrations
+npx prisma migrate dev
+
+# Generate Prisma Client
+npx prisma generate
+
+# (Optional) Seed database
+npx prisma db seed</code></pre></div><h4>5. Start the Server</h4>
+<b>Example :</b><div><pre class="line-numbers"><code class="language-bash"># Development mode (with auto-reload)
+npm run start:dev
+
+# Production mode
+npm run build
+npm run start:prod</code></pre></div><p>The API will be available at <code>http://localhost:3000</code></p>
+<hr>
+<h2>📖 API Documentation</h2>
+<h3>Interactive Documentation</h3>
+<p>Once the server is running, access:</p>
+<ul>
+<li><strong>Swagger UI</strong>: <a href="http://localhost:3000/api">http://localhost:3000/api</a></li>
+<li><strong>API Base</strong>: <a href="http://localhost:3000/api/v1">http://localhost:3000/api/v1</a></li>
+</ul>
+<h3>Available Endpoints</h3>
+<p>The API is versioned and follows RESTful conventions:</p>
+<table class="table table-bordered compodoc-table">
+<thead>
+<tr>
+<th>Category</th>
+<th>Base Path</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Authentication</td>
+<td><code>/api/v1/auth</code></td>
+<td>Login, register, social login, refresh</td>
+</tr>
+<tr>
+<td>Users</td>
+<td><code>/api/v1/users</code></td>
+<td>User profiles and preferences</td>
+</tr>
+<tr>
+<td>Vendors</td>
+<td><code>/api/v1/vendors</code></td>
+<td>Vendor management</td>
+</tr>
+<tr>
+<td>Products</td>
+<td><code>/api/v1/products</code></td>
+<td>Product catalog</td>
+</tr>
+<tr>
+<td>Orders</td>
+<td><code>/api/v1/orders</code></td>
+<td>Order management</td>
+</tr>
+<tr>
+<td>Wallet</td>
+<td><code>/api/v1/wallet</code></td>
+<td>Financial transactions</td>
+</tr>
+<tr>
+<td>Drivers</td>
+<td><code>/api/v1/drivers</code></td>
+<td>Driver management</td>
+</tr>
+<tr>
+<td>Payments</td>
+<td><code>/api/v1/payment</code></td>
+<td>Payment processing</td>
+</tr>
+<tr>
+<td>Maps</td>
+<td><code>/api/v1/maps</code></td>
+<td>Geocoding and routing</td>
+</tr>
+<tr>
+<td>Chat</td>
+<td><code>/api/v1/chat</code></td>
+<td>Messaging</td>
+</tr>
+</tbody>
+</table>
+<h3>Example: Social Login</h3>
+<b>Example :</b><div><pre class="line-numbers"><code class="language-bash">POST /api/v1/auth/social-login
+Content-Type: application/json
+
+{
+  &quot;provider&quot;: &quot;google&quot;,
+  &quot;idToken&quot;: &quot;eyJhbGciOiJSUzI1NiIsImtpZCI6...&quot;
+}
+
+# Response:
+{
+  &quot;access_token&quot;: &quot;eyJhbGciOiJIUzI1NiIsInR5cCI6...&quot;,
+  &quot;refresh_token&quot;: &quot;eyJhbGciOiJIUzI1NiIsInR5cCI6...&quot;,
+  &quot;user&quot;: {
+    &quot;id&quot;: &quot;uuid&quot;,
+    &quot;email&quot;: &quot;user&#64;example.com&quot;,
+    &quot;firstName&quot;: &quot;John&quot;,
+    &quot;lastName&quot;: &quot;Doe&quot;
+  }
+}</code></pre></div><hr>
+<h2>🗄 Database Management</h2>
+<h3>Prisma Commands</h3>
+<b>Example :</b><div><pre class="line-numbers"><code class="language-bash"># Open Prisma Studio (Database GUI)
+npx prisma studio
+
+# Create a new migration
+npx prisma migrate dev --name migration_name
+
+# Apply migrations to production
+npx prisma migrate deploy
+
+# Reset database (WARNING: Deletes all data)
+npx prisma migrate reset
+
+# Generate Prisma Client (after schema changes)
+npx prisma generate
+
+# Sync schema without migrations (prototyping)
+npx prisma db push</code></pre></div><h3>Database Schema</h3>
+<p>The database schema is defined in <code>prisma/schema.prisma</code>. Key models include:</p>
+<ul>
+<li><strong>User</strong>: User accounts with authentication</li>
+<li><strong>Vendor</strong>: Restaurant/vendor profiles</li>
+<li><strong>Product</strong>: Menu items with variants</li>
+<li><strong>Order</strong>: Order records with line items</li>
+<li><strong>WalletTransaction</strong>: Financial transactions</li>
+<li><strong>Driver</strong>: Driver profiles and availability</li>
+<li><strong>RefreshToken</strong>: Secure token storage</li>
+<li><strong>Zone</strong>: Delivery zones with PostGIS geometry</li>
+</ul>
+<hr>
+<h2>🧪 Testing</h2>
+<h3>Social Login Testing</h3>
+<p>Test the secure social login implementation:</p>
+<b>Example :</b><div><pre class="line-numbers"><code class="language-bash"># Run automated verification
+./test-social-login.sh</code></pre></div><h3>Manual Testing</h3>
+<b>Example :</b><div><pre class="line-numbers"><code class="language-bash"># Test with a real Google token from your Flutter app
+curl -X POST http://localhost:3000/api/v1/auth/social-login \
+  -H &#39;Content-Type: application/json&#39; \
+  -d &#39;{
+    &quot;provider&quot;: &quot;google&quot;,
+    &quot;idToken&quot;: &quot;REAL_TOKEN_FROM_FLUTTER&quot;
+  }&#39;
+
+# Expected: 200 OK with access_token
+# With fake token: 401 Unauthorized</code></pre></div><hr>
+<h2>📚 Documentation Files</h2>
+<h3>Architecture &amp; Implementation</h3>
+<ul>
+<li><a href="IMPLEMENTATION_SUMMARY.md"><code>IMPLEMENTATION_SUMMARY.md</code></a> - Feature implementation summary</li>
+<li><a href="SETUP_GUIDE.md"><code>SETUP_GUIDE.md</code></a> - Detailed setup instructions</li>
+<li><a href="DEPLOYMENT.md"><code>DEPLOYMENT.md</code></a> - Deployment guide</li>
+<li><a href="PRISMA_MIGRATION_STATUS.md"><code>PRISMA_MIGRATION_STATUS.md</code></a> - Migration progress</li>
+</ul>
+<h3>Social Login (New)</h3>
+<ul>
+<li><a href="README_SOCIAL_LOGIN.md"><code>README_SOCIAL_LOGIN.md</code></a> - <strong>START HERE</strong> for social login</li>
+<li><a href="SOCIAL_LOGIN_SECURITY_FIX.md"><code>SOCIAL_LOGIN_SECURITY_FIX.md</code></a> - Security improvements</li>
+<li><a href="FLUTTER_INTEGRATION_GUIDE.md"><code>FLUTTER_INTEGRATION_GUIDE.md</code></a> - Flutter setup</li>
+<li><a href="SOCIAL_LOGIN_IMPLEMENTATION.md"><code>SOCIAL_LOGIN_IMPLEMENTATION.md</code></a> - Technical details</li>
+<li><a href="IMPLEMENTATION_CHECKLIST.md"><code>IMPLEMENTATION_CHECKLIST.md</code></a> - Implementation status</li>
+</ul>
+<h3>API Contracts</h3>
+<ul>
+<li><a href="documentation/BACKEND_API_CONTRACT.md"><code>documentation/BACKEND_API_CONTRACT.md</code></a> - API endpoints</li>
+<li><a href="documentation/DATABASE_CONTRACT.md"><code>documentation/DATABASE_CONTRACT.md</code></a> - Database schema</li>
+<li><a href="documentation/NESTJS_ARCHITECTURE.md"><code>documentation/NESTJS_ARCHITECTURE.md</code></a> - Architecture guide</li>
+</ul>
+<hr>
+<h2>🔧 Development</h2>
+<h3>Code Quality</h3>
+<b>Example :</b><div><pre class="line-numbers"><code class="language-bash"># Linting
+npm run lint
+
+# Formatting
+npm run format
+
+# Build
+npm run build
+
+# Watch mode (auto-rebuild)
+npm run start:dev</code></pre></div><h3>Generate Documentation</h3>
+<b>Example :</b><div><pre class="line-numbers"><code class="language-bash"># Generate Compodoc documentation
+npm run doc:build
+
+# Serve documentation
+npm run doc
+# Visit http://localhost:8080</code></pre></div><hr>
+<h2>🚀 Deployment</h2>
+<p>See <a href="DEPLOYMENT.md"><code>DEPLOYMENT.md</code></a> for detailed deployment instructions for:</p>
+<ul>
+<li>Vercel</li>
+<li>Heroku</li>
+<li>AWS</li>
+<li>DigitalOcean</li>
+<li>Self-hosted servers</li>
+</ul>
+<h3>Environment Variables Checklist</h3>
+<p>Before deploying to production, ensure these are configured:</p>
+<ul>
+<li>✅ <code>DATABASE_URL</code> - PostgreSQL connection string</li>
+<li>✅ <code>JWT_SECRET</code> - Strong random secret</li>
+<li>✅ <code>JWT_REFRESH_SECRET</code> - Strong random secret</li>
+<li>✅ <code>GOOGLE_CLIENT_ID</code> - For social login</li>
+<li>✅ <code>APPLE_CLIENT_ID</code> - For social login</li>
+<li>✅ <code>FIREBASE_SERVICE_ACCOUNT</code> - For push notifications</li>
+<li>✅ <code>SMTP_*</code> or email service credentials</li>
+<li>✅ <code>AWS_*</code> credentials (if using S3)</li>
+<li>✅ <code>REDIS_URL</code> - Redis connection string</li>
+</ul>
+<hr>
+<h2>🤝 Contributing</h2>
+<ol>
+<li>Fork the repository</li>
+<li>Create your feature branch (<code>git checkout -b feature/amazing-feature</code>)</li>
+<li>Commit your changes (<code>git commit -m &#39;Add amazing feature&#39;</code>)</li>
+<li>Push to the branch (<code>git push origin feature/amazing-feature</code>)</li>
+<li>Open a Pull Request</li>
+</ol>
+<hr>
+<h2>📝 License</h2>
+<p>This project is <a href="LICENSE">UNLICENSED</a>.</p>
+<hr>
+<h2>🆘 Support</h2>
+<p>For issues and questions:</p>
+<ol>
+<li>Check the documentation files listed above</li>
+<li>Review Swagger API documentation at <code>/api</code></li>
+<li>Check existing GitHub issues</li>
+<li>Create a new issue with detailed description</li>
+</ol>
+<hr>
+<h2>🎯 Project Status</h2>
+<ul>
+<li>✅ <strong>Core Features</strong>: Complete</li>
+<li>✅ <strong>Authentication</strong>: Email/Password + Social Login</li>
+<li>✅ <strong>Security</strong>: Production-ready with token verification</li>
+<li>✅ <strong>Documentation</strong>: Comprehensive guides</li>
+<li>✅ <strong>Database</strong>: Prisma ORM with PostgreSQL</li>
+<li>✅ <strong>Real-time</strong>: WebSocket support</li>
+<li>✅ <strong>File Storage</strong>: S3 integration</li>
+<li>✅ <strong>Payments</strong>: Multi-gateway support</li>
+<li>✅ <strong>Notifications</strong>: Push, Email, SMS</li>
+</ul>
+<p><strong>Status</strong>: Production-Ready ✅</p>
+<hr>
+<p><strong>Built with ❤️ using NestJS, Prisma, and TypeScript</strong></p>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+                   </div><div class="search-results">
+    <div class="has-results">
+        <h1 class="search-results-title"><span class='search-results-count'></span> results matching "<span class='search-query'></span>"</h1>
+        <ul class="search-results-list"></ul>
+    </div>
+    <div class="no-results">
+        <h1 class="search-results-title">No results matching "<span class='search-query'></span>"</h1>
+    </div>
+</div>
+</div>
+               <!-- END CONTENT -->
+           </div>
+       </div>
+
+          <label class="dark-mode-switch">
+               <input type="checkbox">
+               <span class="slider">
+                    <svg class="slider-icon" viewBox="0 0 24 24" fill="none" height="20" stroke="#000" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" width="20" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"></path>
+                    </svg>
+               </span>
+          </label>
+
+       <script>
+            var COMPODOC_CURRENT_PAGE_DEPTH = 0;
+            var COMPODOC_CURRENT_PAGE_CONTEXT = 'readme';
+            var COMPODOC_CURRENT_PAGE_URL = 'index.html';
+            var MAX_SEARCH_RESULTS = 15;
+       </script>
+
+       <script>
+               $darkModeToggleSwitchers = document.querySelectorAll('.dark-mode-switch input');
+               checkToggle(darkModeState);
+               if ($darkModeToggleSwitchers.length > 0) {
+                    for (var i = 0; i < $darkModeToggleSwitchers.length; i++) {
+                         $darkModeToggleSwitchers[i].addEventListener('change', function (event) {
+                              darkModeState = !darkModeState;
+                              toggleDarkMode(darkModeState);
+                         });
+                    }
+               }
+          </script>
+
+       <script src="./js/libs/custom-elements.min.js"></script>
+       <script src="./js/libs/lit-html.js"></script>
+
+       <script src="./js/menu-wc.js" defer></script>
+       <script nomodule src="./js/menu-wc_es5.js" defer></script>
+
+       <script src="./js/libs/bootstrap-native.js"></script>
+
+       <script src="./js/libs/es6-shim.min.js"></script>
+       <script src="./js/libs/EventDispatcher.js"></script>
+       <script src="./js/libs/promise.min.js"></script>
+
+       <script src="./js/compodoc.js"></script>
+
+       <script src="./js/tabs.js"></script>
+       <script src="./js/menu.js"></script>
+       <script src="./js/libs/clipboard.min.js"></script>
+       <script src="./js/libs/prism.js"></script>
+       <script src="./js/sourceCode.js"></script>
+          <script src="./js/search/search.js"></script>
+          <script src="./js/search/lunr.min.js"></script>
+          <script src="./js/search/search-lunr.js"></script>
+          <script src="./js/search/search_index.js"></script>
+       <script src="./js/lazy-load-graphs.js"></script>
+
+
+    </body>
+</html>
