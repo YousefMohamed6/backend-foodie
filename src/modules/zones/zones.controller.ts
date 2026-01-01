@@ -18,13 +18,13 @@ import { UpdateZoneDto } from './dto/update-zone.dto';
 import { ZonesService } from './zones.service';
 
 @ApiTags('Zones')
-@ApiBearerAuth()
-@UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('zones')
 export class ZonesController {
   constructor(private readonly zonesService: ZonesService) {}
 
   @Post()
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.ADMIN)
   @ApiOperation({ summary: 'Create a new zone' })
   create(@Body() createZoneDto: CreateZoneDto) {
@@ -32,20 +32,20 @@ export class ZonesController {
   }
 
   @Get()
-  @Roles(UserRole.ADMIN, UserRole.VENDOR, UserRole.CUSTOMER)
   @ApiOperation({ summary: 'Get all zones' })
   findAll() {
     return this.zonesService.findAll();
   }
 
   @Get(':id')
-  @Roles(UserRole.ADMIN, UserRole.VENDOR, UserRole.CUSTOMER)
   @ApiOperation({ summary: 'Get a zone by ID' })
   findOne(@Param('id') id: string) {
     return this.zonesService.findOne(id);
   }
 
   @Patch(':id')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.ADMIN)
   @ApiOperation({ summary: 'Update a zone' })
   update(@Param('id') id: string, @Body() updateZoneDto: UpdateZoneDto) {
@@ -53,6 +53,8 @@ export class ZonesController {
   }
 
   @Delete(':id')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.ADMIN)
   @ApiOperation({ summary: 'Delete a zone' })
   remove(@Param('id') id: string) {
