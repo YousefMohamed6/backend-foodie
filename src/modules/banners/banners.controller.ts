@@ -19,7 +19,7 @@ import { CreateBannerDto } from './dto/create-banner.dto';
 @ApiTags('Banners')
 @Controller('banners')
 export class BannersController {
-  constructor(private readonly bannersService: BannersService) { }
+  constructor(private readonly bannersService: BannersService) {}
 
   @Get()
   @ApiOperation({ summary: 'Get all banners' })

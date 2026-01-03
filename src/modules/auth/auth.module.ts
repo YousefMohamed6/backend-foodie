@@ -22,7 +22,8 @@ import { JwtStrategy } from './strategies/jwt.strategy';
       useFactory: async (configService: ConfigService) => ({
         secret: configService.get<string>('app.jwtSecret'),
         signOptions: {
-          expiresIn: (configService.get<string>('app.jwtExpiration') || '15m') as any,
+          expiresIn: (configService.get<string>('app.jwtExpiration') ||
+            '15m') as any,
         },
       }),
       inject: [ConfigService],
@@ -38,5 +39,4 @@ import { JwtStrategy } from './strategies/jwt.strategy';
     AppleAuthService,
   ],
 })
-export class AuthModule { }
-
+export class AuthModule {}

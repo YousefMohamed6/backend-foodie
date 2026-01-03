@@ -6,12 +6,13 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import appConfig from './config/app.config';
 import databaseConfig from './config/database.config';
-import redisConfig from './config/redis.config';
-import storageConfig from './config/storage.config';
 import emailConfig from './config/email.config';
-import smsConfig from './config/sms.config';
 import fcmConfig from './config/fcm.config';
+import redisConfig from './config/redis.config';
+import smsConfig from './config/sms.config';
+import storageConfig from './config/storage.config';
 import { AddressesModule } from './modules/addresses/addresses.module';
+import { AdminUIModule } from './modules/admin-ui/admin-ui.module';
 import { AdminModule } from './modules/admin/admin.module';
 import { AdvertisementsModule } from './modules/advertisements/advertisements.module';
 import { AuthModule } from './modules/auth/auth.module';
@@ -48,15 +49,15 @@ import { OnBoardingModule } from './modules/onboarding/onboarding.module';
 import { AttributesModule } from './modules/attributes/attributes.module';
 import { ReviewAttributesModule } from './modules/review-attributes/review-attributes.module';
 
+import { APP_GUARD } from '@nestjs/core';
+import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
+import { DeliveryModule } from './modules/delivery/delivery.module';
 import { DocumentsModule } from './modules/documents/documents.module';
+import { MapsModule } from './modules/maps/maps.module';
+import { PaymentModule } from './modules/payment/payment.module';
 import { VendorTypesModule } from './modules/vendor-types/vendor-types.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { SharedModule } from './shared/shared.module';
-import { DeliveryModule } from './modules/delivery/delivery.module';
-import { PaymentModule } from './modules/payment/payment.module';
-import { MapsModule } from './modules/maps/maps.module';
-import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
-import { APP_GUARD } from '@nestjs/core';
 
 import * as Joi from 'joi';
 
@@ -124,6 +125,7 @@ import * as Joi from 'joi';
     BannersModule,
     SearchModule,
     AdminModule,
+    AdminUIModule,
     SupportModule,
     DineInModule,
     TaxesModule,

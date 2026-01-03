@@ -11,7 +11,9 @@ export class AppleStrategy extends PassportStrategy(Strategy, 'apple') {
       teamID: configService.get<string>('APPLE_TEAM_ID') || '',
       keyID: configService.get<string>('APPLE_KEY_ID') || '',
       privateKeyString: configService.get<string>('APPLE_PRIVATE_KEY') || '',
-      callbackURL: configService.get<string>('APPLE_CALLBACK_URL') || '/auth/apple/callback',
+      callbackURL:
+        configService.get<string>('APPLE_CALLBACK_URL') ||
+        '/auth/apple/callback',
       scope: ['name', 'email'],
     });
   }
@@ -37,4 +39,3 @@ export class AppleStrategy extends PassportStrategy(Strategy, 'apple') {
     done(null, user);
   }
 }
-

@@ -10,7 +10,7 @@ import {
   IsNumber,
   IsOptional,
   IsString,
-  ValidateNested
+  ValidateNested,
 } from 'class-validator';
 import { AddressDto } from './address.dto';
 import { OrderItemDto } from './order-item.dto';
@@ -36,7 +36,6 @@ export class CreateOrderDto {
 
   @ApiProperty()
   @IsNotEmpty()
-
   @IsEnum(PaymentMethod)
   paymentMethod: PaymentMethod;
 
@@ -75,4 +74,3 @@ export class CreateOrderDto {
   @IsDateString()
   scheduleTime?: string;
 }
-

@@ -34,10 +34,13 @@ export class PaymentController {
       },
     });
 
-    const settingsMap = settings.reduce((acc, curr) => {
-      acc[curr.key] = curr.value;
-      return acc;
-    }, {} as Record<string, string>);
+    const settingsMap = settings.reduce(
+      (acc, curr) => {
+        acc[curr.key] = curr.value;
+        return acc;
+      },
+      {} as Record<string, string>,
+    );
 
     return {
       stripe: {
@@ -77,4 +80,3 @@ export class PaymentController {
     );
   }
 }
-

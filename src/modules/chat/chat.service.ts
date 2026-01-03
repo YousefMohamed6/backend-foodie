@@ -8,7 +8,7 @@ import { CreateChannelDto, SendMessageDto } from './dto/chat.dto';
 
 @Injectable()
 export class ChatService {
-  constructor(private prisma: PrismaService) { }
+  constructor(private prisma: PrismaService) {}
 
   async getChannels(userId: string) {
     return this.prisma.chatChannel.findMany({

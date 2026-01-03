@@ -25,7 +25,7 @@ export class AdminController {
   constructor(
     private readonly driversService: DriversService,
     private readonly usersService: UsersService,
-  ) { }
+  ) {}
 
   @Get('drivers')
   @ApiOperation({ summary: 'Get all drivers for admin' })

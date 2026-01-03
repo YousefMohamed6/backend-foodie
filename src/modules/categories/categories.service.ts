@@ -14,7 +14,7 @@ export class CategoriesService {
   constructor(
     private prisma: PrismaService,
     private vendorsService: VendorsService,
-  ) { }
+  ) {}
 
   async create(createCategoryDto: CreateCategoryDto, user: User) {
     let vendorId = createCategoryDto.vendorId;
@@ -33,9 +33,9 @@ export class CategoriesService {
     // Normalize reviewAttributes to IDs
     let attributeIds: string[] = [];
     if (reviewAttributes && Array.isArray(reviewAttributes)) {
-      attributeIds = reviewAttributes.map((attr) =>
-        typeof attr === 'string' ? attr : attr.id
-      ).filter(Boolean);
+      attributeIds = reviewAttributes
+        .map((attr) => (typeof attr === 'string' ? attr : attr.id))
+        .filter(Boolean);
     }
 
     return this.prisma.category.create({
@@ -44,9 +44,12 @@ export class CategoriesService {
         isActive: rest.isActive ?? true,
         showOnHome: rest.showOnHome ?? false,
         vendorId,
-        reviewAttributes: attributeIds.length > 0 ? {
-          connect: attributeIds.map((id) => ({ id })),
-        } : undefined,
+        reviewAttributes:
+          attributeIds.length > 0
+            ? {
+                connect: attributeIds.map((id) => ({ id })),
+              }
+            : undefined,
       },
       include: {
         products: true,
@@ -55,7 +58,11 @@ export class CategoriesService {
     });
   }
 
-  findAll(query: { vendorId?: string; home?: string | boolean; showInHomepage?: string | boolean }) {
+  findAll(query: {
+    vendorId?: string;
+    home?: string | boolean;
+    showInHomepage?: string | boolean;
+  }) {
     const where: Prisma.CategoryWhereInput = {};
     if (query.vendorId) {
       where.vendorId = query.vendorId;
@@ -65,7 +72,8 @@ export class CategoriesService {
       where.showOnHome = query.home === 'true' || query.home === true;
     }
     if (query.showInHomepage !== undefined) {
-      where.showOnHome = query.showInHomepage === 'true' || query.showInHomepage === true;
+      where.showOnHome =
+        query.showInHomepage === 'true' || query.showInHomepage === true;
     }
     return this.prisma.category.findMany({
       where,
@@ -81,7 +89,7 @@ export class CategoriesService {
       where: { id },
       include: {
         products: true,
-        reviewAttributes: true
+        reviewAttributes: true,
       },
     });
     if (!category) {
@@ -104,18 +112,20 @@ export class CategoriesService {
 
     let attributeIds: string[] = [];
     if (reviewAttributes && Array.isArray(reviewAttributes)) {
-      attributeIds = reviewAttributes.map((attr) =>
-        typeof attr === 'string' ? attr : attr.id
-      ).filter(Boolean);
+      attributeIds = reviewAttributes
+        .map((attr) => (typeof attr === 'string' ? attr : attr.id))
+        .filter(Boolean);
     }
 
     return this.prisma.category.update({
       where: { id },
       data: {
         ...rest,
-        reviewAttributes: reviewAttributes ? {
-          set: attributeIds.map((id) => ({ id })),
-        } : undefined,
+        reviewAttributes: reviewAttributes
+          ? {
+              set: attributeIds.map((id) => ({ id })),
+            }
+          : undefined,
       },
       include: {
         products: true,

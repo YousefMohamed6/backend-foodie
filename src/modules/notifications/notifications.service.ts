@@ -4,7 +4,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 
 @Injectable()
 export class NotificationsService {
-  constructor(private prisma: PrismaService) { }
+  constructor(private prisma: PrismaService) {}
 
   async findAll(userId: string, type?: string) {
     const where: Prisma.NotificationWhereInput = { userId };
@@ -84,7 +84,10 @@ export class NotificationsService {
     });
 
     if (template) {
-      const value = JSON.parse(template.value || '{}') as { subject?: string; message?: string };
+      const value = JSON.parse(template.value || '{}') as {
+        subject?: string;
+        message?: string;
+      };
       return {
         id: template.key,
         type,

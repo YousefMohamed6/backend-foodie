@@ -10,7 +10,7 @@ export class EmailService {
 
   constructor(private configService: ConfigService) {
     const emailConfig = this.configService.get('email');
-    
+
     if (emailConfig?.smtpUser && emailConfig?.smtpPassword) {
       this.transporter = nodemailer.createTransport({
         host: emailConfig.smtpHost,
@@ -22,7 +22,9 @@ export class EmailService {
         },
       });
     } else {
-      this.logger.warn('Email service not configured. Emails will be logged to console.');
+      this.logger.warn(
+        'Email service not configured. Emails will be logged to console.',
+      );
     }
   }
 
@@ -33,7 +35,7 @@ export class EmailService {
     text?: string,
   ): Promise<void> {
     const emailConfig = this.configService.get('email');
-    
+
     if (!this.transporter) {
       this.logger.log(`[Email] To: ${to}, Subject: ${subject}`);
       this.logger.log(`[Email] Body: ${text || html}`);
@@ -58,7 +60,7 @@ export class EmailService {
   async sendPasswordReset(email: string, resetToken: string): Promise<void> {
     const appUrl = this.configService.get('app.url') || 'http://localhost:3000';
     const resetUrl = `${appUrl}/reset-password?token=${resetToken}`;
-    
+
     const html = `
       <h2>Password Reset Request</h2>
       <p>Click the link below to reset your password:</p>
@@ -102,4 +104,3 @@ export class EmailService {
     await this.sendEmail(email, 'Order Confirmation', html);
   }
 }
-

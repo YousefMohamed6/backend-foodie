@@ -1,6 +1,10 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { S3Client, PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
+import {
+  S3Client,
+  PutObjectCommand,
+  DeleteObjectCommand,
+} from '@aws-sdk/client-s3';
 import sharp from 'sharp';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -117,7 +121,10 @@ export class FileStorageService {
     }
   }
 
-  private async uploadToS3(file: Express.Multer.File, fileName: string): Promise<string> {
+  private async uploadToS3(
+    file: Express.Multer.File,
+    fileName: string,
+  ): Promise<string> {
     if (!this.s3Client || !this.bucketName) {
       throw new Error('S3 not configured');
     }
@@ -139,7 +146,10 @@ export class FileStorageService {
     }
   }
 
-  private async uploadToLocal(file: Express.Multer.File, fileName: string): Promise<string> {
+  private async uploadToLocal(
+    file: Express.Multer.File,
+    fileName: string,
+  ): Promise<string> {
     const uploadDir = path.join(process.cwd(), this.uploadDir);
     const filePath = path.join(uploadDir, fileName);
 
@@ -158,7 +168,10 @@ export class FileStorageService {
   private async generateVideoThumbnail(videoBuffer: Buffer): Promise<Buffer> {
     // Save video buffer to temp file
     const tempVideoPath = path.join(process.cwd(), `temp-${Date.now()}.mp4`);
-    const tempThumbPath = path.join(process.cwd(), `temp-thumb-${Date.now()}.jpg`);
+    const tempThumbPath = path.join(
+      process.cwd(),
+      `temp-thumb-${Date.now()}.jpg`,
+    );
 
     try {
       fs.writeFileSync(tempVideoPath, videoBuffer);
@@ -210,4 +223,3 @@ export class FileStorageService {
     }
   }
 }
-

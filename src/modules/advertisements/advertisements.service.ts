@@ -5,7 +5,7 @@ import { UpdateAdvertisementDto } from './dto/update-advertisement.dto';
 
 @Injectable()
 export class AdvertisementsService {
-  constructor(private prisma: PrismaService) { }
+  constructor(private prisma: PrismaService) {}
 
   async findAll() {
     return this.prisma.advertisement.findMany({ where: { isActive: true } });

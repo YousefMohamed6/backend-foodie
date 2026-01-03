@@ -99,8 +99,10 @@ export class PaymentService {
     paymentGateway: string,
     transactionId: string,
   ): Promise<PaymentResult> {
-    this.logger.log(`Verifying payment: ${transactionId} via ${paymentGateway}`);
-    
+    this.logger.log(
+      `Verifying payment: ${transactionId} via ${paymentGateway}`,
+    );
+
     // TODO: Implement payment verification for each gateway
     return {
       success: false,
@@ -116,8 +118,10 @@ export class PaymentService {
     transactionId: string,
     amount?: number,
   ): Promise<PaymentResult> {
-    this.logger.log(`Refunding payment: ${transactionId} via ${paymentGateway}`);
-    
+    this.logger.log(
+      `Refunding payment: ${transactionId} via ${paymentGateway}`,
+    );
+
     // TODO: Implement payment refund for each gateway
     return {
       success: false,
@@ -125,4 +129,3 @@ export class PaymentService {
     };
   }
 }
-

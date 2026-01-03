@@ -21,7 +21,7 @@ export class ProductsService {
     private prisma: PrismaService,
     @Inject(forwardRef(() => VendorsService))
     private vendorsService: VendorsService,
-  ) { }
+  ) {}
 
   async create(createProductDto: CreateProductDto, user: User) {
     const vendor = await this.vendorsService.findByAuthor(user.id);
@@ -47,11 +47,17 @@ export class ProductsService {
     return this.mapProductResponse(product);
   }
 
-  async findAll(query: { vendorId?: string; categoryId?: string; publish?: string | boolean; foodType?: string }) {
+  async findAll(query: {
+    vendorId?: string;
+    categoryId?: string;
+    publish?: string | boolean;
+    foodType?: string;
+  }) {
     const where: Prisma.ProductWhereInput = {};
     if (query.vendorId) where.vendorId = query.vendorId;
     if (query.categoryId) where.categoryId = query.categoryId;
-    if (query.publish !== undefined) where.isActive = query.publish === 'true' || query.publish === true;
+    if (query.publish !== undefined)
+      where.isActive = query.publish === 'true' || query.publish === true;
 
     // Filter by food type (TakeAway or DineIn)
     if (query.foodType) {
@@ -109,16 +115,17 @@ export class ProductsService {
         ...updateData,
         extras: extras
           ? {
-            deleteMany: {},
-            create: extras,
-          }
+              deleteMany: {},
+              create: extras,
+            }
           : undefined,
-        itemAttributes: itemAttributes !== undefined
-          ? {
-            deleteMany: {},
-            create: attributeData || [],
-          }
-          : undefined,
+        itemAttributes:
+          itemAttributes !== undefined
+            ? {
+                deleteMany: {},
+                create: attributeData || [],
+              }
+            : undefined,
       },
       include: { extras: true, itemAttributes: true },
     });
@@ -155,21 +162,29 @@ export class ProductsService {
     return products.map((p) => this.mapProductResponse(p));
   }
 
-  private parseItemAttributes(attrString?: string): { key: string; value: string }[] | null {
+  private parseItemAttributes(
+    attrString?: string,
+  ): { key: string; value: string }[] | null {
     if (!attrString) return null;
     try {
       // Try parsing as JSON array
       const parsed = JSON.parse(attrString);
       if (Array.isArray(parsed)) return parsed;
       if (typeof parsed === 'object') {
-        return Object.entries(parsed).map(([key, value]) => ({ key, value: String(value) }));
+        return Object.entries(parsed).map(([key, value]) => ({
+          key,
+          value: String(value),
+        }));
       }
     } catch {
       // Fallback: split by comma if it looks like key:value
-      return attrString.split(',').map((pair) => {
-        const [key, value] = pair.split(':');
-        return { key: key?.trim(), value: value?.trim() || '' };
-      }).filter(p => p.key);
+      return attrString
+        .split(',')
+        .map((pair) => {
+          const [key, value] = pair.split(':');
+          return { key: key?.trim(), value: value?.trim() || '' };
+        })
+        .filter((p) => p.key);
     }
     return [{ key: 'label', value: attrString }];
   }
@@ -186,7 +201,10 @@ export class ProductsService {
 
     return {
       ...rest,
-      itemAttributes: Object.keys(attributesObj).length > 0 ? JSON.stringify(attributesObj) : null,
+      itemAttributes:
+        Object.keys(attributesObj).length > 0
+          ? JSON.stringify(attributesObj)
+          : null,
     };
   }
 }

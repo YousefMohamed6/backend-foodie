@@ -23,15 +23,17 @@ export class RateLimitMiddleware implements NestMiddleware {
         });
       }
 
-      await this.redisService.set(
-        key,
-        (currentCount + 1).toString(),
-        window,
-      );
+      await this.redisService.set(key, (currentCount + 1).toString(), window);
 
       res.setHeader('X-RateLimit-Limit', limit.toString());
-      res.setHeader('X-RateLimit-Remaining', (limit - currentCount - 1).toString());
-      res.setHeader('X-RateLimit-Reset', (Date.now() + window * 1000).toString());
+      res.setHeader(
+        'X-RateLimit-Remaining',
+        (limit - currentCount - 1).toString(),
+      );
+      res.setHeader(
+        'X-RateLimit-Reset',
+        (Date.now() + window * 1000).toString(),
+      );
 
       next();
     } catch (error) {
@@ -40,4 +42,3 @@ export class RateLimitMiddleware implements NestMiddleware {
     }
   }
 }
-

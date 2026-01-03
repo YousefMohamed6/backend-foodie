@@ -9,7 +9,7 @@ export class FcmService {
 
   constructor(private configService: ConfigService) {
     const fcmConfig = this.configService.get('fcm');
-    
+
     if (fcmConfig?.serviceAccount) {
       try {
         if (!admin.apps.length) {
@@ -24,7 +24,9 @@ export class FcmService {
         this.logger.error('Failed to initialize Firebase Admin SDK:', error);
       }
     } else {
-      this.logger.warn('FCM service not configured. Push notifications will be logged to console.');
+      this.logger.warn(
+        'FCM service not configured. Push notifications will be logged to console.',
+      );
     }
   }
 
@@ -35,7 +37,9 @@ export class FcmService {
     data?: Record<string, any>,
   ): Promise<void> {
     if (!this.firebaseAdmin) {
-      this.logger.log(`[FCM] Token: ${fcmToken}, Title: ${title}, Body: ${body}`);
+      this.logger.log(
+        `[FCM] Token: ${fcmToken}, Title: ${title}, Body: ${body}`,
+      );
       return;
     }
 
@@ -46,9 +50,11 @@ export class FcmService {
           title,
           body,
         },
-        data: data ? Object.fromEntries(
-          Object.entries(data).map(([k, v]) => [k, String(v)])
-        ) : {},
+        data: data
+          ? Object.fromEntries(
+              Object.entries(data).map(([k, v]) => [k, String(v)]),
+            )
+          : {},
         android: {
           priority: 'high',
         },
@@ -63,10 +69,12 @@ export class FcmService {
       this.logger.log(`Push notification sent successfully to ${fcmToken}`);
     } catch (error: any) {
       this.logger.error(`Failed to send FCM notification:`, error);
-      
+
       // Handle invalid tokens
-      if (error.code === 'messaging/invalid-registration-token' ||
-          error.code === 'messaging/registration-token-not-registered') {
+      if (
+        error.code === 'messaging/invalid-registration-token' ||
+        error.code === 'messaging/registration-token-not-registered'
+      ) {
         this.logger.warn(`Invalid FCM token: ${fcmToken}`);
         // Token should be removed from database
       }
@@ -80,7 +88,9 @@ export class FcmService {
     data?: Record<string, any>,
   ): Promise<admin.messaging.BatchResponse | null> {
     if (!this.firebaseAdmin) {
-      this.logger.log(`[FCM Multicast] Tokens: ${fcmTokens.length}, Title: ${title}, Body: ${body}`);
+      this.logger.log(
+        `[FCM Multicast] Tokens: ${fcmTokens.length}, Title: ${title}, Body: ${body}`,
+      );
       return null;
     }
 
@@ -90,9 +100,11 @@ export class FcmService {
         title,
         body,
       },
-      data: data ? Object.fromEntries(
-        Object.entries(data).map(([k, v]) => [k, String(v)])
-      ) : {},
+      data: data
+        ? Object.fromEntries(
+            Object.entries(data).map(([k, v]) => [k, String(v)]),
+          )
+        : {},
       android: {
         priority: 'high',
       },
@@ -105,7 +117,9 @@ export class FcmService {
 
     try {
       const response = await admin.messaging().sendEachForMulticast(message);
-      this.logger.log(`Multicast notification sent. Success: ${response.successCount}, Failed: ${response.failureCount}`);
+      this.logger.log(
+        `Multicast notification sent. Success: ${response.successCount}, Failed: ${response.failureCount}`,
+      );
       return response;
     } catch (error) {
       this.logger.error('Failed to send multicast notification:', error);
@@ -115,7 +129,9 @@ export class FcmService {
 
   async subscribeToTopic(tokens: string[], topic: string): Promise<void> {
     if (!this.firebaseAdmin) {
-      this.logger.log(`[FCM] Subscribe ${tokens.length} tokens to topic: ${topic}`);
+      this.logger.log(
+        `[FCM] Subscribe ${tokens.length} tokens to topic: ${topic}`,
+      );
       return;
     }
 
@@ -134,7 +150,9 @@ export class FcmService {
     data?: Record<string, any>,
   ): Promise<void> {
     if (!this.firebaseAdmin) {
-      this.logger.log(`[FCM Topic] Topic: ${topic}, Title: ${title}, Body: ${body}`);
+      this.logger.log(
+        `[FCM Topic] Topic: ${topic}, Title: ${title}, Body: ${body}`,
+      );
       return;
     }
 
@@ -144,9 +162,11 @@ export class FcmService {
         title,
         body,
       },
-      data: data ? Object.fromEntries(
-        Object.entries(data).map(([k, v]) => [k, String(v)])
-      ) : {},
+      data: data
+        ? Object.fromEntries(
+            Object.entries(data).map(([k, v]) => [k, String(v)]),
+          )
+        : {},
     };
 
     try {
@@ -157,4 +177,3 @@ export class FcmService {
     }
   }
 }
-

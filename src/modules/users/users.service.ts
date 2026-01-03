@@ -11,7 +11,7 @@ export class UsersService {
   constructor(
     private prisma: PrismaService,
     private redisService: RedisService,
-  ) { }
+  ) {}
 
   async create(createUserDto: CreateUserDto) {
     const hashedPassword = await bcrypt.hash(createUserDto.password, 10);
@@ -20,8 +20,14 @@ export class UsersService {
         ...createUserDto,
         password: hashedPassword,
         role: createUserDto.role || UserRole.CUSTOMER,
-        customerProfile: (createUserDto.role === UserRole.CUSTOMER || !createUserDto.role) ? { create: {} } : undefined,
-        driverProfile: createUserDto.role === UserRole.DRIVER ? { create: { status: DriverStatus.OFFLINE } } : undefined,
+        customerProfile:
+          createUserDto.role === UserRole.CUSTOMER || !createUserDto.role
+            ? { create: {} }
+            : undefined,
+        driverProfile:
+          createUserDto.role === UserRole.DRIVER
+            ? { create: { status: DriverStatus.OFFLINE } }
+            : undefined,
       },
     });
     const { password, ...result } = user;

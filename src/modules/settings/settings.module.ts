@@ -8,11 +8,7 @@ import { SettingsService } from './settings.service';
 @Module({
   imports: [PrismaModule],
   controllers: [SettingsController],
-  providers: [
-    SettingsService,
-    SettingsSeederService,
-    SettingsGateway,
-  ],
+  providers: [SettingsService, SettingsSeederService, SettingsGateway],
   exports: [SettingsService],
 })
 export class SettingsModule {}

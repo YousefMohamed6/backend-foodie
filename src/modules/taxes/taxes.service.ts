@@ -5,7 +5,7 @@ import { CreateTaxDto } from './dto/create-tax.dto';
 
 @Injectable()
 export class TaxesService {
-  constructor(private prisma: PrismaService) { }
+  constructor(private prisma: PrismaService) {}
 
   async findAll(country?: string) {
     const where: Prisma.TaxWhereInput = { isActive: true };

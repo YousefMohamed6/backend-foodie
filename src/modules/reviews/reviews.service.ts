@@ -1,7 +1,4 @@
-import {
-  Injectable,
-  NotFoundException
-} from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma, User } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateReviewDto } from './dto/create-review.dto';
@@ -13,7 +10,7 @@ type ReviewWithRelations = Prisma.ReviewGetPayload<{
 
 @Injectable()
 export class ReviewsService {
-  constructor(private prisma: PrismaService) { }
+  constructor(private prisma: PrismaService) {}
 
   async create(createReviewDto: CreateReviewDto, user: User) {
     const { images, reviewAttributes, ...rest } = createReviewDto;
@@ -22,9 +19,15 @@ export class ReviewsService {
     let ratingsData: { attributeId: string; rating: number }[] = [];
     if (reviewAttributes) {
       if (Array.isArray(reviewAttributes)) {
-        ratingsData = reviewAttributes.map(r => ({ attributeId: r.id || r.attributeId, rating: Number(r.rating) }));
+        ratingsData = reviewAttributes.map((r) => ({
+          attributeId: r.id || r.attributeId,
+          rating: Number(r.rating),
+        }));
       } else if (typeof reviewAttributes === 'object') {
-        ratingsData = Object.entries(reviewAttributes).map(([id, rating]) => ({ attributeId: id, rating: Number(rating) }));
+        ratingsData = Object.entries(reviewAttributes).map(([id, rating]) => ({
+          attributeId: id,
+          rating: Number(rating),
+        }));
       }
     }
 
@@ -34,12 +37,15 @@ export class ReviewsService {
         customerId: user.id,
         images: images
           ? {
-            create: images.map((url) => ({ url })),
-          }
+              create: images.map((url) => ({ url })),
+            }
           : undefined,
-        ratings: ratingsData.length > 0 ? {
-          create: ratingsData,
-        } : undefined,
+        ratings:
+          ratingsData.length > 0
+            ? {
+                create: ratingsData,
+              }
+            : undefined,
       },
       include: { images: true, ratings: true, customer: true },
     });
@@ -84,9 +90,15 @@ export class ReviewsService {
     let ratingsData: { attributeId: string; rating: number }[] = [];
     if (reviewAttributes) {
       if (Array.isArray(reviewAttributes)) {
-        ratingsData = reviewAttributes.map(r => ({ attributeId: r.id || r.attributeId, rating: Number(r.rating) }));
+        ratingsData = reviewAttributes.map((r) => ({
+          attributeId: r.id || r.attributeId,
+          rating: Number(r.rating),
+        }));
       } else if (typeof reviewAttributes === 'object') {
-        ratingsData = Object.entries(reviewAttributes).map(([id, rating]) => ({ attributeId: id, rating: Number(rating) }));
+        ratingsData = Object.entries(reviewAttributes).map(([id, rating]) => ({
+          attributeId: id,
+          rating: Number(rating),
+        }));
       }
     }
 
@@ -96,14 +108,16 @@ export class ReviewsService {
         ...rest,
         images: images
           ? {
-            deleteMany: {},
-            create: images.map((url) => ({ url })),
-          }
+              deleteMany: {},
+              create: images.map((url) => ({ url })),
+            }
           : undefined,
-        ratings: reviewAttributes ? {
-          deleteMany: {},
-          create: ratingsData,
-        } : undefined,
+        ratings: reviewAttributes
+          ? {
+              deleteMany: {},
+              create: ratingsData,
+            }
+          : undefined,
       },
       include: { images: true, ratings: true, customer: true },
     });
@@ -162,15 +176,21 @@ export class ReviewsService {
     const { images, ratings, customer, ...rest } = review;
 
     // Map ratings back to object { [attributeId]: rating }
-    const reviewAttributes = ratings?.reduce((acc, r) => {
-      acc[r.attributeId] = r.rating;
-      return acc;
-    }, {} as Record<string, number>) || {};
+    const reviewAttributes =
+      ratings?.reduce(
+        (acc, r) => {
+          acc[r.attributeId] = r.rating;
+          return acc;
+        },
+        {} as Record<string, number>,
+      ) || {};
 
     // Map relational images back to simple string array to preserve response shape
     return {
       ...rest,
-      uname: customer?.firstName ? `${customer.firstName} ${customer.lastName}` : 'Anonymous',
+      uname: customer?.firstName
+        ? `${customer.firstName} ${customer.lastName}`
+        : 'Anonymous',
       profile: customer?.profilePictureURL || null,
       images: images?.map((img) => img.url) || [],
       reviewAttributes,

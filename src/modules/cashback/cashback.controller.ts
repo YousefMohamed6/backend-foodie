@@ -25,7 +25,9 @@ export class CashbackController {
   @Get(':id/redeems')
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard)
-  @ApiOperation({ summary: 'Get user redemption history for cashback (alias for /redeemed)' })
+  @ApiOperation({
+    summary: 'Get user redemption history for cashback (alias for /redeemed)',
+  })
   getRedeemHistory(@Param('id') id: string, @Request() req) {
     return this.cashbackService.getRedeemed(id, req.user.id);
   }

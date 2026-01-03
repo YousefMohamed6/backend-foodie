@@ -4,7 +4,7 @@ import {
   IsNumber,
   IsObject,
   IsOptional,
-  IsString
+  IsString,
 } from 'class-validator';
 
 export class TopUpWalletDto {

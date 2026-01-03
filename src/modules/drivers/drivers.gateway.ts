@@ -18,14 +18,15 @@ import { DriversService } from './drivers.service';
   namespace: 'drivers',
 })
 export class DriversGateway
-  implements OnGatewayConnection, OnGatewayDisconnect {
+  implements OnGatewayConnection, OnGatewayDisconnect
+{
   @WebSocketServer()
   server: Server;
 
   constructor(
     private driversService: DriversService,
     private usersService: UsersService,
-  ) { }
+  ) {}
 
   handleConnection(client: Socket) {
     const driverId = client.handshake.query.driverId as string;
@@ -61,19 +62,20 @@ export class DriversGateway
       });
 
       // Broadcast to anyone watching this driver
-      this.server
-        .to(`driver_${data.driverId}`)
-        .emit('driverLocationUpdated', {
-          driverId: data.driverId,
-          latitude: data.latitude,
-          longitude: data.longitude,
-          rotation: data.rotation,
-          timestamp: new Date(),
-        });
+      this.server.to(`driver_${data.driverId}`).emit('driverLocationUpdated', {
+        driverId: data.driverId,
+        latitude: data.latitude,
+        longitude: data.longitude,
+        rotation: data.rotation,
+        timestamp: new Date(),
+      });
 
       return { event: 'location_updated', success: true };
     } catch (error) {
-      return { event: 'location_update_failed', error: (error as Error).message };
+      return {
+        event: 'location_update_failed',
+        error: (error as Error).message,
+      };
     }
   }
 
@@ -96,13 +98,14 @@ export class DriversGateway
   }
 
   // Method to emit driver location updates (called from service)
-  emitDriverLocationUpdate(driverId: string, location: { latitude: number; longitude: number; rotation?: number }) {
-    this.server
-      .to(`driver_${driverId}`)
-      .emit('driverLocationUpdated', {
-        driverId,
-        ...location,
-        timestamp: new Date(),
-      });
+  emitDriverLocationUpdate(
+    driverId: string,
+    location: { latitude: number; longitude: number; rotation?: number },
+  ) {
+    this.server.to(`driver_${driverId}`).emit('driverLocationUpdated', {
+      driverId,
+      ...location,
+      timestamp: new Date(),
+    });
   }
 }

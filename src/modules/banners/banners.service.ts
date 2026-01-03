@@ -5,7 +5,7 @@ import { CreateBannerDto } from './dto/create-banner.dto';
 
 @Injectable()
 export class BannersService {
-  constructor(private prisma: PrismaService) { }
+  constructor(private prisma: PrismaService) {}
 
   async findAll(position?: string) {
     const where: Prisma.BannerWhereInput = { isActive: true };

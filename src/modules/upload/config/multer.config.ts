@@ -15,7 +15,11 @@ export const multerOptions = {
     fileSize: 50 * 1024 * 1024, // 50MB
   },
   // Check the mimetypes to allow for upload
-  fileFilter: (req: Request, file: Express.Multer.File, cb: (error: Error | null, acceptFile: boolean) => void) => {
+  fileFilter: (
+    req: Request,
+    file: Express.Multer.File,
+    cb: (error: Error | null, acceptFile: boolean) => void,
+  ) => {
     if (file.mimetype.match(/\/(jpg|jpeg|png|gif|mp4|mov|avi|wmv)$/)) {
       // Allow storage of file
       cb(null, true);
@@ -33,7 +37,11 @@ export const multerOptions = {
   // Storage properties
   storage: diskStorage({
     // Destination storage path details
-    destination: (req: Request, file: Express.Multer.File, cb: (error: Error | null, destination: string) => void) => {
+    destination: (
+      req: Request,
+      file: Express.Multer.File,
+      cb: (error: Error | null, destination: string) => void,
+    ) => {
       const isVideo = file.mimetype.match(/\/(mp4|mov|avi|wmv)$/);
       const uploadPath = isVideo ? './uploads/videos' : './uploads/images';
       // Create folder if doesn't exist
@@ -43,7 +51,11 @@ export const multerOptions = {
       cb(null, uploadPath);
     },
     // File modification details
-    filename: (req: Request, file: Express.Multer.File, cb: (error: Error | null, filename: string) => void) => {
+    filename: (
+      req: Request,
+      file: Express.Multer.File,
+      cb: (error: Error | null, filename: string) => void,
+    ) => {
       // Calling the callback passing the random name generated with the original extension name
       cb(null, `${uuid()}${extname(file.originalname)}`);
     },
@@ -52,7 +64,11 @@ export const multerOptions = {
 
 export const multerImageOptions = {
   ...multerOptions,
-  fileFilter: (req: Request, file: Express.Multer.File, cb: (error: Error | null, acceptFile: boolean) => void) => {
+  fileFilter: (
+    req: Request,
+    file: Express.Multer.File,
+    cb: (error: Error | null, acceptFile: boolean) => void,
+  ) => {
     if (file.mimetype.match(/\/(jpg|jpeg|png|gif)$/)) {
       cb(null, true);
     } else {

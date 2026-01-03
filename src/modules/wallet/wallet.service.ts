@@ -1,11 +1,15 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { TransactionType, Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
-import { SetWithdrawMethodDto, TopUpWalletDto, WithdrawWalletDto } from './dto/wallet.dto';
+import {
+  SetWithdrawMethodDto,
+  TopUpWalletDto,
+  WithdrawWalletDto,
+} from './dto/wallet.dto';
 
 @Injectable()
 export class WalletService {
-  constructor(private prisma: PrismaService) { }
+  constructor(private prisma: PrismaService) {}
 
   async getBalance(userId: string) {
     const getSum = async (type: TransactionType) => {
@@ -26,7 +30,10 @@ export class WalletService {
     return deposits - withdrawals - payments;
   }
 
-  async getTransactions(userId: string, query: { limit?: string | number; page?: string | number } = {}) {
+  async getTransactions(
+    userId: string,
+    query: { limit?: string | number; page?: string | number } = {},
+  ) {
     return this.prisma.walletTransaction.findMany({
       where: { userId },
       orderBy: { createdAt: 'desc' },
@@ -106,12 +113,20 @@ export class WalletService {
     // creating the record naturally deducts it from getBalance() result.
 
     // However, if we maintain walletAmount on User:
-    await this.updateUserWallet(userId, withdrawDto.amount, 'subtract', this.prisma);
+    await this.updateUserWallet(
+      userId,
+      withdrawDto.amount,
+      'subtract',
+      this.prisma,
+    );
 
     return transaction;
   }
 
-  async getWithdrawals(userId: string, query: { limit?: string | number; page?: string | number } = {}) {
+  async getWithdrawals(
+    userId: string,
+    query: { limit?: string | number; page?: string | number } = {},
+  ) {
     return this.prisma.walletTransaction.findMany({
       where: { userId, type: TransactionType.WITHDRAWAL },
       orderBy: { createdAt: 'desc' },
@@ -120,7 +135,13 @@ export class WalletService {
     });
   }
 
-  async pay(userId: string, amount: number, description: string, orderId?: string, tx?: Prisma.TransactionClient) {
+  async pay(
+    userId: string,
+    amount: number,
+    description: string,
+    orderId?: string,
+    tx?: Prisma.TransactionClient,
+  ) {
     const prisma = tx || this.prisma;
     const balance = await this.getBalance(userId);
     if (balance < amount) {
@@ -170,10 +191,12 @@ export class WalletService {
     userId: string,
     amount: number,
     type: 'add' | 'subtract',
-    tx?: Prisma.TransactionClient
+    tx?: Prisma.TransactionClient,
   ) {
     const prisma = tx || this.prisma;
-    const profile = await prisma.customerProfile.findUnique({ where: { userId } });
+    const profile = await prisma.customerProfile.findUnique({
+      where: { userId },
+    });
     if (profile) {
       const current = profile.walletAmount.toNumber();
       const newBalance = type === 'add' ? current + amount : current - amount;

@@ -1,4 +1,9 @@
-import { Injectable, Logger, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  OnModuleInit,
+  OnModuleDestroy,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { createClient, RedisClientType } from 'redis';
 
@@ -24,12 +29,9 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
       // Pub/Sub clients for WebSocket adapter
       this.pubClient = createClient({ url: redisUrl }) as RedisClientType;
       this.subClient = this.pubClient.duplicate() as RedisClientType;
-      
-      await Promise.all([
-        this.pubClient.connect(),
-        this.subClient.connect(),
-      ]);
-      
+
+      await Promise.all([this.pubClient.connect(), this.subClient.connect()]);
+
       this.logger.log('Redis pub/sub clients connected');
     } catch (error) {
       this.logger.error('Failed to connect to Redis:', error);
@@ -104,4 +106,3 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
     }
   }
 }
-

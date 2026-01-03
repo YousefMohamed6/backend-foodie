@@ -6,12 +6,13 @@ import { UpdateZoneDto } from './dto/update-zone.dto';
 
 @Injectable()
 export class ZonesService {
-  constructor(private prisma: PrismaService) { }
+  constructor(private prisma: PrismaService) {}
 
   create(createZoneDto: CreateZoneDto) {
     const data: Prisma.ZoneCreateInput = {
       ...createZoneDto,
-      coordinates: createZoneDto.coordinates as unknown as Prisma.InputJsonValue,
+      coordinates:
+        createZoneDto.coordinates as unknown as Prisma.InputJsonValue,
     };
     return this.prisma.zone.create({
       data,
@@ -34,7 +35,9 @@ export class ZonesService {
     await this.findOne(id);
     const data: Prisma.ZoneUpdateInput = {
       ...updateZoneDto,
-      coordinates: updateZoneDto.coordinates ? (updateZoneDto.coordinates as unknown as Prisma.InputJsonValue) : undefined,
+      coordinates: updateZoneDto.coordinates
+        ? (updateZoneDto.coordinates as unknown as Prisma.InputJsonValue)
+        : undefined,
     };
     return this.prisma.zone.update({
       where: { id },

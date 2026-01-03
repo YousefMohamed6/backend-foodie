@@ -14,7 +14,11 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
-import { SetWithdrawMethodDto, TopUpWalletDto, WithdrawWalletDto } from './dto/wallet.dto';
+import {
+  SetWithdrawMethodDto,
+  TopUpWalletDto,
+  WithdrawWalletDto,
+} from './dto/wallet.dto';
 import { WalletService } from './wallet.service';
 
 @ApiTags('Wallet')
@@ -22,7 +26,7 @@ import { WalletService } from './wallet.service';
 @UseGuards(JwtAuthGuard)
 @Controller('wallet')
 export class WalletController {
-  constructor(private readonly walletService: WalletService) { }
+  constructor(private readonly walletService: WalletService) {}
 
   @Get('balance')
   @ApiOperation({ summary: 'Get wallet balance' })

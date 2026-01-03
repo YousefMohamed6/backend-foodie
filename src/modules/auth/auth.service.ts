@@ -35,7 +35,7 @@ export class AuthService {
     private prisma: PrismaService,
     private googleAuthService: GoogleAuthService,
     private appleAuthService: AppleAuthService,
-  ) { }
+  ) {}
 
   async register(
     registerDto: RegisterDto,
@@ -74,10 +74,13 @@ export class AuthService {
   ) {
     // Correct approach: use UsersService to find by email + bcrypt check
     const validUser = await this.usersService.findByEmail(loginDto.email);
-    if (!validUser || !(await bcrypt.compare(loginDto.password, validUser.password))) {
+    if (
+      !validUser ||
+      !(await bcrypt.compare(loginDto.password, validUser.password))
+    ) {
       throw new UnauthorizedException('Invalid credentials');
     }
-    
+
     // Ensure active
     if (!validUser.isActive) {
       throw new UnauthorizedException('User is inactive');
@@ -120,7 +123,8 @@ export class AuthService {
     }
 
     // Step 2: Find or create user with VERIFIED email
-    let user: User | Omit<User, 'password'> | null = await this.usersService.findByEmail(email);
+    let user: User | Omit<User, 'password'> | null =
+      await this.usersService.findByEmail(email);
 
     if (!user) {
       // Create new user with verified data
@@ -132,7 +136,9 @@ export class AuthService {
         provider: socialLoginDto.provider,
       } as any);
 
-      this.logger.log(`New user created via ${socialLoginDto.provider}: ${email}`);
+      this.logger.log(
+        `New user created via ${socialLoginDto.provider}: ${email}`,
+      );
     } else {
       // Update name if provided (useful for Apple's first login)
       if (firstName || lastName) {
@@ -274,11 +280,14 @@ export class AuthService {
     const [accessToken, refreshToken] = await Promise.all([
       this.jwtService.signAsync(payload, {
         secret: this.configService.get<string>('app.jwtSecret'),
-        expiresIn: (this.configService.get<string>('app.jwtExpiration') || '15m') as any,
+        expiresIn: (this.configService.get<string>('app.jwtExpiration') ||
+          '15m') as any,
       }),
       this.jwtService.signAsync(payload, {
         secret: this.configService.get<string>('app.jwtRefreshSecret'),
-        expiresIn: (this.configService.get<string>('app.jwtRefreshExpiration') || '7d') as any,
+        expiresIn: (this.configService.get<string>(
+          'app.jwtRefreshExpiration',
+        ) || '7d') as any,
       }),
     ]);
 

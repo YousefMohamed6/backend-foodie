@@ -4,7 +4,7 @@ import { CreateCashbackDto } from './dto/create-cashback.dto';
 
 @Injectable()
 export class CashbackService {
-  constructor(private prisma: PrismaService) { }
+  constructor(private prisma: PrismaService) {}
 
   async findAll() {
     return this.prisma.cashback.findMany({ where: { isActive: true } });

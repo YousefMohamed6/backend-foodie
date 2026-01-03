@@ -67,7 +67,12 @@ export class GeolocationService {
       return vendors;
     } catch (error) {
       // Fallback to Haversine if PostGIS not available
-      return this.getNearestVendorsFallback(latitude, longitude, radius, isDining);
+      return this.getNearestVendorsFallback(
+        latitude,
+        longitude,
+        radius,
+        isDining,
+      );
     }
   }
 
@@ -124,7 +129,7 @@ export class GeolocationService {
           )
         LIMIT 1
       `;
-      
+
       const zone = zones?.[0];
       if (!zone) {
         // Fallback: find nearest zone
@@ -132,7 +137,7 @@ export class GeolocationService {
         if (!nearestZone) {
           return [];
         }
-        
+
         // Get taxes for the zone's country or default
         const taxes = await this.prisma.tax.findMany({
           where: {
@@ -220,4 +225,3 @@ export class GeolocationService {
     return Math.round(charge * 100) / 100; // Round to 2 decimal places
   }
 }
-

@@ -18,7 +18,7 @@ export class DriversService {
     private prisma: PrismaService,
     @Inject(forwardRef(() => OrdersService))
     private ordersService: OrdersService,
-  ) { }
+  ) {}
 
   async create(createDriverDto: CreateDriverDto, userId: string) {
     const existingDriver = await this.prisma.driverProfile.findUnique({
@@ -143,10 +143,7 @@ export class DriversService {
     });
   }
 
-  async uploadDocument(
-    userId: string,
-    data: UploadDriverDocumentDto,
-  ) {
+  async uploadDocument(userId: string, data: UploadDriverDocumentDto) {
     const driver = await this.findByUser(userId);
     if (!driver) {
       throw new NotFoundException('Driver profile not found');

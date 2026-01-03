@@ -7,4 +7,3 @@ import { SharedModule } from '../../shared/shared.module';
   controllers: [DeliveryController],
 })
 export class DeliveryModule {}
-

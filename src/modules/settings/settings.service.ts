@@ -11,10 +11,13 @@ export class SettingsService {
 
   async findAll() {
     const settings = await this.prisma.setting.findMany();
-    return settings.reduce((acc, curr) => {
-      acc[curr.key] = curr.value;
-      return acc;
-    }, {} as Record<string, string>);
+    return settings.reduce(
+      (acc, curr) => {
+        acc[curr.key] = curr.value;
+        return acc;
+      },
+      {} as Record<string, string>,
+    );
   }
 
   async findOne(key: string) {
@@ -31,10 +34,10 @@ export class SettingsService {
       update: { value },
       create: { key, value },
     });
-    
+
     // Emit real-time update
     this.settingsGateway.emitSettingsUpdate({ [key]: value });
-    
+
     return setting;
   }
 
@@ -44,10 +47,10 @@ export class SettingsService {
     );
     await Promise.all(promises);
     const allSettings = await this.findAll();
-    
+
     // Emit all settings update
     this.settingsGateway.emitSettingsUpdate(allSettings);
-    
+
     return allSettings;
   }
 }

@@ -44,7 +44,12 @@ export class CategoriesController {
   @Get()
   @ApiOperation({ summary: 'Get all categories' })
   @ApiQuery({ name: 'vendorId', required: false })
-  @ApiQuery({ name: 'showInHomepage', required: false, type: Boolean, description: 'Filter categories shown on homepage' })
+  @ApiQuery({
+    name: 'showInHomepage',
+    required: false,
+    type: Boolean,
+    description: 'Filter categories shown on homepage',
+  })
   findAll(@Query() query: { vendorId?: string; showInHomepage?: boolean }) {
     return this.categoriesService.findAll(query);
   }

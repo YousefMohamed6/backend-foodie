@@ -34,7 +34,9 @@ export class GiftCardsController {
   @Get('my-cards')
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard)
-  @ApiOperation({ summary: 'Get user purchased gift cards (alias for history)' })
+  @ApiOperation({
+    summary: 'Get user purchased gift cards (alias for history)',
+  })
   getMyCards(@Request() req) {
     return this.giftCardsService.getMyCards(req.user.id);
   }

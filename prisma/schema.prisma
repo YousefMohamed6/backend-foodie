@@ -23,6 +23,13 @@ enum PaymentMethod {
   online
 }
 
+enum OnboardingType {
+  driverApp
+  customerApp
+  vendorApp
+  mangerApp
+}
+
 enum OrderStatus {
   PLACED         @map("Order Placed")
   ACCEPTED       @map("Order Accepted")
@@ -101,6 +108,9 @@ model CustomerProfile {
   user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   walletAmount Decimal   @default(0) @map("wallet_amount") @db.Decimal(10, 2)
   addresses    Address[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@map("customer_profiles")
 }
@@ -206,6 +216,9 @@ model VendorSchedule {
   closeTime String  @map("close_time")
   isActive  Boolean @default(true) @map("is_active")
 
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
   @@map("vendor_schedules")
 }
 
@@ -216,6 +229,9 @@ model VendorCommission {
   amount   Decimal @map("commission_amount") @db.Decimal(10, 2)
   type     String  @default("percentage") // "fixed" or "percentage"
 
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
   @@map("vendor_commissions")
 }
 
@@ -225,6 +241,9 @@ model VendorPhoto {
   vendorId String
   vendor   Vendor @relation(fields: [vendorId], references: [id], onDelete: Cascade)
 
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
   @@map("vendor_photos")
 }
 
@@ -233,6 +252,9 @@ model VendorMenuPhoto {
   url      String @map("photo")
   vendorId String
   vendor   Vendor @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@map("vendor_menu_photos")
 }
@@ -280,6 +302,9 @@ model ProductExtra {
   productId String
   product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
 
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
   @@map("product_extras")
 }
 
@@ -289,6 +314,9 @@ model ProductAttribute {
   product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
   key       String
   value     String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([productId])
   @@map("product_attributes")
@@ -379,6 +407,7 @@ model OrderItem {
   extras    OrderItemExtra[]
 
   createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([orderId])
   @@index([productId])
@@ -391,6 +420,9 @@ model OrderItemExtra {
   price       Decimal   @db.Decimal(10, 2)
   orderItemId String
   orderItem   OrderItem @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@map("order_item_extras")
 }
@@ -520,6 +552,7 @@ model CashbackRedeem {
   redeemedAmount Decimal  @db.Decimal(10, 2)
 
   createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@map("cashback_redeems")
 }
@@ -551,6 +584,7 @@ model WalletTransaction {
   referenceId     String?
   metadata        Json?
   createdAt       DateTime @default(now()) @map("date")
+  updatedAt       DateTime @updatedAt
 
   @@map("wallet_transactions")
 }
@@ -609,6 +643,7 @@ model Review {
   images   ReviewImage[]
 
   createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@map("reviews")
 }
@@ -620,6 +655,7 @@ model ReviewImage {
   review   Review @relation(fields: [reviewId], references: [id], onDelete: Cascade)
 
   createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@map("review_images")
 }
@@ -679,6 +715,7 @@ model ChatMessage {
   orderId     String?
   isRead      Boolean     @default(false) @map("seen")
   createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
 
   @@map("chat_messages")
 }
@@ -693,6 +730,7 @@ model Notification {
   metadata  Json?
   isRead    Boolean  @default(false)
   createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@map("notifications")
 }
@@ -748,6 +786,7 @@ model FavoriteVendor {
   vendorId  String
   vendor    Vendor   @relation(fields: [vendorId], references: [id])
   createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@unique([userId, vendorId])
   @@map("favorite_vendors")
@@ -760,6 +799,7 @@ model FavoriteProduct {
   productId String
   product   Product  @relation(fields: [productId], references: [id])
   createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@unique([userId, productId])
   @@map("favorite_products")
@@ -793,6 +833,7 @@ model Setting {
   key       String   @id
   value     String   @db.Text
   updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now())
 
   @@map("settings")
 }
@@ -899,6 +940,7 @@ model OnBoarding {
   title       String
   description String   @db.Text
   image       String
+  type        OnboardingType @default(customerApp)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -948,6 +990,9 @@ model ReviewRating {
 
   attributeId String
   attribute   ReviewAttribute @relation(fields: [attributeId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@map("review_ratings")
 }

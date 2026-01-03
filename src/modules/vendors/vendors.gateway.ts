@@ -18,15 +18,16 @@ import { Vendor } from '@prisma/client';
   namespace: 'vendors',
 })
 export class VendorsGateway
-  implements OnGatewayConnection, OnGatewayDisconnect {
+  implements OnGatewayConnection, OnGatewayDisconnect
+{
   @WebSocketServer()
   server: Server;
 
-  constructor(private readonly vendorsService: VendorsService) { }
+  constructor(private readonly vendorsService: VendorsService) {}
 
-  handleConnection(client: Socket) { }
+  handleConnection(client: Socket) {}
 
-  handleDisconnect(client: Socket) { }
+  handleDisconnect(client: Socket) {}
 
   @SubscribeMessage('requestNearbyVendors')
   async handleRequestNearbyVendors(

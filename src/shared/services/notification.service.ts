@@ -38,11 +38,7 @@ export class NotificationService {
     }
   }
 
-  async sendEmail(
-    userId: string,
-    template: string,
-    data: any,
-  ): Promise<void> {
+  async sendEmail(userId: string, template: string, data: any): Promise<void> {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
       select: { email: true },
@@ -99,4 +95,3 @@ export class NotificationService {
     await this.sendPushToUser(userId, title, body, metadata);
   }
 }
-

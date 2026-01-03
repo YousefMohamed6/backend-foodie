@@ -13,7 +13,8 @@ import { Server, Socket } from 'socket.io';
   namespace: 'settings',
 })
 export class SettingsGateway
-  implements OnGatewayConnection, OnGatewayDisconnect {
+  implements OnGatewayConnection, OnGatewayDisconnect
+{
   @WebSocketServer()
   server: Server;
 
@@ -21,7 +22,7 @@ export class SettingsGateway
     client.join('global_settings');
   }
 
-  handleDisconnect(client: Socket) { }
+  handleDisconnect(client: Socket) {}
 
   emitSettingsUpdate(settings: Record<string, any>) {
     this.server.to('global_settings').emit('settingsUpdated', settings);

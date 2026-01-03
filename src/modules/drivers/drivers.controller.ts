@@ -24,7 +24,7 @@ import { UploadDriverDocumentDto } from './dto/upload-driver-document.dto';
 @ApiBearerAuth()
 @Controller('drivers')
 export class DriversController {
-  constructor(private readonly driversService: DriversService) { }
+  constructor(private readonly driversService: DriversService) {}
 
   @Post()
   @UseGuards(JwtAuthGuard, RolesGuard)
@@ -146,7 +146,10 @@ export class DriversController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.DRIVER)
   @ApiOperation({ summary: 'Upload driver document' })
-  uploadDocument(@CurrentUser() user: User, @Body() data: UploadDriverDocumentDto) {
+  uploadDocument(
+    @CurrentUser() user: User,
+    @Body() data: UploadDriverDocumentDto,
+  ) {
     return this.driversService.uploadDocument(user.id, data);
   }
 

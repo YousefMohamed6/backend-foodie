@@ -6,4 +6,3 @@ export default registerAs('fcm', () => ({
     : null,
   projectId: process.env.FIREBASE_PROJECT_ID,
 }));
-

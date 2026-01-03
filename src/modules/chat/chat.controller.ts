@@ -58,7 +58,10 @@ export class ChatController {
 
   @Post('admin/channels')
   @ApiOperation({ summary: 'Create admin chat channel' })
-  createAdminChannel(@Body() createChannelDto: CreateChannelDto, @Request() req) {
+  createAdminChannel(
+    @Body() createChannelDto: CreateChannelDto,
+    @Request() req,
+  ) {
     return this.chatService.createAdminChannel(req.user.id, createChannelDto);
   }
 

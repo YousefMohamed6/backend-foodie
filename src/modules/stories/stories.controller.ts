@@ -20,7 +20,7 @@ import { StoriesService } from './stories.service';
 @ApiTags('Stories')
 @Controller('stories')
 export class StoriesController {
-  constructor(private readonly storiesService: StoriesService) { }
+  constructor(private readonly storiesService: StoriesService) {}
 
   @Get()
   @ApiOperation({ summary: 'Get all stories' })

@@ -1,9 +1,12 @@
-import { Controller, Get } from '@nestjs/common';
-import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import { Controller, Get, Query } from '@nestjs/common';
+import { ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
+import { OnboardingType } from '@prisma/client';
+import { PrismaService } from '../../prisma/prisma.service';
 
 @ApiTags('Configuration')
 @Controller()
 export class ConfigController {
+  constructor(private prisma: PrismaService) {}
   @Get('languages')
   @ApiOperation({ summary: 'Get available languages' })
   getLanguages() {
@@ -31,28 +34,15 @@ export class ConfigController {
 
   @Get('onboarding')
   @ApiOperation({ summary: 'Get onboarding list' })
-  getOnboarding() {
+  @ApiQuery({ name: 'type', enum: OnboardingType, required: false })
+  async getOnboarding(@Query('type') type?: OnboardingType) {
+    const where = type ? { type } : {};
+    const onboarding = await this.prisma.onBoarding.findMany({
+      where,
+      orderBy: { createdAt: 'asc' },
+    });
     return {
-      onboarding: [
-        {
-          id: '1',
-          title: 'Order Food',
-          description: 'Easily order food from your favorite restaurants',
-          image: 'onboarding1.png',
-        },
-        {
-          id: '2',
-          title: 'Fast Delivery',
-          description: 'Real-time tracking and fast delivery',
-          image: 'onboarding2.png',
-        },
-        {
-          id: '3',
-          title: 'Safe Payment',
-          description: 'Multiple safe payment methods',
-          image: 'onboarding3.png',
-        },
-      ],
+      onboarding,
     };
   }
 
@@ -80,8 +70,8 @@ export class ConfigController {
   getPaymentSettings() {
     return {
       settings: {
-        paypal_enabled: true,
-        stripe_enabled: true,
+        paypal_enabled: false,
+        stripe_enabled: false,
         wallet_enabled: true,
         cash_on_delivery_enabled: true,
       },

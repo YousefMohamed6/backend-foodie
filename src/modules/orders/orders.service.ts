@@ -3,7 +3,7 @@ import {
   forwardRef,
   Inject,
   Injectable,
-  NotFoundException
+  NotFoundException,
 } from '@nestjs/common';
 import {
   OrderStatus,
@@ -11,7 +11,7 @@ import {
   Prisma,
   Product,
   User,
-  UserRole
+  UserRole,
 } from '@prisma/client';
 
 import { PrismaService } from '../../prisma/prisma.service';
@@ -74,7 +74,7 @@ export class OrdersService {
     private walletService: WalletService,
     private reviewsService: ReviewsService,
     private ordersGateway: OrdersGateway,
-  ) { }
+  ) {}
 
   async create(createOrderDto: CreateOrderDto, user: User) {
     const productIds = createOrderDto.products.map((item) => item.productId);
@@ -83,7 +83,10 @@ export class OrdersService {
     });
     const productMap = new Map(products.map((p) => [p.id, p]));
 
-    const subtotal = this.calculateSubtotal(createOrderDto.products, productMap);
+    const subtotal = this.calculateSubtotal(
+      createOrderDto.products,
+      productMap,
+    );
 
     // Use transaction to ensure atomicity: if wallet payment succeeds but order creation fails,
     // the entire operation rolls back preventing money loss
@@ -103,7 +106,9 @@ export class OrdersService {
             create: createOrderDto.products.map((item) => {
               const product = productMap.get(item.productId);
               if (!product) {
-                throw new NotFoundException(`Product ${item.productId} not found`);
+                throw new NotFoundException(
+                  `Product ${item.productId} not found`,
+                );
               }
               const price = product.discountPrice
                 ? Number(product.discountPrice)
@@ -170,9 +175,7 @@ export class OrdersService {
   /**
    * Map Prisma order relation to historical API structure
    */
-  private mapOrderResponse(
-    order: OrderWithRelations | null,
-  ) {
+  private mapOrderResponse(order: OrderWithRelations | null) {
     if (!order) return null;
     const { items, ...rest } = order;
     return {
@@ -304,7 +307,11 @@ export class OrdersService {
 
   async findAll(
     user: Pick<User, 'id' | 'role'>,
-    query: { vendorId?: string; status?: OrderStatus | string; firstOrder?: string }
+    query: {
+      vendorId?: string;
+      status?: OrderStatus | string;
+      firstOrder?: string;
+    },
   ) {
     const where: Prisma.OrderWhereInput = {};
 
@@ -334,9 +341,7 @@ export class OrdersService {
       include: orderInclude,
     });
 
-    return orders.map((order) =>
-      this.mapOrderResponse(order),
-    );
+    return orders.map((order) => this.mapOrderResponse(order));
   }
 
   async findOne(id: string, user: User) {
@@ -369,7 +374,7 @@ export class OrdersService {
 
     const savedOrder = await this.prisma.order.update({
       where: { id },
-      data: { status: updateOrderStatusDto.status as OrderStatus },
+      data: { status: updateOrderStatusDto.status },
       include: orderInclude,
     });
 

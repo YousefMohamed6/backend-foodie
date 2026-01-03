@@ -4,14 +4,15 @@ import { IsNotEmpty, IsOptional, IsString } from 'class-validator';
 export class SocialLoginDto {
   @ApiProperty({
     enum: ['google', 'apple'],
-    description: 'Social login provider'
+    description: 'Social login provider',
   })
   @IsString()
   @IsNotEmpty()
   provider: 'google' | 'apple';
 
   @ApiProperty({
-    description: 'ID token from Google or Identity token from Apple. This token will be verified server-side.'
+    description:
+      'ID token from Google or Identity token from Apple. This token will be verified server-side.',
   })
   @IsString()
   @IsNotEmpty()
@@ -19,7 +20,8 @@ export class SocialLoginDto {
 
   @ApiProperty({
     required: false,
-    description: 'Optional: User first name (only needed if not available in token)'
+    description:
+      'Optional: User first name (only needed if not available in token)',
   })
   @IsOptional()
   @IsString()
@@ -27,7 +29,8 @@ export class SocialLoginDto {
 
   @ApiProperty({
     required: false,
-    description: 'Optional: User last name (only needed if not available in token)'
+    description:
+      'Optional: User last name (only needed if not available in token)',
   })
   @IsOptional()
   @IsString()
@@ -35,7 +38,7 @@ export class SocialLoginDto {
 
   @ApiProperty({
     required: false,
-    description: 'Device ID for token binding'
+    description: 'Device ID for token binding',
   })
   @IsOptional()
   @IsString()

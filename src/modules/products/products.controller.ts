@@ -47,7 +47,12 @@ export class ProductsController {
   @ApiQuery({ name: 'vendorId', required: false })
   @ApiQuery({ name: 'categoryId', required: false })
   @ApiQuery({ name: 'publish', required: false, type: Boolean })
-  @ApiQuery({ name: 'foodType', required: false, enum: ['TakeAway', 'DineIn'], description: 'Filter by food type' })
+  @ApiQuery({
+    name: 'foodType',
+    required: false,
+    enum: ['TakeAway', 'DineIn'],
+    description: 'Filter by food type',
+  })
   findAll(@Query() query) {
     return this.productsService.findAll(query);
   }

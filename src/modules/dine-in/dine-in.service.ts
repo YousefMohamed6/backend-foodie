@@ -5,7 +5,7 @@ import { CreateDineInBookingDto } from './dto/create-dine-in-booking.dto';
 
 @Injectable()
 export class DineInService {
-  constructor(private prisma: PrismaService) { }
+  constructor(private prisma: PrismaService) {}
 
   async create(createDineInBookingDto: CreateDineInBookingDto) {
     return this.prisma.dineInBooking.create({
@@ -13,7 +13,10 @@ export class DineInService {
     });
   }
 
-  async findAll(userId?: string, query: { isUpcoming?: string | boolean } = {}) {
+  async findAll(
+    userId?: string,
+    query: { isUpcoming?: string | boolean } = {},
+  ) {
     const where: Prisma.DineInBookingWhereInput = {};
 
     if (userId) {
@@ -32,10 +35,7 @@ export class DineInService {
 
     return this.prisma.dineInBooking.findMany({
       where,
-      orderBy: [
-        { date: 'desc' },
-        { createdAt: 'desc' },
-      ],
+      orderBy: [{ date: 'desc' }, { createdAt: 'desc' }],
     });
   }
 }

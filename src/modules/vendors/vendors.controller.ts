@@ -9,7 +9,12 @@ import {
   Query,
   UseGuards,
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiOperation,
+  ApiQuery,
+  ApiTags,
+} from '@nestjs/swagger';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
@@ -44,9 +49,23 @@ export class VendorsController {
   @ApiOperation({ summary: 'Get nearest vendors' })
   @ApiQuery({ name: 'latitude', required: true, type: Number })
   @ApiQuery({ name: 'longitude', required: true, type: Number })
-  @ApiQuery({ name: 'radius', required: false, type: Number, description: 'Radius in kilometers' })
-  @ApiQuery({ name: 'categoryId', required: false, description: 'Filter by category ID' })
-  @ApiQuery({ name: 'isDining', required: false, type: Boolean, description: 'Filter by dine-in availability' })
+  @ApiQuery({
+    name: 'radius',
+    required: false,
+    type: Number,
+    description: 'Radius in kilometers',
+  })
+  @ApiQuery({
+    name: 'categoryId',
+    required: false,
+    description: 'Filter by category ID',
+  })
+  @ApiQuery({
+    name: 'isDining',
+    required: false,
+    type: Boolean,
+    description: 'Filter by dine-in availability',
+  })
   findNearest(
     @Query('latitude') latitude: number,
     @Query('longitude') longitude: number,

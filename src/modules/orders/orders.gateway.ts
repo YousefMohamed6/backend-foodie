@@ -61,7 +61,10 @@ export class OrdersGateway implements OnGatewayConnection, OnGatewayDisconnect {
     return { event: 'watching_vendor', vendorId };
   }
 
-  emitOrderUpdate(order: Pick<Order, 'id' | 'vendorId' | 'authorId' | 'driverId'> & Record<string, any>) {
+  emitOrderUpdate(
+    order: Pick<Order, 'id' | 'vendorId' | 'authorId' | 'driverId'> &
+      Record<string, any>,
+  ) {
     // Emit to order room
     this.server.to(order.id).emit('orderUpdated', order);
     // Emit to vendor room

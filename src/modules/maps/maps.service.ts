@@ -15,7 +15,7 @@ export class MapsService {
     destLng: number,
   ): Promise<any> {
     const key = this.configService.get<string>('GOOGLE_MAPS_API_KEY');
-    
+
     if (!key) {
       throw new Error('Google Maps API key not configured');
     }
@@ -44,4 +44,3 @@ export class MapsService {
     }
   }
 }
-

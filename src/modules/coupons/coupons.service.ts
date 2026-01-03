@@ -17,7 +17,7 @@ export class CouponsService {
     private prisma: PrismaService,
     @Inject(forwardRef(() => VendorsService))
     private vendorsService: VendorsService,
-  ) { }
+  ) {}
 
   async create(createCouponDto: CreateCouponDto, user: User) {
     let vendorId = createCouponDto.vendorId || null;
@@ -64,8 +64,12 @@ export class CouponsService {
     // transform dto dates/types if needed
     const data: Prisma.CouponUpdateInput = {
       ...updateCouponDto,
-      expiresAt: updateCouponDto.expiresAt ? new Date(updateCouponDto.expiresAt) : undefined,
-      discount: updateCouponDto.discount ? String(updateCouponDto.discount) : undefined,
+      expiresAt: updateCouponDto.expiresAt
+        ? new Date(updateCouponDto.expiresAt)
+        : undefined,
+      discount: updateCouponDto.discount
+        ? String(updateCouponDto.discount)
+        : undefined,
     };
 
     return this.prisma.coupon.update({

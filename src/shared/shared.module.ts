@@ -65,4 +65,3 @@ import { ProcessOrderProcessor } from './jobs/process-order.processor';
   ],
 })
 export class SharedModule {}
-

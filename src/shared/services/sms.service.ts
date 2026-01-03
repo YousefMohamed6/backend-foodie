@@ -9,20 +9,22 @@ export class SmsService {
 
   constructor(private configService: ConfigService) {
     const smsConfig = this.configService.get('sms');
-    
+
     if (smsConfig?.twilioAccountSid && smsConfig?.twilioAuthToken) {
       this.twilioClient = twilio(
         smsConfig.twilioAccountSid,
         smsConfig.twilioAuthToken,
       );
     } else {
-      this.logger.warn('SMS service not configured. SMS will be logged to console.');
+      this.logger.warn(
+        'SMS service not configured. SMS will be logged to console.',
+      );
     }
   }
 
   async sendSms(to: string, message: string): Promise<void> {
     const smsConfig = this.configService.get('sms');
-    
+
     if (!this.twilioClient) {
       this.logger.log(`[SMS] To: ${to}, Message: ${message}`);
       return;
@@ -46,4 +48,3 @@ export class SmsService {
     await this.sendSms(phoneNumber, message);
   }
 }
-
