@@ -38,10 +38,10 @@ export class AddressesController {
     return this.addressesService.findAll(user);
   }
 
-  @Get(':id')
-  @ApiOperation({ summary: 'Get an address by ID' })
-  findOne(@Param('id') id: string, @CurrentUser() user: User) {
-    return this.addressesService.findOne(id, user);
+  @Get('default')
+  @ApiOperation({ summary: 'Get default address for current user' })
+  findDefault(@CurrentUser() user: User) {
+    return this.addressesService.findDefault(user);
   }
 
   @Patch(':id')

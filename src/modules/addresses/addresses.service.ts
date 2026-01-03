@@ -10,7 +10,7 @@ import { UpdateAddressDto } from './dto/update-address.dto';
 
 @Injectable()
 export class AddressesService {
-  constructor(private prisma: PrismaService) {}
+  constructor(private prisma: PrismaService) { }
 
   async create(createAddressDto: CreateAddressDto, user: User) {
     const profile = await this.prisma.customerProfile.findUnique({
@@ -22,9 +22,18 @@ export class AddressesService {
     }
 
     if (createAddressDto.isDefault) {
-      await this.prisma.address.updateMany({
-        where: { customerId: profile.id, isDefault: true },
-        data: { isDefault: false },
+      return this.prisma.$transaction(async (tx) => {
+        await tx.address.updateMany({
+          where: { customerId: profile.id, isDefault: true },
+          data: { isDefault: false },
+        });
+
+        return tx.address.create({
+          data: {
+            ...createAddressDto,
+            customerId: profile.id,
+          },
+        });
       });
     }
 
@@ -41,6 +50,16 @@ export class AddressesService {
       where: { customer: { userId: user.id } },
       orderBy: [{ isDefault: 'desc' }, { createdAt: 'desc' }],
     });
+  }
+
+  async findDefault(user: User) {
+    const address = await this.prisma.address.findFirst({
+      where: { customer: { userId: user.id }, isDefault: true },
+    });
+    if (!address) {
+      throw new NotFoundException('Default address not found');
+    }
+    return address;
   }
 
   async findOne(id: string, user: User) {
@@ -62,9 +81,16 @@ export class AddressesService {
     await this.findOne(id, user);
 
     if (updateAddressDto.isDefault) {
-      await this.prisma.address.updateMany({
-        where: { customer: { userId: user.id }, isDefault: true },
-        data: { isDefault: false },
+      return this.prisma.$transaction(async (tx) => {
+        await tx.address.updateMany({
+          where: { customer: { userId: user.id }, isDefault: true },
+          data: { isDefault: false },
+        });
+
+        return tx.address.update({
+          where: { id },
+          data: updateAddressDto,
+        });
       });
     }
 
