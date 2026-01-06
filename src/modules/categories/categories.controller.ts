@@ -15,19 +15,20 @@ import {
   ApiQuery,
   ApiTags,
 } from '@nestjs/swagger';
+import { UserRole, type User } from '@prisma/client';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
-import { UserRole, type User } from '@prisma/client';
 import { CategoriesService } from './categories.service';
 import { CreateCategoryDto } from './dto/create-category.dto';
+import { FindAllCategoriesQueryDto } from './dto/find-all-categories-query.dto';
 import { UpdateCategoryDto } from './dto/update-category.dto';
 
 @ApiTags('Categories')
 @Controller('categories')
 export class CategoriesController {
-  constructor(private readonly categoriesService: CategoriesService) {}
+  constructor(private readonly categoriesService: CategoriesService) { }
 
   @Post()
   @ApiBearerAuth()
@@ -50,7 +51,7 @@ export class CategoriesController {
     type: Boolean,
     description: 'Filter categories shown on homepage',
   })
-  findAll(@Query() query: { vendorId?: string; showInHomepage?: boolean }) {
+  findAll(@Query() query: FindAllCategoriesQueryDto) {
     return this.categoriesService.findAll(query);
   }
 

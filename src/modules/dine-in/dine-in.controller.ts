@@ -17,11 +17,12 @@ import { DineInBooking } from '@prisma/client';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { DineInService } from './dine-in.service';
 import { CreateDineInBookingDto } from './dto/create-dine-in-booking.dto';
+import { GetDiningReservationsQueryDto } from './dto/get-dining-reservations-query.dto';
 
 @ApiTags('Dine-In Bookings')
 @Controller('dine-in-bookings')
 export class DineInController {
-  constructor(private readonly dineInService: DineInService) {}
+  constructor(private readonly dineInService: DineInService) { }
 
   @Post()
   @ApiBearerAuth()
@@ -48,7 +49,7 @@ export class DineInController {
     description: 'Filter by upcoming (true) or past (false) bookings',
   })
   async findAll(
-    @Query() query: { isUpcoming?: string | boolean },
+    @Query() query: GetDiningReservationsQueryDto,
     @Request() req,
   ): Promise<DineInBooking[]> {
     return this.dineInService.findAll(req.user.id, query);

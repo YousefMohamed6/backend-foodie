@@ -14,7 +14,7 @@ export class CategoriesService {
   constructor(
     private prisma: PrismaService,
     private vendorsService: VendorsService,
-  ) {}
+  ) { }
 
   async create(createCategoryDto: CreateCategoryDto, user: User) {
     let vendorId = createCategoryDto.vendorId;
@@ -47,8 +47,8 @@ export class CategoriesService {
         reviewAttributes:
           attributeIds.length > 0
             ? {
-                connect: attributeIds.map((id) => ({ id })),
-              }
+              connect: attributeIds.map((id) => ({ id })),
+            }
             : undefined,
       },
       include: {
@@ -62,7 +62,13 @@ export class CategoriesService {
     vendorId?: string;
     home?: string | boolean;
     showInHomepage?: string | boolean;
+    page?: number | string;
+    limit?: number | string;
   }) {
+    const page = Number(query.page) || 1;
+    const limit = Math.min(Number(query.limit) || 20, 100); // Max 100 per page
+    const skip = (page - 1) * limit;
+
     const where: Prisma.CategoryWhereInput = {};
     if (query.vendorId) {
       where.vendorId = query.vendorId;
@@ -77,6 +83,8 @@ export class CategoriesService {
     }
     return this.prisma.category.findMany({
       where,
+      skip,
+      take: limit,
       include: {
         products: true,
         reviewAttributes: true,
@@ -123,8 +131,8 @@ export class CategoriesService {
         ...rest,
         reviewAttributes: reviewAttributes
           ? {
-              set: attributeIds.map((id) => ({ id })),
-            }
+            set: attributeIds.map((id) => ({ id })),
+          }
           : undefined,
       },
       include: {

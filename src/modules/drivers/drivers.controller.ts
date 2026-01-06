@@ -10,13 +10,14 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
-import { DriverStatus, type User, UserRole } from '@prisma/client';
+import { type User, UserRole } from '@prisma/client';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { DriversService } from './drivers.service';
 import { CreateDriverDto } from './dto/create-driver.dto';
+import { UpdateDriverStatusDto } from './dto/update-driver-status.dto';
 import { UpdateDriverDto } from './dto/update-driver.dto';
 import { UploadDriverDocumentDto } from './dto/upload-driver-document.dto';
 
@@ -24,7 +25,7 @@ import { UploadDriverDocumentDto } from './dto/upload-driver-document.dto';
 @ApiBearerAuth()
 @Controller('drivers')
 export class DriversController {
-  constructor(private readonly driversService: DriversService) {}
+  constructor(private readonly driversService: DriversService) { }
 
   @Post()
   @UseGuards(JwtAuthGuard, RolesGuard)
@@ -78,19 +79,13 @@ export class DriversController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.DRIVER)
   @ApiOperation({ summary: 'Update status' })
-  updateStatus(
-    @CurrentUser() user: User,
-    @Body('status') status: DriverStatus,
-    @Body('isOnline') isOnline: boolean,
-    @Body('latitude') latitude: number,
-    @Body('longitude') longitude: number,
-  ) {
+  updateStatus(@CurrentUser() user: User, @Body() dto: UpdateDriverStatusDto) {
     return this.driversService.updateStatus(
       user.id,
-      status,
-      isOnline,
-      latitude,
-      longitude,
+      dto.status,
+      dto.isOnline,
+      dto.latitude,
+      dto.longitude,
     );
   }
 

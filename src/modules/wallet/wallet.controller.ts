@@ -14,7 +14,9 @@ import {
   ApiQuery,
   ApiTags,
 } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
+import { GetTransactionsQueryDto, GetWithdrawalsQueryDto } from './dto/get-transactions-query.dto';
 import {
   SetWithdrawMethodDto,
   TopUpWalletDto,
@@ -27,7 +29,7 @@ import { WalletService } from './wallet.service';
 @UseGuards(JwtAuthGuard)
 @Controller('wallet')
 export class WalletController {
-  constructor(private readonly walletService: WalletService) {}
+  constructor(private readonly walletService: WalletService) { }
 
   @Get('balance')
   @ApiOperation({ summary: 'Get wallet balance' })
@@ -39,11 +41,12 @@ export class WalletController {
   @ApiOperation({ summary: 'Get wallet transactions' })
   @ApiQuery({ name: 'page', required: false })
   @ApiQuery({ name: 'limit', required: false })
-  getTransactions(@Request() req, @Query() query) {
+  getTransactions(@Request() req, @Query() query: GetTransactionsQueryDto) {
     return this.walletService.getTransactions(req.user.id, query);
   }
 
   @Post('topup')
+  @Throttle({ default: { ttl: 60000, limit: 3 } }) // 3 requests per minute
   @ApiOperation({ summary: 'Top up wallet' })
   topUp(@Body() topUpDto: TopUpWalletDto, @Request() req) {
     return this.walletService.topUp(req.user.id, topUpDto);
@@ -56,6 +59,7 @@ export class WalletController {
   }
 
   @Post('withdraw')
+  @Throttle({ default: { ttl: 60000, limit: 3 } }) // 3 requests per minute
   @ApiOperation({ summary: 'Withdraw from wallet' })
   withdraw(@Body() withdrawDto: WithdrawWalletDto, @Request() req) {
     return this.walletService.withdraw(req.user.id, withdrawDto);
@@ -65,7 +69,7 @@ export class WalletController {
   @ApiOperation({ summary: 'Get withdrawal history' })
   @ApiQuery({ name: 'page', required: false })
   @ApiQuery({ name: 'limit', required: false })
-  getWithdrawals(@Request() req, @Query() query) {
+  getWithdrawals(@Request() req, @Query() query: GetWithdrawalsQueryDto) {
     return this.walletService.getWithdrawals(req.user.id, query);
   }
 

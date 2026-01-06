@@ -157,4 +157,13 @@ import * as Joi from 'joi';
     },
   ],
 })
-export class AppModule { }
+export class AppModule {
+  configure(consumer: import('@nestjs/common').MiddlewareConsumer) {
+    const { TimeoutMiddleware } = require('./common/middleware/timeout.middleware');
+    const { XssSanitizationMiddleware } = require('./common/middleware/xss-sanitization.middleware');
+
+    consumer
+      .apply(XssSanitizationMiddleware, TimeoutMiddleware)
+      .forRoutes('*');
+  }
+}

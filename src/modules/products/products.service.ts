@@ -21,7 +21,7 @@ export class ProductsService {
     private prisma: PrismaService,
     @Inject(forwardRef(() => VendorsService))
     private vendorsService: VendorsService,
-  ) {}
+  ) { }
 
   async create(createProductDto: CreateProductDto, user: User) {
     const vendor = await this.vendorsService.findByAuthor(user.id);
@@ -52,7 +52,13 @@ export class ProductsService {
     categoryId?: string;
     publish?: string | boolean;
     foodType?: string;
+    page?: number | string;
+    limit?: number | string;
   }) {
+    const page = Number(query.page) || 1;
+    const limit = Math.min(Number(query.limit) || 20, 100); // Max 100 per page
+    const skip = (page - 1) * limit;
+
     const where: Prisma.ProductWhereInput = {};
     if (query.vendorId) where.vendorId = query.vendorId;
     if (query.categoryId) where.categoryId = query.categoryId;
@@ -68,6 +74,8 @@ export class ProductsService {
 
     const products = await this.prisma.product.findMany({
       where,
+      skip,
+      take: limit,
       include: { extras: true, itemAttributes: true },
     });
 
@@ -115,16 +123,16 @@ export class ProductsService {
         ...updateData,
         extras: extras
           ? {
-              deleteMany: {},
-              create: extras,
-            }
+            deleteMany: {},
+            create: extras,
+          }
           : undefined,
         itemAttributes:
           itemAttributes !== undefined
             ? {
-                deleteMany: {},
-                create: attributeData || [],
-              }
+              deleteMany: {},
+              create: attributeData || [],
+            }
             : undefined,
       },
       include: { extras: true, itemAttributes: true },

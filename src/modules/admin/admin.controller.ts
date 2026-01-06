@@ -19,6 +19,7 @@ import { DriversService } from '../drivers/drivers.service';
 import { UpdateDriverDto } from '../drivers/dto/update-driver.dto';
 import { OrdersService } from '../orders/orders.service';
 import { UsersService } from '../users/users.service';
+import { GetDriversQueryDto } from './dto/get-drivers-query.dto';
 
 @ApiTags('Admin')
 @ApiBearerAuth()
@@ -35,8 +36,8 @@ export class AdminController {
 
   @Get('drivers')
   @ApiOperation({ summary: 'Get all drivers for admin' })
-  getDrivers(@Query('available') available?: boolean) {
-    if (available) {
+  getDrivers(@Query() query: GetDriversQueryDto) {
+    if (query.available) {
       return this.driversService.findAvailable();
     }
     return this.driversService.findAll();

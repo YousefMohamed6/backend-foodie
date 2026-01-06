@@ -21,6 +21,7 @@ import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { AssignDriverDto } from './dto/assign-driver.dto';
 import { CreateOrderDto } from './dto/create-order.dto';
+import { FindAllOrdersQueryDto } from './dto/find-all-orders-query.dto';
 import { UpdateOrderStatusDto } from './dto/update-order-status.dto';
 import { OrdersService } from './orders.service';
 
@@ -44,7 +45,7 @@ export class OrdersController {
   @ApiQuery({ name: 'status', required: false })
   @ApiQuery({ name: 'vendorId', required: false })
   @ApiQuery({ name: 'firstOrder', required: false, type: Boolean })
-  findAll(@Request() req, @Query() query) {
+  findAll(@Request() req, @Query() query: FindAllOrdersQueryDto) {
     return this.ordersService.findAll(req.user, query);
   }
 

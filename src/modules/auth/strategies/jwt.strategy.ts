@@ -14,10 +14,13 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     private redisService: RedisService,
   ) {
     const secret = configService.get<string>('app.jwtSecret');
+    if (!secret) {
+      throw new Error('JWT_SECRET is required in environment configuration');
+    }
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
       ignoreExpiration: false,
-      secretOrKey: secret || 'temporary_fallback_secret',
+      secretOrKey: secret,
     });
   }
 

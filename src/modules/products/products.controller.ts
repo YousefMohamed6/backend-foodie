@@ -15,20 +15,21 @@ import {
   ApiQuery,
   ApiTags,
 } from '@nestjs/swagger';
+import type { User } from '@prisma/client';
+import { UserRole } from '@prisma/client';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
-import type { User } from '@prisma/client';
-import { UserRole } from '@prisma/client';
 import { CreateProductDto } from './dto/create-product.dto';
+import { FindAllProductsQueryDto } from './dto/find-all-products-query.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
 import { ProductsService } from './products.service';
 
 @ApiTags('Products')
 @Controller('products')
 export class ProductsController {
-  constructor(private readonly productsService: ProductsService) {}
+  constructor(private readonly productsService: ProductsService) { }
 
   @Post()
   @ApiBearerAuth()
@@ -53,7 +54,7 @@ export class ProductsController {
     enum: ['TakeAway', 'DineIn'],
     description: 'Filter by food type',
   })
-  findAll(@Query() query) {
+  findAll(@Query() query: FindAllProductsQueryDto) {
     return this.productsService.findAll(query);
   }
 

@@ -15,12 +15,13 @@ import {
   ApiQuery,
   ApiTags,
 } from '@nestjs/swagger';
+import { UserRole, type User } from '@prisma/client';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
-import { UserRole, type User } from '@prisma/client';
 import { CreateReviewDto } from './dto/create-review.dto';
+import { FindAllReviewsQueryDto } from './dto/find-all-reviews-query.dto';
 import { UpdateReviewDto } from './dto/update-review.dto';
 import { ReviewsService } from './reviews.service';
 
@@ -28,7 +29,7 @@ import { ReviewsService } from './reviews.service';
 @ApiBearerAuth()
 @Controller('reviews')
 export class ReviewsController {
-  constructor(private readonly reviewsService: ReviewsService) {}
+  constructor(private readonly reviewsService: ReviewsService) { }
 
   @Post()
   @UseGuards(JwtAuthGuard, RolesGuard)
@@ -42,7 +43,7 @@ export class ReviewsController {
   @ApiOperation({ summary: 'Get reviews' })
   @ApiQuery({ name: 'vendorId', required: false })
   @ApiQuery({ name: 'productId', required: false })
-  findAll(@Query() query) {
+  findAll(@Query() query: FindAllReviewsQueryDto) {
     return this.reviewsService.findAll(query);
   }
 

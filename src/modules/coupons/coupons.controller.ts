@@ -15,20 +15,22 @@ import {
   ApiQuery,
   ApiTags,
 } from '@nestjs/swagger';
+import { UserRole, type User } from '@prisma/client';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
-import { UserRole, type User } from '@prisma/client';
 import { CouponsService } from './coupons.service';
 import { CreateCouponDto } from './dto/create-coupon.dto';
+import { FindAllCouponsQueryDto } from './dto/find-all-coupons-query.dto';
 import { UpdateCouponDto } from './dto/update-coupon.dto';
+import { ValidateCouponDto } from './dto/validate-coupon.dto';
 
 @ApiTags('Coupons')
 @ApiBearerAuth()
 @Controller('coupons')
 export class CouponsController {
-  constructor(private readonly couponsService: CouponsService) {}
+  constructor(private readonly couponsService: CouponsService) { }
 
   @Post()
   @UseGuards(JwtAuthGuard, RolesGuard)
@@ -48,7 +50,7 @@ export class CouponsController {
   @ApiOperation({ summary: 'Get all coupons' })
   @ApiQuery({ name: 'isPublic', required: false, type: Boolean })
   @ApiQuery({ name: 'vendorId', required: false })
-  findAll(@Query() query) {
+  findAll(@Query() query: FindAllCouponsQueryDto) {
     return this.couponsService.findAll(query);
   }
 
@@ -76,11 +78,7 @@ export class CouponsController {
 
   @Post('validate')
   @ApiOperation({ summary: 'Validate coupon for order' })
-  validate(
-    @Body('code') code: string,
-    @Body('vendorId') vendorId: string,
-    @Body('orderAmount') orderAmount: number,
-  ) {
-    return this.couponsService.validate(code, vendorId || null, orderAmount);
+  validate(@Body() dto: ValidateCouponDto) {
+    return this.couponsService.validate(dto.code, dto.vendorId || null, dto.orderAmount);
   }
 }

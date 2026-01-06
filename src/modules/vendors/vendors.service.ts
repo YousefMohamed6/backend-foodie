@@ -55,8 +55,14 @@ export class VendorsService {
     return this.mapVendorResponse(vendor);
   }
 
-  async findAll() {
+  async findAll(query: { page?: number | string; limit?: number | string } = {}) {
+    const page = Number(query.page) || 1;
+    const limit = Math.min(Number(query.limit) || 20, 100); // Max 100 per page
+    const skip = (page - 1) * limit;
+
     const vendors = await this.prisma.vendor.findMany({
+      skip,
+      take: limit,
       include: {
         photos: true,
         restaurantMenuPhotos: true,

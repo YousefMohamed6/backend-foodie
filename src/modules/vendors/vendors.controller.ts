@@ -15,13 +15,14 @@ import {
   ApiQuery,
   ApiTags,
 } from '@nestjs/swagger';
+import type { User } from '@prisma/client';
+import { UserRole } from '@prisma/client';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
-import type { User } from '@prisma/client';
-import { UserRole } from '@prisma/client';
 import { CreateVendorDto } from './dto/create-vendor.dto';
+import { FindNearestVendorsDto } from './dto/find-nearest-vendors.dto';
 import { UpdateVendorDto } from './dto/update-vendor.dto';
 import { VendorsService } from './vendors.service';
 
@@ -29,7 +30,7 @@ import { VendorsService } from './vendors.service';
 @ApiBearerAuth()
 @Controller('vendors')
 export class VendorsController {
-  constructor(private readonly vendorsService: VendorsService) {}
+  constructor(private readonly vendorsService: VendorsService) { }
 
   @Post()
   @UseGuards(JwtAuthGuard, RolesGuard)
@@ -66,19 +67,13 @@ export class VendorsController {
     type: Boolean,
     description: 'Filter by dine-in availability',
   })
-  findNearest(
-    @Query('latitude') latitude: number,
-    @Query('longitude') longitude: number,
-    @Query('radius') radius?: number,
-    @Query('categoryId') categoryId?: string,
-    @Query('isDining') isDining?: boolean,
-  ) {
+  findNearest(@Query() dto: FindNearestVendorsDto) {
     return this.vendorsService.findNearest(
-      latitude,
-      longitude,
-      radius,
-      isDining,
-      categoryId,
+      dto.latitude,
+      dto.longitude,
+      dto.radius,
+      dto.isDining,
+      dto.categoryId,
     );
   }
 

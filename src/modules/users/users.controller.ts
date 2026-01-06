@@ -15,13 +15,14 @@ import { Roles } from '../../common/decorators/roles.decorator';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { CreateUserDto } from './dto/create-user.dto';
+import { UpdateLocationDto } from './dto/update-location.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { UsersService } from './users.service';
 
 @ApiTags('User Management')
 @Controller('user')
 export class UsersController {
-  constructor(private readonly usersService: UsersService) {}
+  constructor(private readonly usersService: UsersService) { }
 
   @Get('me')
   @ApiBearerAuth()
@@ -52,11 +53,7 @@ export class UsersController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.DRIVER)
   @ApiOperation({ summary: 'Update driver location' })
-  updateLocation(
-    @Body()
-    location: { latitude: number; longitude: number; rotation?: number },
-    @Request() req,
-  ) {
+  updateLocation(@Body() location: UpdateLocationDto, @Request() req) {
     return this.usersService.updateLocation(req.user.id, location);
   }
 

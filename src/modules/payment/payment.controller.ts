@@ -1,8 +1,10 @@
-import { Controller, Get, Post, Body, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Post, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
-import { PaymentService } from '../../shared/services/payment.service';
 import { PrismaService } from '../../prisma/prisma.service';
+import { PaymentService } from '../../shared/services/payment.service';
+import { ProcessPaymentDto } from './dto/process-payment.dto';
 
 @ApiTags('Payment')
 @ApiBearerAuth()
@@ -12,7 +14,7 @@ export class PaymentController {
   constructor(
     private readonly paymentService: PaymentService,
     private readonly prisma: PrismaService,
-  ) {}
+  ) { }
 
   @Get('settings')
   @ApiOperation({ summary: 'Get payment settings' })
@@ -62,16 +64,9 @@ export class PaymentController {
   }
 
   @Post('process')
+  @Throttle({ default: { ttl: 60000, limit: 5 } }) // 5 requests per minute
   @ApiOperation({ summary: 'Process payment' })
-  async processPayment(
-    @Body()
-    body: {
-      amount: number;
-      paymentMethod: string;
-      paymentGateway: string;
-      orderId?: string;
-    },
-  ) {
+  async processPayment(@Body() body: ProcessPaymentDto) {
     return this.paymentService.processPayment(
       body.amount,
       body.paymentMethod,
