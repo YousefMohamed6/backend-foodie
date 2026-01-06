@@ -212,36 +212,34 @@ export class VendorsService {
 
   async getStats(vendorId: string) {
     const productsCount = await this.productsService.count({ vendorId });
-    const reviews = await this.reviewsService.findAll({ vendorId });
-    // TODO: refactor ordersService.findAll to be compatible or use prisma count/aggregate
-    const ordersResult = await this.ordersService.findAll(
-      { id: '', role: UserRole.VENDOR },
-      { vendorId },
-    );
 
-    // Handle case where firstOrder query returns { isFirstOrder: boolean }
-    const orders = Array.isArray(ordersResult) ? ordersResult : [];
-    const totalOrders = orders.length;
-    const totalRevenue = orders.reduce(
-      (acc, order) => acc + Number(order?.totalAmount || 0),
-      0,
-    );
-    const averageRating =
-      reviews.length > 0
-        ? reviews.reduce((acc, review) => acc + (review?.rating || 0), 0) /
-        reviews.length
-        : 0;
+    const [orderStats, reviewStats] = await Promise.all([
+      this.prisma.order.aggregate({
+        where: { vendorId },
+        _count: { id: true },
+        _sum: { totalAmount: true },
+      }),
+      this.prisma.review.aggregate({
+        where: { vendorId },
+        _count: { id: true },
+        _avg: { rating: true },
+      }),
+    ]);
 
     return {
-      totalOrders,
-      totalRevenue,
+      totalOrders: orderStats._count.id,
+      totalRevenue: orderStats._sum.totalAmount ? orderStats._sum.totalAmount.toNumber() : 0,
       totalProducts: productsCount,
-      totalReviews: reviews.length,
-      averageRating,
+      totalReviews: reviewStats._count.id,
+      averageRating: reviewStats._avg.rating || 0,
     };
   }
 
-  async search(query: string) {
+  async search(query: string, page?: string | number, limit?: string | number) {
+    const p = Number(page) || 1;
+    const l = Math.min(Number(limit) || 20, 100);
+    const skip = (p - 1) * l;
+
     const vendors = await this.prisma.vendor.findMany({
       where: {
         title: {
@@ -253,6 +251,8 @@ export class VendorsService {
         photos: true,
         restaurantMenuPhotos: true,
       },
+      skip,
+      take: l,
     });
     return vendors.map((v) => this.mapVendorResponse(v));
   }

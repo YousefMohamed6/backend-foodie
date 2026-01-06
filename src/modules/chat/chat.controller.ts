@@ -5,6 +5,7 @@ import {
   Param,
   Patch,
   Post,
+  Query,
   Request,
   UseGuards,
 } from '@nestjs/common';
@@ -18,7 +19,7 @@ import { CreateChannelDto, SendMessageDto } from './dto/chat.dto';
 @UseGuards(JwtAuthGuard)
 @Controller('chat')
 export class ChatController {
-  constructor(private readonly chatService: ChatService) {}
+  constructor(private readonly chatService: ChatService) { }
 
   @Get('threads')
   @ApiOperation({ summary: 'Get user chat threads' })
@@ -34,8 +35,13 @@ export class ChatController {
 
   @Get('threads/:id/messages')
   @ApiOperation({ summary: 'Get thread messages' })
-  getMessages(@Param('id') id: string, @Request() req) {
-    return this.chatService.getMessages(id, req.user.id);
+  getMessages(
+    @Param('id') id: string,
+    @Request() req,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.chatService.getMessages(id, req.user.id, { page, limit });
   }
 
   @Patch('threads/:id/seen')

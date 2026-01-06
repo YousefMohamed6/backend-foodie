@@ -10,7 +10,7 @@ type ReviewWithRelations = Prisma.ReviewGetPayload<{
 
 @Injectable()
 export class ReviewsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(private prisma: PrismaService) { }
 
   async create(createReviewDto: CreateReviewDto, user: User) {
     const { images, reviewAttributes, ...rest } = createReviewDto;
@@ -37,14 +37,14 @@ export class ReviewsService {
         customerId: user.id,
         images: images
           ? {
-              create: images.map((url) => ({ url })),
-            }
+            create: images.map((url) => ({ url })),
+          }
           : undefined,
         ratings:
           ratingsData.length > 0
             ? {
-                create: ratingsData,
-              }
+              create: ratingsData,
+            }
             : undefined,
       },
       include: { images: true, ratings: true, customer: true },
@@ -53,18 +53,37 @@ export class ReviewsService {
     return this.mapReviewResponse(savedReview);
   }
 
-  async findAll(query: { vendorId?: string; productId?: string }) {
+  async findAll(query: {
+    vendorId?: string;
+    productId?: string;
+    page?: string | number;
+    limit?: string | number;
+  }) {
     const where: Prisma.ReviewWhereInput = {};
     if (query.vendorId) where.vendorId = query.vendorId;
     if (query.productId) where.productId = query.productId;
+
+    const page = Number(query.page) || 1;
+    const limit = Math.min(Number(query.limit) || 20, 100);
+    const skip = (page - 1) * limit;
 
     const reviews = await this.prisma.review.findMany({
       where,
       orderBy: { createdAt: 'desc' },
       include: { images: true, ratings: true, customer: true },
+      skip,
+      take: limit,
     });
 
     return reviews.map((review) => this.mapReviewResponse(review));
+  }
+
+  async count(where: Prisma.ReviewWhereInput) {
+    return this.prisma.review.count({ where });
+  }
+
+  async aggregate(args: Prisma.ReviewAggregateArgs) {
+    return this.prisma.review.aggregate(args);
   }
 
   async findOne(id: string) {
@@ -108,15 +127,15 @@ export class ReviewsService {
         ...rest,
         images: images
           ? {
-              deleteMany: {},
-              create: images.map((url) => ({ url })),
-            }
+            deleteMany: {},
+            create: images.map((url) => ({ url })),
+          }
           : undefined,
         ratings: reviewAttributes
           ? {
-              deleteMany: {},
-              create: ratingsData,
-            }
+            deleteMany: {},
+            create: ratingsData,
+          }
           : undefined,
       },
       include: { images: true, ratings: true, customer: true },

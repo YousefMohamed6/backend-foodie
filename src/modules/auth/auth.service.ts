@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ConflictException,
   ForbiddenException,
   Injectable,
@@ -12,6 +13,8 @@ import { User } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 import * as crypto from 'crypto';
 import { PrismaService } from '../../prisma/prisma.service';
+import { RedisService } from '../../shared/services/redis.service';
+import { SmsService } from '../../shared/services/sms.service';
 import { UsersService } from '../users/users.service';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { LoginDto } from './dto/login.dto';
@@ -35,7 +38,9 @@ export class AuthService {
     private prisma: PrismaService,
     private googleAuthService: GoogleAuthService,
     private appleAuthService: AppleAuthService,
-  ) {}
+    private smsService: SmsService,
+    private redisService: RedisService,
+  ) { }
 
   async register(
     registerDto: RegisterDto,
@@ -155,18 +160,50 @@ export class AuthService {
   }
 
   async sendOtp(sendOtpDto: SendOtpDto) {
-    // Integration with SMS service (Twilio/AWS SNS)
-    // For now, return a mock verificationId
-    const verificationId = `v_${Date.now()}`;
-    return { verificationId };
+    const { phoneNumber } = sendOtpDto;
+
+    // 1. Generate 6-digit OTP
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+
+    // 2. Store in Redis with 5-minute expiry
+    const otpKey = `otp:${phoneNumber}`;
+    await this.redisService.set(otpKey, otp, 300); // 5 minutes
+
+    // 3. Send SMS
+    try {
+      await this.smsService.sendOtp(phoneNumber, otp);
+      this.logger.log(`OTP sent to ${phoneNumber}`);
+    } catch (err) {
+      this.logger.error(`Failed to send OTP to ${phoneNumber}: ${err.message}`);
+      // In development, we might want to return the OTP in the response or just log it
+      if (process.env.NODE_ENV !== 'production') {
+        return { verificationId: otpKey, devOtp: otp };
+      }
+      throw new BadRequestException('Failed to send verification code');
+    }
+
+    return { verificationId: otpKey };
   }
 
   async verifyOtp(
     verifyOtpDto: VerifyOtpDto,
     context: { ip: string; userAgent: string; deviceId?: string },
   ) {
-    // Verify OTP code with verificationId
-    const user = await this.usersService.findByPhone(verifyOtpDto.phoneNumber);
+    const { phoneNumber, code } = verifyOtpDto;
+    const otpKey = `otp:${phoneNumber}`;
+
+    // 1. Verify OTP code
+    const storedOtp = await this.redisService.get(otpKey);
+
+    if (!storedOtp || storedOtp !== code) {
+      throw new UnauthorizedException('Invalid or expired verification code');
+    }
+
+    // 2. Clear OTP after successful verification
+    await this.redisService.del(otpKey);
+
+    // 3. Find user and login
+    const user = await this.usersService.findByPhone(phoneNumber);
     if (!user) {
       throw new UnauthorizedException('Phone number not registered');
     }

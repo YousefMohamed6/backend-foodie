@@ -1,21 +1,9 @@
 import { Injectable, NestMiddleware } from '@nestjs/common';
 import { NextFunction, Request, Response } from 'express';
 
-/**
- * XSS Sanitization Middleware
- * 
- * Sanitizes all user input to prevent XSS attacks.
- * Applies to request body, query parameters, and URL parameters.
- * 
- * Follows OWASP recommendations for XSS prevention:
- * - Strips dangerous HTML tags and attributes
- * - Encodes special characters
- * - Prevents script injection
- */
 @Injectable()
 export class XssSanitizationMiddleware implements NestMiddleware {
     use(req: Request, res: Response, next: NextFunction) {
-        // Sanitize body
         if (req.body && typeof req.body === 'object') {
             const sanitizedBody = this.sanitizeObject(req.body);
             Object.keys(req.body).forEach(key => {
@@ -23,7 +11,6 @@ export class XssSanitizationMiddleware implements NestMiddleware {
             });
         }
 
-        // Sanitize query parameters
         if (req.query && typeof req.query === 'object') {
             const sanitizedQuery = this.sanitizeObject(req.query);
             Object.keys(req.query).forEach(key => {
@@ -31,7 +18,6 @@ export class XssSanitizationMiddleware implements NestMiddleware {
             });
         }
 
-        // Sanitize URL parameters
         if (req.params && typeof req.params === 'object') {
             const sanitizedParams = this.sanitizeObject(req.params);
             Object.keys(req.params).forEach(key => {
@@ -65,7 +51,6 @@ export class XssSanitizationMiddleware implements NestMiddleware {
     }
 
     private sanitizeString(str: string): string {
-        // Remove dangerous HTML tags and JavaScript
         return str
             .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
             .replace(/<iframe\b[^<]*(?:(?!<\/iframe>)<[^<]*)*<\/iframe>/gi, '')

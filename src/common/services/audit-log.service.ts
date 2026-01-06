@@ -1,29 +1,12 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 
-/**
- * Audit Logging Service
- * 
- * Tracks critical operations for security and compliance.
- * Inspired by enterprise audit logging (Google Cloud Audit Logs, AWS CloudTrail).
- * 
- * Logs:
- * - Payment transactions
- * - Wallet operations
- * - Admin actions
- * - Authentication events
- * - Data exports
- * - Configuration changes
- */
 @Injectable()
 export class AuditLogService {
     private readonly logger = new Logger('AuditLog');
 
     constructor(private prisma: PrismaService) { }
 
-    /**
-     * Log payment operation
-     */
     async logPayment(data: {
         userId: string;
         action: 'PROCESS' | 'REFUND' | 'FAILED';
@@ -40,9 +23,6 @@ export class AuditLogService {
         // await this.prisma.auditLog.create({ data: { ... } });
     }
 
-    /**
-     * Log wallet operation
-     */
     async logWallet(data: {
         userId: string;
         action: 'TOPUP' | 'WITHDRAW' | 'TRANSFER';
@@ -56,9 +36,6 @@ export class AuditLogService {
         );
     }
 
-    /**
-     * Log admin action
-     */
     async logAdminAction(data: {
         adminId: string;
         action: string;
@@ -72,9 +49,6 @@ export class AuditLogService {
         );
     }
 
-    /**
-     * Log authentication event
-     */
     async logAuth(data: {
         userId?: string;
         action: 'LOGIN' | 'LOGOUT' | 'REGISTER' | 'FAILED_LOGIN' | 'PASSWORD_RESET';
@@ -89,9 +63,6 @@ export class AuditLogService {
         );
     }
 
-    /**
-     * Log data export (GDPR compliance)
-     */
     async logDataExport(data: {
         userId: string;
         requestedBy: string;
@@ -103,9 +74,6 @@ export class AuditLogService {
         );
     }
 
-    /**
-     * Log security event
-     */
     async logSecurityEvent(data: {
         event: string;
         severity: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';

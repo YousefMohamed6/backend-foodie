@@ -8,7 +8,7 @@ import { CreateChannelDto, SendMessageDto } from './dto/chat.dto';
 
 @Injectable()
 export class ChatService {
-  constructor(private prisma: PrismaService) {}
+  constructor(private prisma: PrismaService) { }
 
   async getChannels(userId: string) {
     return this.prisma.chatChannel.findMany({
@@ -35,7 +35,11 @@ export class ChatService {
     });
   }
 
-  async getMessages(channelId: string, userId: string) {
+  async getMessages(
+    channelId: string,
+    userId: string,
+    query: { page?: string | number; limit?: string | number } = {},
+  ) {
     const channel = await this.prisma.chatChannel.findUnique({
       where: { id: channelId },
       include: {
@@ -54,6 +58,10 @@ export class ChatService {
       throw new ForbiddenException('You are not a participant in this channel');
     }
 
+    const page = Number(query.page) || 1;
+    const limit = Math.min(Number(query.limit) || 20, 100);
+    const skip = (page - 1) * limit;
+
     return this.prisma.chatMessage.findMany({
       where: { channelId },
       include: {
@@ -67,8 +75,10 @@ export class ChatService {
         },
       },
       orderBy: {
-        createdAt: 'asc',
+        createdAt: 'desc',
       },
+      skip,
+      take: limit,
     });
   }
 

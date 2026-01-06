@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
+import { RedisService } from '../../shared/services/redis.service';
 import { SettingsGateway } from './settings.gateway';
 
 @Injectable()
@@ -7,17 +8,28 @@ export class SettingsService {
   constructor(
     private prisma: PrismaService,
     private settingsGateway: SettingsGateway,
-  ) {}
+    private redis: RedisService,
+  ) { }
+
+  private readonly CACHE_KEY = 'global:settings';
 
   async findAll() {
+    // Try to get from cache first
+    const cached = await this.redis.get<Record<string, string>>(this.CACHE_KEY);
+    if (cached) return cached;
+
     const settings = await this.prisma.setting.findMany();
-    return settings.reduce(
+    const result = settings.reduce(
       (acc, curr) => {
         acc[curr.key] = curr.value;
         return acc;
       },
       {} as Record<string, string>,
     );
+
+    // Cache for 1 hour
+    await this.redis.set(this.CACHE_KEY, result, 3600);
+    return result;
   }
 
   async findOne(key: string) {
@@ -34,6 +46,9 @@ export class SettingsService {
       update: { value },
       create: { key, value },
     });
+
+    // Invalidate cache
+    await this.redis.del(this.CACHE_KEY);
 
     // Emit real-time update
     this.settingsGateway.emitSettingsUpdate({ [key]: value });

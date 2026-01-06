@@ -157,7 +157,11 @@ export class ProductsService {
     return this.prisma.product.delete({ where: { id } });
   }
 
-  async search(query: string) {
+  async search(query: string, page?: string | number, limit?: string | number) {
+    const p = Number(page) || 1;
+    const l = Math.min(Number(limit) || 20, 100);
+    const skip = (p - 1) * l;
+
     const products = await this.prisma.product.findMany({
       where: {
         name: {
@@ -166,6 +170,8 @@ export class ProductsService {
         },
       },
       include: { extras: true, itemAttributes: true },
+      skip,
+      take: l,
     });
     return products.map((p) => this.mapProductResponse(p));
   }

@@ -159,11 +159,13 @@ import * as Joi from 'joi';
 })
 export class AppModule {
   configure(consumer: import('@nestjs/common').MiddlewareConsumer) {
+    const hpp = require('hpp');
     const { TimeoutMiddleware } = require('./common/middleware/timeout.middleware');
     const { XssSanitizationMiddleware } = require('./common/middleware/xss-sanitization.middleware');
 
     consumer
-      .apply(XssSanitizationMiddleware, TimeoutMiddleware)
+      .apply(hpp(), XssSanitizationMiddleware, TimeoutMiddleware)
+      .exclude('api/v1/admin/(.*)', 'api/v1/admin')
       .forRoutes('*');
   }
 }

@@ -25,9 +25,10 @@ import { WalletService } from '../wallet/wallet.service';
 import { AssignDriverDto } from './dto/assign-driver.dto';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { UpdateOrderStatusDto } from './dto/update-order-status.dto';
+import { OrderManagementService } from './order-management.service';
+import { OrderPricingService } from './order-pricing.service';
 import { OrdersGateway } from './orders.gateway';
 import {
-  calculateDistance,
   calculateSubtotal,
   mapOrderResponse,
   orderInclude
@@ -52,6 +53,8 @@ export class OrdersService {
     private reviewsService: ReviewsService,
     private ordersGateway: OrdersGateway,
     private notificationService: NotificationService,
+    private pricingService: OrderPricingService,
+    private managementService: OrderManagementService,
   ) { }
 
   async create(createOrderDto: CreateOrderDto, user: User) {
@@ -74,6 +77,8 @@ export class OrdersService {
       vendorId?: string;
       status?: OrderStatus | string;
       firstOrder?: string;
+      page?: string | number;
+      limit?: string | number;
     },
   ) {
     if (user.role === UserRole.CUSTOMER && query.firstOrder === 'true') {
@@ -86,13 +91,27 @@ export class OrdersService {
     const where = await this.buildSearchFilters(user, query);
     if (!where) return [];
 
+    const page = Number(query.page) || 1;
+    const limit = Math.min(Number(query.limit) || 20, 100);
+    const skip = (page - 1) * limit;
+
     const orders = await this.prisma.order.findMany({
       where,
       orderBy: { createdAt: 'desc' },
       include: orderInclude,
+      skip,
+      take: limit,
     });
 
     return orders.map((order) => mapOrderResponse(order));
+  }
+
+  async count(where: Prisma.OrderWhereInput) {
+    return this.prisma.order.count({ where });
+  }
+
+  async aggregate(args: Prisma.OrderAggregateArgs) {
+    return this.prisma.order.aggregate(args);
   }
 
   async findOne(id: string, user: User) {
@@ -110,7 +129,7 @@ export class OrdersService {
     }
 
     if (user.role === UserRole.MANAGER) {
-      await this.validateManagerZoneAccess(user.id, order.vendor.zoneId);
+      await this.managementService.validateManagerZoneAccess(user.id, order.vendor.zoneId);
     }
 
     return mapOrderResponse(order);
@@ -148,7 +167,7 @@ export class OrdersService {
     if (!order) throw new NotFoundException('Order not found');
 
     if (user.role === UserRole.MANAGER) {
-      const managerZoneId = await this.validateManagerZoneAccess(user.id, order.vendor.zoneId);
+      const managerZoneId = await this.managementService.validateManagerZoneAccess(user.id, order.vendor.zoneId);
 
       const driver = await this.prisma.user.findUnique({
         where: { id: assignDriverDto.driverId },
@@ -271,7 +290,7 @@ export class OrdersService {
       throw new ForbiddenException('Access denied');
     }
 
-    await this.validateManagerZoneAccess(user.id, order.vendor.zoneId);
+    await this.managementService.validateManagerZoneAccess(user.id, order.vendor.zoneId);
 
     if (!order.cashReportedAt) {
       throw new BadRequestException('Driver has not reported cash collection yet');
@@ -302,87 +321,15 @@ export class OrdersService {
   }
 
   async getManagerPendingCashOrders(user: User) {
-    if (user.role !== UserRole.MANAGER) {
-      throw new ForbiddenException('Access denied');
-    }
-
-    const zoneId = await this.getManagerZoneId(user.id);
-
-    const orders = await this.prisma.order.findMany({
-      where: {
-        paymentMethod: PaymentMethod.cash,
-        status: OrderStatus.COMPLETED,
-        paymentStatus: PaymentStatus.UNPAID,
-        vendor: { zoneId },
-      },
-      include: orderInclude,
-      orderBy: { updatedAt: 'desc' },
-    });
-
-    return orders.map((order) => mapOrderResponse(order));
+    return this.managementService.getManagerPendingCashOrders(user);
   }
 
   async getManagerCashSummary(user: User, date: string) {
-    if (user.role !== UserRole.MANAGER) {
-      throw new ForbiddenException('Access denied');
-    }
-
-    const startOfDay = new Date(date);
-    startOfDay.setHours(0, 0, 0, 0);
-    const endOfDay = new Date(date);
-    endOfDay.setHours(23, 59, 59, 999);
-
-    const confirmations = await this.prisma.managerCashConfirmation.findMany({
-      where: {
-        managerId: user.id,
-        createdAt: { gte: startOfDay, lte: endOfDay },
-      },
-    });
-
-    const totalCash = confirmations.reduce((sum, conf) => sum + Number(conf.amount), 0);
-
-    return {
-      date,
-      totalOrders: confirmations.length,
-      totalCash,
-    };
+    return this.managementService.getManagerCashSummary(user, date);
   }
 
   async getDriverPendingCashOrders(driverId: string, user: User) {
-    if (user.role === UserRole.DRIVER && user.id !== driverId) {
-      throw new ForbiddenException('Access denied');
-    }
-
-    if (user.role === UserRole.MANAGER) {
-      const managerZoneId = await this.getManagerZoneId(user.id);
-      const driver = await this.prisma.user.findUnique({
-        where: { id: driverId },
-        select: { zoneId: true },
-      });
-      if (driver?.zoneId !== managerZoneId) {
-        throw new ForbiddenException('Access denied: Driver outside your zone');
-      }
-    }
-
-    const orders = await this.prisma.order.findMany({
-      where: {
-        driverId: driverId,
-        paymentMethod: PaymentMethod.cash,
-        status: OrderStatus.COMPLETED,
-        paymentStatus: PaymentStatus.UNPAID,
-      },
-      include: orderInclude,
-      orderBy: { updatedAt: 'desc' },
-    });
-
-    const totalCash = orders.reduce((sum, order) => sum + Number(order.totalAmount), 0);
-
-    return {
-      driverId,
-      totalOrders: orders.length,
-      totalCash,
-      orders: orders.map((order) => mapOrderResponse(order)),
-    };
+    return this.managementService.getDriverPendingCashOrders(driverId, user);
   }
 
   async confirmManagerPayout(managerId: string, date: string, adminUser: User) {
@@ -431,64 +378,7 @@ export class OrdersService {
   }
 
   private async initializeOrderCalculations(createOrderDto: CreateOrderDto, subtotal: number) {
-    const settings = await this.prisma.setting.findMany({
-      where: { key: { in: ['admin_commission_percentage', 'delivery_price_per_km'] } },
-    });
-
-    const commissionPercentSetting = Number(settings.find((s) => s.key === 'admin_commission_percentage')?.value || 0);
-    const deliveryPricePerKm = Number(settings.find((s) => s.key === 'delivery_price_per_km')?.value || 0);
-
-    const vendor = await this.prisma.vendor.findUnique({
-      where: { id: createOrderDto.vendorId },
-      include: { subscriptionPlan: true },
-    });
-    if (!vendor) throw new NotFoundException('Vendor not found');
-
-    const address = await this.prisma.address.findUnique({ where: { id: createOrderDto.addressId } });
-    if (!address) throw new NotFoundException('Delivery address not found');
-
-    const distance = calculateDistance(
-      Number(vendor.latitude),
-      Number(vendor.longitude),
-      Number(address.latitude),
-      Number(address.longitude),
-    );
-
-    const deliveryCharge = distance * deliveryPricePerKm;
-    createOrderDto.deliveryCharge = deliveryCharge;
-
-    let adminCommissionPercentage = 0;
-    if (vendor.subscriptionPlan && Number(vendor.subscriptionPlan.price.toString()) === 0) {
-      adminCommissionPercentage = commissionPercentSetting;
-    }
-
-    const adminCommissionAmount = subtotal * (adminCommissionPercentage / 100);
-    let discountAmount = 0;
-    if (createOrderDto.couponCode) {
-      const couponResult = await this.couponsService.validate(
-        createOrderDto.couponCode,
-        createOrderDto.vendorId,
-        subtotal,
-      );
-      discountAmount = couponResult.discountValue;
-    }
-
-    const vendorEarnings = subtotal - adminCommissionAmount - discountAmount;
-    let totalAmount = subtotal - (discountAmount + (createOrderDto.deliveryCharge || 0) + (createOrderDto.tipAmount || 0));
-    totalAmount = Math.max(totalAmount, 0);
-
-    return {
-      vendor,
-      address,
-      distance,
-      deliveryPricePerKm,
-      adminCommissionPercentage,
-      adminCommissionAmount,
-      discountAmount,
-      vendorEarnings,
-      totalAmount,
-      deliveryCharge,
-    };
+    return this.pricingService.calculatePricing(createOrderDto, subtotal);
   }
 
   private async finalizeOrderCreate(
@@ -586,7 +476,7 @@ export class OrdersService {
     } else if (user.role === UserRole.DRIVER) {
       where.driverId = user.id;
     } else if (user.role === UserRole.MANAGER) {
-      const zoneId = await this.getManagerZoneId(user.id).catch(() => null);
+      const zoneId = await this.managementService.getManagerZoneId(user.id).catch(() => null);
       if (!zoneId) return null;
       where.vendor = { zoneId };
     }
@@ -597,24 +487,6 @@ export class OrdersService {
     return where;
   }
 
-  private async getManagerZoneId(managerId: string) {
-    const manager = await this.prisma.user.findUnique({
-      where: { id: managerId },
-      select: { zoneId: true },
-    });
-    if (!manager?.zoneId) {
-      throw new ForbiddenException('Manager has no assigned zone');
-    }
-    return manager.zoneId;
-  }
-
-  private async validateManagerZoneAccess(managerId: string, vendorZoneId: string | null) {
-    const zoneId = await this.getManagerZoneId(managerId);
-    if (vendorZoneId !== zoneId) {
-      throw new ForbiddenException('Access denied: Order outside your zone');
-    }
-    return zoneId;
-  }
 
   private emitUpdate(order: any) {
     const mappedOrder = mapOrderResponse(order);

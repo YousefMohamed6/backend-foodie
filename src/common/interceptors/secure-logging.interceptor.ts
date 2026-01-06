@@ -8,19 +8,6 @@ import {
 import { Observable } from 'rxjs';
 import { tap } from 'rxjs/operators';
 
-/**
- * Secure Logging Interceptor
- * 
- * Logs requests and responses while masking sensitive data.
- * Prevents secrets from appearing in logs following OWASP guidelines.
- * 
- * Masked fields:
- * - Passwords
- * - Tokens (JWT, refresh, API keys)
- * - Credit card numbers
- * - SSN and personal IDs
- * - Authorization headers
- */
 @Injectable()
 export class SecureLoggingInterceptor implements NestInterceptor {
     private readonly logger = new Logger('HTTP');
@@ -79,7 +66,6 @@ export class SecureLoggingInterceptor implements NestInterceptor {
                 },
                 error: (error) => {
                     const responseTime = Date.now() - now;
-                    // Mask error details that might contain sensitive info
                     const safeError = this.maskSensitiveData(error);
                     this.logger.error(
                         `Failed ${method} ${url} in ${responseTime}ms [ERROR]: ${safeError?.message || 'Unknown error'}`,

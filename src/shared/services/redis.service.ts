@@ -1,8 +1,8 @@
 import {
   Injectable,
   Logger,
-  OnModuleInit,
   OnModuleDestroy,
+  OnModuleInit,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { createClient, RedisClientType } from 'redis';
@@ -14,7 +14,7 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
   private pubClient: RedisClientType;
   private subClient: RedisClientType;
 
-  constructor(private configService: ConfigService) {}
+  constructor(private configService: ConfigService) { }
 
   async onModuleInit() {
     const redisConfig = this.configService.get('redis');
@@ -63,23 +63,35 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
     return this.subClient;
   }
 
-  async get(key: string): Promise<string | null> {
+  async get<T = string>(key: string): Promise<T | null> {
     if (!this.client) return null;
     try {
-      return await this.client.get(key);
+      const value = await this.client.get(key);
+      if (!value) return null;
+
+      try {
+        // Attempt to parse as JSON if it's an object/array string
+        return JSON.parse(value) as T;
+      } catch {
+        // If parsing fails, return as is (plain string)
+        return value as unknown as T;
+      }
     } catch (error) {
       this.logger.error(`Redis GET error for key ${key}:`, error);
       return null;
     }
   }
 
-  async set(key: string, value: string, expirySeconds?: number): Promise<void> {
+  async set(key: string, value: any, expirySeconds?: number): Promise<void> {
     if (!this.client) return;
     try {
+      const stringValue =
+        typeof value === 'string' ? value : JSON.stringify(value);
+
       if (expirySeconds) {
-        await this.client.setEx(key, expirySeconds, value);
+        await this.client.setEx(key, expirySeconds, stringValue);
       } else {
-        await this.client.set(key, value);
+        await this.client.set(key, stringValue);
       }
     } catch (error) {
       this.logger.error(`Redis SET error for key ${key}:`, error);

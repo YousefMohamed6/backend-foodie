@@ -4,21 +4,20 @@ import { NestFactory } from '@nestjs/core';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import session from 'express-session';
 import helmet from 'helmet';
-import hpp from 'hpp';
 import { AppModule } from './app.module';
 import { GlobalExceptionFilter } from './common/filters/global-exception.filter';
 import { SecureLoggingInterceptor } from './common/interceptors/secure-logging.interceptor';
 import { securityHeadersConfig } from './config/security-headers.config';
+const cookieParser = require('cookie-parser');
 
-// Process-level error handlers
+
 process.on('unhandledRejection', (reason, promise) => {
   console.error('Unhandled Rejection at:', promise, 'reason:', reason);
-  // In production, log to external service (Sentry, CloudWatch, etc.)
+
 });
 
 process.on('uncaughtException', (error) => {
   console.error('Uncaught Exception:', error);
-  // Log and exit gracefully in production
   if (process.env.NODE_ENV === 'production') {
     process.exit(1);
   }
@@ -26,34 +25,18 @@ process.on('uncaughtException', (error) => {
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, {
-    logger: ['error', 'warn', 'log'], // Production-safe logging
+    logger: ['error', 'warn', 'log'],
   });
 
   const configService = app.get(ConfigService);
   const port = configService.get<number>('app.port') || 3000;
   const isProduction = process.env.NODE_ENV === 'production';
 
-  // Set global API prefix
-  app.setGlobalPrefix('api/v1');
 
-  // ============================================
-  // SECURITY HEADERS - OWASP Best Practices
-  // ============================================
   app.use(helmet(securityHeadersConfig));
+  app.use(cookieParser());
 
-  // ============================================
-  // XSS PROTECTION - Additional Layer
-  // ============================================
-  // Note: XSS middleware applied in AppModule
 
-  // ============================================
-  // HTTP PARAMETER POLLUTION PROTECTION
-  // ============================================
-  app.use(hpp());
-
-  // ============================================
-  // CORS CONFIGURATION
-  // ============================================
   const allowedOrigins = configService.get<string>('ALLOWED_ORIGINS');
   const corsOrigins = allowedOrigins
     ? allowedOrigins.split(',').map(origin => origin.trim())
@@ -63,12 +46,9 @@ async function bootstrap() {
     origin: corsOrigins,
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
     credentials: true,
-    maxAge: 86400, // 24 hours
+    maxAge: 86400,
   });
 
-  // ============================================
-  // SESSION CONFIGURATION (AdminJS)
-  // ============================================
   const sessionSecret = configService.get<string>('SESSION_SECRET') ||
     (isProduction
       ? (() => { throw new Error('SESSION_SECRET is required in production'); })()
@@ -80,46 +60,31 @@ async function bootstrap() {
       resave: false,
       saveUninitialized: false,
       cookie: {
-        secure: isProduction, // HTTPS only in production
-        httpOnly: true,
-        maxAge: 24 * 60 * 60 * 1000, // 24 hours
+        maxAge: 24 * 60 * 60 * 1000,
         sameSite: 'strict',
       },
     }),
   );
 
-  // ============================================
-  // GLOBAL EXCEPTION FILTER
-  // ============================================
   app.useGlobalFilters(new GlobalExceptionFilter());
-
-  // ============================================
-  // SECURE LOGGING INTERCEPTOR
-  // ============================================
   app.useGlobalInterceptors(new SecureLoggingInterceptor());
 
-  // ============================================
-  // VALIDATION PIPE - Strict Mode
-  // ============================================
   app.useGlobalPipes(
     new ValidationPipe({
-      whitelist: true, // Strip unknown properties
-      transform: true, // Auto-transform types
-      forbidNonWhitelisted: true, // Reject unknown properties
-      disableErrorMessages: isProduction, // Hide validation details in production
+      whitelist: true,
+      transform: true,
+      forbidNonWhitelisted: true,
+      disableErrorMessages: isProduction,
       transformOptions: {
-        enableImplicitConversion: false, // Explicit type conversion only
+        enableImplicitConversion: false,
       },
     }),
   );
 
-  // ============================================
-  // SWAGGER DOCUMENTATION (Dev/Staging Only)
-  // ============================================
   if (!isProduction) {
     const config = new DocumentBuilder()
       .setTitle('Foodie Restaurant API')
-      .setDescription('Enterprise-grade food delivery platform API')
+      .setDescription('Foodie Restaurant API')
       .setVersion('1.0')
       .addBearerAuth()
       .addSecurity('JWT', {
@@ -133,21 +98,14 @@ async function bootstrap() {
     SwaggerModule.setup('api', app, document);
   }
 
-  // ============================================
-  // START SERVER
-  // ============================================
   await app.listen(port, '0.0.0.0');
 
-  console.log('='.repeat(60));
-  console.log(`🚀 Application is running on: http://localhost:${port}`);
-  console.log(`📚 API Base URL: http://localhost:${port}/api/v1`);
+  console.log(`Application is running on: http://localhost:${port}`);
+  console.log(`API Base URL: http://localhost:${port}/api/v1`);
   if (!isProduction) {
-    console.log(`📖 Swagger documentation: http://localhost:${port}/api`);
-    console.log(`⚙️  Admin UI: http://localhost:${port}/api/v1/admin`);
+    console.log(`Swagger documentation: http://localhost:${port}/api`);
+    console.log(`Admin UI: http://localhost:${port}/api/v1/admin`);
   }
-  console.log(`🔒 Security Level: ENTERPRISE-GRADE`);
-  console.log(`🛡️  OWASP Compliant: YES`);
-  console.log('='.repeat(60));
 }
 
 bootstrap();

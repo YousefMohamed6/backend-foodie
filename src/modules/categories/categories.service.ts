@@ -5,6 +5,7 @@ import {
 } from '@nestjs/common';
 import { Prisma, User, UserRole } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
+import { RedisService } from '../../shared/services/redis.service';
 import { VendorsService } from '../vendors/vendors.service';
 import { CreateCategoryDto } from './dto/create-category.dto';
 import { UpdateCategoryDto } from './dto/update-category.dto';
@@ -14,7 +15,10 @@ export class CategoriesService {
   constructor(
     private prisma: PrismaService,
     private vendorsService: VendorsService,
+    private redis: RedisService,
   ) { }
+
+  private readonly CACHE_KEY_HOME = 'categories:home';
 
   async create(createCategoryDto: CreateCategoryDto, user: User) {
     let vendorId = createCategoryDto.vendorId;
@@ -38,7 +42,7 @@ export class CategoriesService {
         .filter(Boolean);
     }
 
-    return this.prisma.category.create({
+    const result = await this.prisma.category.create({
       data: {
         ...rest,
         isActive: rest.isActive ?? true,
@@ -56,9 +60,11 @@ export class CategoriesService {
         reviewAttributes: true,
       },
     });
+    await this.redis.del(this.CACHE_KEY_HOME);
+    return result;
   }
 
-  findAll(query: {
+  async findAll(query: {
     vendorId?: string;
     home?: string | boolean;
     showInHomepage?: string | boolean;
@@ -81,7 +87,17 @@ export class CategoriesService {
       where.showOnHome =
         query.showInHomepage === 'true' || query.showInHomepage === true;
     }
-    return this.prisma.category.findMany({
+    const cacheKey = `categories:all:${query.vendorId || 'global'}:${query.home}:${query.showInHomepage}`;
+
+    // Only cache home categories for now as they are most hit
+    const isHomeQuery = query.home === 'true' || query.home === true || query.showInHomepage === 'true' || query.showInHomepage === true;
+
+    if (isHomeQuery && !query.page && !query.limit) {
+      const cached = await this.redis.get<any[]>(this.CACHE_KEY_HOME);
+      if (cached) return cached;
+    }
+
+    const categories = await this.prisma.category.findMany({
       where,
       skip,
       take: limit,
@@ -90,6 +106,12 @@ export class CategoriesService {
         reviewAttributes: true,
       },
     });
+
+    if (isHomeQuery && !query.page && !query.limit) {
+      await this.redis.set(this.CACHE_KEY_HOME, categories, 1800); // 30 mins
+    }
+
+    return categories;
   }
 
   async findOne(id: string) {
@@ -125,7 +147,7 @@ export class CategoriesService {
         .filter(Boolean);
     }
 
-    return this.prisma.category.update({
+    const result = await this.prisma.category.update({
       where: { id },
       data: {
         ...rest,
@@ -140,6 +162,8 @@ export class CategoriesService {
         reviewAttributes: true,
       },
     });
+    await this.redis.del(this.CACHE_KEY_HOME);
+    return result;
   }
 
   async remove(id: string, user: User) {
@@ -152,6 +176,8 @@ export class CategoriesService {
       }
     }
 
-    return this.prisma.category.delete({ where: { id } });
+    const result = await this.prisma.category.delete({ where: { id } });
+    await this.redis.del(this.CACHE_KEY_HOME);
+    return result;
   }
 }

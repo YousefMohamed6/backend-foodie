@@ -1,3 +1,5 @@
+import { Logger, UseGuards } from '@nestjs/common';
+import { JwtService } from '@nestjs/jwt';
 import {
   ConnectedSocket,
   MessageBody,
@@ -9,6 +11,7 @@ import {
 } from '@nestjs/websockets';
 import { Order } from '@prisma/client';
 import { Server, Socket } from 'socket.io';
+import { WsJwtGuard } from '../../common/guards/ws-jwt.guard';
 
 @WebSocketGateway({
   cors: {
@@ -16,22 +19,49 @@ import { Server, Socket } from 'socket.io';
   },
   namespace: 'orders',
 })
+@UseGuards(WsJwtGuard)
 export class OrdersGateway implements OnGatewayConnection, OnGatewayDisconnect {
+  private readonly logger = new Logger(OrdersGateway.name);
+
+  constructor(private readonly jwtService: JwtService) { }
+
   @WebSocketServer()
   server: Server;
 
-  handleConnection(client: Socket) {
-    const userId = client.handshake.query.userId as string;
-    if (userId) {
-      client.join(userId);
+  async handleConnection(client: Socket) {
+    try {
+      const token = this.extractToken(client);
+      if (!token) {
+        client.disconnect();
+        return;
+      }
+
+      const payload = await this.jwtService.verifyAsync(token);
+      client.data.user = payload;
+
+      // Join private user room safely
+      client.join(payload.sub);
+      this.logger.log(`Client authenticated: ${payload.sub}`);
+    } catch (err) {
+      this.logger.error(`WS Connection failed: ${err.message}`);
+      client.disconnect();
     }
   }
 
   handleDisconnect(client: Socket) {
-    const userId = client.handshake.query.userId as string;
-    if (userId) {
-      client.leave(userId);
+    const user = client.data.user;
+    if (user) {
+      this.logger.log(`Client disconnected: ${user.sub}`);
     }
+  }
+
+  private extractToken(client: Socket): string | null {
+    const authHeader = client.handshake.auth?.token || client.handshake.headers?.authorization;
+    if (authHeader) {
+      return authHeader.split(' ')[1] || authHeader;
+    }
+    const queryToken = client.handshake.query?.token;
+    return Array.isArray(queryToken) ? queryToken[0] : (queryToken as string);
   }
 
   @SubscribeMessage('watchOrder')
