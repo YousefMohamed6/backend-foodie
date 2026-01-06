@@ -7,8 +7,8 @@ import {
   WebSocketGateway,
   WebSocketServer,
 } from '@nestjs/websockets';
-import { Server, Socket } from 'socket.io';
 import { Order } from '@prisma/client';
+import { Server, Socket } from 'socket.io';
 
 @WebSocketGateway({
   cors: {
@@ -77,5 +77,18 @@ export class OrdersGateway implements OnGatewayConnection, OnGatewayDisconnect {
     if (order.driverId) {
       this.server.to(order.driverId).emit('driverOrderUpdated', order);
     }
+  }
+
+  emitDriverLocationToOrder(
+    orderId: string,
+    driverId: string,
+    location: { latitude: number; longitude: number; rotation?: number },
+  ) {
+    this.server.to(orderId).emit('orderDriverLocationUpdated', {
+      orderId,
+      driverId,
+      ...location,
+      timestamp: new Date(),
+    });
   }
 }

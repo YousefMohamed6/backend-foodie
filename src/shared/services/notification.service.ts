@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
-import { FcmService } from './fcm.service';
-import { EmailService } from './email.service';
 import { PrismaService } from '../../prisma/prisma.service';
+import { EmailService } from './email.service';
+import { FcmService } from './fcm.service';
 
 @Injectable()
 export class NotificationService {
@@ -9,7 +9,7 @@ export class NotificationService {
     private fcmService: FcmService,
     private emailService: EmailService,
     private prisma: PrismaService,
-  ) {}
+  ) { }
 
   async sendPush(
     fcmToken: string | null,
@@ -80,7 +80,6 @@ export class NotificationService {
     type?: string,
     metadata?: any,
   ): Promise<void> {
-    // Create notification record
     await this.prisma.notification.create({
       data: {
         userId,
@@ -91,7 +90,99 @@ export class NotificationService {
       },
     });
 
-    // Send push notification
     await this.sendPushToUser(userId, title, body, metadata);
+  }
+
+  async sendOrderNotification(
+    userId: string,
+    templateKey: string,
+    orderId: string,
+    orderStatus: string,
+  ): Promise<void> {
+    try {
+      const template = await this.getNotificationTemplate(templateKey);
+      if (!template) {
+        return;
+      }
+
+      const user = await this.prisma.user.findUnique({
+        where: { id: userId },
+        select: { fcmToken: true },
+      });
+
+      if (!user?.fcmToken) {
+        return;
+      }
+
+      await this.fcmService.sendNotification(
+        user.fcmToken,
+        template.subject,
+        template.message,
+        {
+          orderId,
+          orderStatus,
+        },
+      );
+    } catch (error) {
+      console.error(`Failed to send order notification:`, error);
+    }
+  }
+
+  async sendVendorNotification(
+    vendorId: string,
+    templateKey: string,
+    orderId: string,
+    orderStatus: string,
+  ): Promise<void> {
+    try {
+      const template = await this.getNotificationTemplate(templateKey);
+      if (!template) {
+        return;
+      }
+
+      const vendor = await this.prisma.vendor.findUnique({
+        where: { id: vendorId },
+        select: { fcmToken: true },
+      });
+
+      if (!vendor?.fcmToken) {
+        return;
+      }
+
+      await this.fcmService.sendNotification(
+        vendor.fcmToken,
+        template.subject,
+        template.message,
+        {
+          orderId,
+          orderStatus,
+        },
+      );
+    } catch (error) {
+      console.error(`Failed to send vendor notification:`, error);
+    }
+  }
+
+  private async getNotificationTemplate(
+    key: string,
+  ): Promise<{ subject: string; message: string } | null> {
+    try {
+      const setting = await this.prisma.setting.findUnique({
+        where: { key },
+      });
+
+      if (!setting) {
+        return null;
+      }
+
+      const parsed = JSON.parse(setting.value);
+      return {
+        subject: parsed.subject || '',
+        message: parsed.message || '',
+      };
+    } catch (error) {
+      console.error(`Failed to parse notification template ${key}:`, error);
+      return null;
+    }
   }
 }

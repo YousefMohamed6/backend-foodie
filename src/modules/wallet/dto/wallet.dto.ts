@@ -4,6 +4,7 @@ import {
   IsNumber,
   IsObject,
   IsOptional,
+  IsUrl,
   IsString,
 } from 'class-validator';
 
@@ -22,6 +23,21 @@ export class TopUpWalletDto {
   @IsNotEmpty()
   @IsString()
   paymentGateway: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsUrl()
+  successUrl?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsUrl()
+  failUrl?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsUrl()
+  pendingUrl?: string;
 }
 
 export class WithdrawWalletDto {

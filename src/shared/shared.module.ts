@@ -7,6 +7,7 @@ import { FcmService } from './services/fcm.service';
 import { GeolocationService } from './services/geolocation.service';
 import { FileStorageService } from './services/file-storage.service';
 import { PaymentService } from './services/payment.service';
+import { FawaterakService } from './services/fawaterak.service';
 import { NotificationService } from './services/notification.service';
 import { RedisService } from './services/redis.service';
 import { PrismaModule } from '../prisma/prisma.module';
@@ -47,6 +48,7 @@ import { ProcessOrderProcessor } from './jobs/process-order.processor';
     GeolocationService,
     FileStorageService,
     PaymentService,
+    FawaterakService,
     NotificationService,
     RedisService,
     SendEmailProcessor,
@@ -60,6 +62,7 @@ import { ProcessOrderProcessor } from './jobs/process-order.processor';
     GeolocationService,
     FileStorageService,
     PaymentService,
+    FawaterakService,
     NotificationService,
     RedisService,
   ],

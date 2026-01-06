@@ -13,18 +13,6 @@ import { ReviewsService } from '../reviews/reviews.service';
 import { CreateVendorDto } from './dto/create-vendor.dto';
 import { UpdateVendorDto } from './dto/update-vendor.dto';
 
-interface VendorPhoto {
-  id: string;
-  url: string;
-  vendorId: string;
-}
-
-interface VendorMenuPhoto {
-  id: string;
-  url: string;
-  vendorId: string;
-}
-
 type VendorWithRelations = Prisma.VendorGetPayload<{
   include: {
     photos: true;
@@ -44,7 +32,7 @@ export class VendorsService {
     private ordersService: OrdersService,
     @Inject(forwardRef(() => CouponsService))
     private couponsService: CouponsService,
-  ) {}
+  ) { }
 
   async create(createVendorDto: CreateVendorDto, user: User) {
     const { photos, restaurantMenuPhotos, ...rest } = createVendorDto;
@@ -100,15 +88,15 @@ export class VendorsService {
         ...rest,
         photos: photos
           ? {
-              deleteMany: {},
-              create: photos.map((url) => ({ url })),
-            }
+            deleteMany: {},
+            create: photos.map((url) => ({ url })),
+          }
           : undefined,
         restaurantMenuPhotos: restaurantMenuPhotos
           ? {
-              deleteMany: {},
-              create: restaurantMenuPhotos.map((url) => ({ url })),
-            }
+            deleteMany: {},
+            create: restaurantMenuPhotos.map((url) => ({ url })),
+          }
           : undefined,
       },
       include: {
@@ -172,12 +160,12 @@ export class VendorsService {
         ],
         ...(categoryId
           ? {
-              categories: {
-                some: {
-                  id: categoryId,
-                },
+            categories: {
+              some: {
+                id: categoryId,
               },
-            }
+            },
+          }
           : {}),
       },
       include: {
@@ -235,7 +223,7 @@ export class VendorsService {
     const averageRating =
       reviews.length > 0
         ? reviews.reduce((acc, review) => acc + (review?.rating || 0), 0) /
-          reviews.length
+        reviews.length
         : 0;
 
     return {

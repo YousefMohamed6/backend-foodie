@@ -1,0 +1,4 @@
+ALTER TABLE "addresses" DROP COLUMN IF EXISTS "city";
+ALTER TABLE "addresses" DROP COLUMN IF EXISTS "state";
+ALTER TABLE "addresses" DROP COLUMN IF EXISTS "zipCode";
+

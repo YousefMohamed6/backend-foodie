@@ -12,7 +12,6 @@ import {
   IsString,
   ValidateNested,
 } from 'class-validator';
-import { AddressDto } from './address.dto';
 import { OrderItemDto } from './order-item.dto';
 
 export class CreateOrderDto {
@@ -28,11 +27,10 @@ export class CreateOrderDto {
   @Type(() => OrderItemDto)
   products: OrderItemDto[];
 
-  @ApiProperty({ type: AddressDto })
+  @ApiProperty()
   @IsNotEmpty()
-  @ValidateNested()
-  @Type(() => AddressDto)
-  address: AddressDto;
+  @IsString()
+  addressId: string;
 
   @ApiProperty()
   @IsNotEmpty()
@@ -42,7 +40,7 @@ export class CreateOrderDto {
   @ApiPropertyOptional()
   @IsOptional()
   @IsString()
-  couponId?: string;
+  couponCode?: string;
 
   @ApiPropertyOptional()
   @IsOptional()

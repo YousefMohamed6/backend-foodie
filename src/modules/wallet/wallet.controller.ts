@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Get,
+  Param,
   Post,
   Query,
   Request,
@@ -46,6 +47,12 @@ export class WalletController {
   @ApiOperation({ summary: 'Top up wallet' })
   topUp(@Body() topUpDto: TopUpWalletDto, @Request() req) {
     return this.walletService.topUp(req.user.id, topUpDto);
+  }
+
+  @Get('topup/:id/status')
+  @ApiOperation({ summary: 'Get topup status' })
+  getTopUpStatus(@Param('id') id: string, @Request() req) {
+    return this.walletService.getTopUpStatus(req.user.id, id);
   }
 
   @Post('withdraw')

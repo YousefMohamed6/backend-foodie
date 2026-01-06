@@ -25,21 +25,6 @@ export class CreateAddressDto {
   @IsOptional()
   addressLine2?: string;
 
-  @ApiProperty({ example: 'New York' })
-  @IsString()
-  @IsNotEmpty()
-  city: string;
-
-  @ApiProperty({ example: 'NY' })
-  @IsString()
-  @IsNotEmpty()
-  state: string;
-
-  @ApiProperty({ example: '10001' })
-  @IsString()
-  @IsNotEmpty()
-  zipCode: string;
-
   @ApiProperty({ example: 40.7128 })
   @IsNumber()
   @IsLatitude()

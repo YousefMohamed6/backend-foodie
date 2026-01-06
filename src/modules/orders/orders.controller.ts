@@ -15,10 +15,10 @@ import {
   ApiQuery,
   ApiTags,
 } from '@nestjs/swagger';
+import { UserRole } from '@prisma/client';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
-import { UserRole } from '@prisma/client';
 import { AssignDriverDto } from './dto/assign-driver.dto';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { UpdateOrderStatusDto } from './dto/update-order-status.dto';
@@ -29,7 +29,7 @@ import { OrdersService } from './orders.service';
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('orders')
 export class OrdersController {
-  constructor(private readonly ordersService: OrdersService) {}
+  constructor(private readonly ordersService: OrdersService) { }
 
   @Post()
   @Roles(UserRole.CUSTOMER)
@@ -39,6 +39,7 @@ export class OrdersController {
   }
 
   @Get()
+  @Roles(UserRole.ADMIN, UserRole.CUSTOMER, UserRole.VENDOR, UserRole.DRIVER, UserRole.MANAGER)
   @ApiOperation({ summary: 'Get all orders' })
   @ApiQuery({ name: 'status', required: false })
   @ApiQuery({ name: 'vendorId', required: false })
@@ -48,12 +49,14 @@ export class OrdersController {
   }
 
   @Get(':id')
+  @Roles(UserRole.ADMIN, UserRole.CUSTOMER, UserRole.VENDOR, UserRole.DRIVER, UserRole.MANAGER)
   @ApiOperation({ summary: 'Get an order by ID' })
   findOne(@Param('id') id: string, @Request() req) {
     return this.ordersService.findOne(id, req.user);
   }
 
   @Patch(':id/status')
+  @Roles(UserRole.ADMIN, UserRole.VENDOR, UserRole.DRIVER)
   @ApiOperation({ summary: 'Update order status' })
   updateStatus(
     @Param('id') id: string,
@@ -73,7 +76,7 @@ export class OrdersController {
   }
 
   @Post(':id/assign-driver')
-  @Roles(UserRole.ADMIN, UserRole.VENDOR)
+  @Roles(UserRole.ADMIN, UserRole.VENDOR, UserRole.MANAGER)
   @ApiOperation({ summary: 'Assign a driver to an order' })
   assignDriver(
     @Param('id') id: string,
@@ -81,5 +84,40 @@ export class OrdersController {
     @Request() req,
   ) {
     return this.ordersService.assignDriver(id, assignDriverDto, req.user);
+  }
+
+  @Post(':id/reject')
+  @Roles(UserRole.DRIVER)
+  @ApiOperation({ summary: 'Reject an assigned order' })
+  rejectOrder(@Param('id') id: string, @Request() req) {
+    return this.ordersService.rejectOrder(id, req.user);
+  }
+
+  @Post(':id/accept')
+  @Roles(UserRole.DRIVER)
+  @ApiOperation({ summary: 'Accept an assigned order' })
+  acceptOrder(@Param('id') id: string, @Request() req) {
+    return this.ordersService.acceptOrder(id, req.user);
+  }
+
+  @Post(':id/report-cash')
+  @Roles(UserRole.DRIVER)
+  @ApiOperation({ summary: 'Driver reports cash collection for COD order' })
+  reportCashCollection(@Param('id') id: string, @Request() req) {
+    return this.ordersService.reportCashCollection(id, req.user);
+  }
+
+  @Post(':id/confirm-cash')
+  @Roles(UserRole.MANAGER)
+  @ApiOperation({ summary: 'Manager confirms cash receipt for COD order' })
+  confirmCashReceipt(@Param('id') id: string, @Request() req) {
+    return this.ordersService.confirmCashReceipt(id, req.user);
+  }
+
+  @Get('drivers/:driverId/pending-cash-orders')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.DRIVER)
+  @ApiOperation({ summary: 'Get all cash orders still with a driver (Not yet handed over)' })
+  getDriverPendingCash(@Param('driverId') driverId: string, @Request() req) {
+    return this.ordersService.getDriverPendingCashOrders(driverId, req.user);
   }
 }

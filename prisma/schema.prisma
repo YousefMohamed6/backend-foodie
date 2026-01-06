@@ -14,6 +14,7 @@ enum UserRole {
   VENDOR   @map("vendor")
   DRIVER   @map("driver")
   ADMIN    @map("admin")
+  MANAGER  @map("manager")
 }
 
 enum PaymentMethod {
@@ -21,6 +22,11 @@ enum PaymentMethod {
   card
   cash
   online
+}
+
+enum PaymentStatus {
+  UNPAID @map("unpaid")
+  PAID   @map("paid")
 }
 
 enum OnboardingType {
@@ -35,7 +41,10 @@ enum OrderStatus {
   ACCEPTED       @map("Order Accepted")
   REJECTED       @map("Order Rejected")
   CANCELLED      @map("Order Cancelled")
-  DRIVER_PENDING @map("Driver Pending")
+  DRIVER_PENDING  @map("Driver Pending")
+  DRIVER_ACCEPTED @map("Driver Accepted")
+  SHIPPED         @map("Order Shipped")
+  IN_TRANSIT     @map("In Transit")
   COMPLETED      @map("Order Completed")
 }
 
@@ -95,6 +104,12 @@ model User {
   userGiftCards       UserGiftCard[]
   dineInBookings      DineInBooking[]
   refreshTokens       RefreshToken[]
+  managerAuditLogs    ManagerAuditLog[]   @relation("ManagerLogs")
+  driverAuditLogs     ManagerAuditLog[]   @relation("DriverManagerLogs")
+  managerCashConfirmations ManagerCashConfirmation[] @relation("ManagerCashConfirmations")
+  driverCashConfirmations  ManagerCashConfirmation[] @relation("DriverCashConfirmations")
+  managerPayouts           ManagerPayoutConfirmation[] @relation("ManagerPayouts")
+  adminPayoutConfirmations ManagerPayoutConfirmation[] @relation("AdminPayoutConfirmations")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -197,6 +212,9 @@ model Vendor {
   favoriteVendors FavoriteVendor[]
   stories         Story[]
   dineInBookings  DineInBooking[]
+
+  subscriptionId String?
+  subscription   Subscription? @relation("VendorSubscription", fields: [subscriptionId], references: [id])
   advertisements  Advertisement[]
   schedules  VendorSchedule[]
   commission VendorCommission?
@@ -357,7 +375,9 @@ model Order {
   driver   User?   @relation("OrderDriver", fields: [driverId], references: [id])
 
   items          OrderItem[]
-  address        OrderAddress?
+  addressId      String?       @map("address_id")
+  address        Address?      @relation(fields: [addressId], references: [id])
+  orderAddress   OrderAddress?
   paymentMethod  PaymentMethod @map("payment_method")
   totalAmount    Decimal       @db.Decimal(10, 2)
   deliveryCharge Decimal       @default(0) @db.Decimal(10, 2)
@@ -366,13 +386,32 @@ model Order {
   takeAway       Boolean       @default(false)
   scheduleTime   DateTime?
   status         OrderStatus @default(PLACED)
+  paymentStatus  PaymentStatus @default(UNPAID) @map("payment_status")
+  cashReportedAt DateTime? @map("cash_reported_at")
 
   chatChannels       ChatChannel[]
   walletTransactions WalletTransaction[]
   reviews            Review[]
+  managerAuditLogs        ManagerAuditLog[] @relation("OrderManagerLogs")
+  managerCashConfirmations ManagerCashConfirmation[] @relation("OrderCashConfirmations")
 
   createdAt      DateTime    @default(now())
   updatedAt DateTime @updatedAt
+
+  // Financial Fields
+  orderSubtotal            Decimal   @db.Decimal(10, 2) @default(0)
+  orderTotal               Decimal   @db.Decimal(10, 2) @default(0)
+  discountAmount           Decimal   @db.Decimal(10, 2) @default(0)
+  
+  // Delivery Docs
+  distanceInKm             Decimal   @db.Decimal(10, 2) @default(0)
+  deliveryPricePerKm       Decimal   @db.Decimal(10, 2) @default(0)
+
+  // Commission Docs
+  adminCommissionPercentage Decimal   @db.Decimal(10, 2) @default(0)
+  adminCommissionAmount     Decimal   @db.Decimal(10, 2) @default(0)
+  
+  vendorEarnings           Decimal   @db.Decimal(10, 2) @default(0)
 
   @@map("orders")
 }
@@ -434,15 +473,13 @@ model Address {
   label        String
   addressLine1 String
   addressLine2 String?
-  city         String
-  state        String
-  zipCode      String
   latitude     Decimal         @db.Decimal(10, 6)
   longitude    Decimal         @db.Decimal(10, 6)
   isDefault    Boolean         @default(false)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  orders    Order[]
 
   @@map("addresses")
 }
@@ -516,6 +553,8 @@ model Subscription {
   paymentMethod String?
   paymentId     String?
 
+
+  vendors       Vendor[] @relation("VendorSubscription")
   walletTransactions WalletTransaction[]
 
   createdAt     DateTime           @default(now())
@@ -1012,4 +1051,45 @@ model RefreshToken {
 
   @@index([userId])
   @@map("refresh_tokens")
+}
+
+model ManagerAuditLog {
+  id        String   @id @default(uuid())
+  managerId String   @map("manager_id")
+  manager   User     @relation("ManagerLogs", fields: [managerId], references: [id])
+  orderId   String   @map("order_id")
+  order     Order    @relation("OrderManagerLogs", fields: [orderId], references: [id])
+  driverId  String?  @map("driver_id")
+  driver    User?    @relation("DriverManagerLogs", fields: [driverId], references: [id])
+  action    String   @default("dispatch")
+  createdAt DateTime @default(now())
+
+  @@map("manager_audit_logs")
+}
+
+model ManagerCashConfirmation {
+  id        String   @id @default(uuid())
+  managerId String   @map("manager_id")
+  manager   User     @relation("ManagerCashConfirmations", fields: [managerId], references: [id])
+  driverId  String   @map("driver_id")
+  driver    User     @relation("DriverCashConfirmations", fields: [driverId], references: [id])
+  orderId   String   @map("order_id")
+  order     Order    @relation("OrderCashConfirmations", fields: [orderId], references: [id])
+  amount    Decimal  @db.Decimal(10, 2)
+  createdAt DateTime @default(now())
+
+  @@map("manager_cash_confirmations")
+}
+
+model ManagerPayoutConfirmation {
+  id        String   @id @default(uuid())
+  managerId String   @map("manager_id")
+  manager   User     @relation("ManagerPayouts", fields: [managerId], references: [id])
+  adminId   String   @map("admin_id")
+  admin     User     @relation("AdminPayoutConfirmations", fields: [adminId], references: [id])
+  amount    Decimal  @db.Decimal(10, 2)
+  payoutDate DateTime @map("payout_date")
+  createdAt DateTime @default(now())
+
+  @@map("manager_payout_confirmations")
 }

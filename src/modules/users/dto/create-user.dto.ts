@@ -7,5 +7,5 @@ export class CreateUserDto {
   password: string;
   role?: UserRole;
   phoneNumber?: string;
-  // Add other fields as needed
+  zoneId?: string;
 }

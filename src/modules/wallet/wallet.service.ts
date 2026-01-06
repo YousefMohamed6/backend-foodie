@@ -1,6 +1,8 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
-import { TransactionType, Prisma } from '@prisma/client';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { Prisma, TransactionType } from '@prisma/client';
+import crypto from 'crypto';
 import { PrismaService } from '../../prisma/prisma.service';
+import { FawaterakService } from '../../shared/services/fawaterak.service';
 import {
   SetWithdrawMethodDto,
   TopUpWalletDto,
@@ -9,10 +11,19 @@ import {
 
 @Injectable()
 export class WalletService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private readonly fawaterakService: FawaterakService,
+  ) { }
 
   async getBalance(userId: string) {
     const getSum = async (type: TransactionType) => {
+      const depositFilter =
+        type === TransactionType.DEPOSIT
+          ? {
+            OR: [{ paymentStatus: 'PAID' }, { paymentStatus: null }],
+          }
+          : {};
       const aggregations = await this.prisma.walletTransaction.aggregate({
         _sum: {
           amount: true,
@@ -20,6 +31,7 @@ export class WalletService {
         where: {
           userId,
           type,
+          ...depositFilter,
         },
       });
       return aggregations._sum.amount ? aggregations._sum.amount.toNumber() : 0;
@@ -60,31 +72,74 @@ export class WalletService {
   }
 
   async topUp(userId: string, topUpDto: TopUpWalletDto) {
+    if (topUpDto.paymentGateway.toLowerCase() !== 'fawaterak') {
+      throw new BadRequestException('Unsupported payment gateway');
+    }
+    if (!topUpDto.successUrl || !topUpDto.failUrl || !topUpDto.pendingUrl) {
+      throw new BadRequestException('Redirection URLs are required');
+    }
+
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { firstName: true, lastName: true, email: true, phoneNumber: true },
+    });
+    if (!user?.email || !user?.phoneNumber) {
+      throw new BadRequestException('User profile is missing required payment data');
+    }
+
+    const transactionId = crypto.randomUUID();
     const transaction = await this.prisma.walletTransaction.create({
       data: {
+        id: transactionId,
         userId,
         amount: topUpDto.amount,
         type: TransactionType.DEPOSIT,
         description: `Top up via ${topUpDto.paymentMethod}`,
         isTopup: true,
+        paymentStatus: 'PENDING',
+        referenceId: transactionId,
         metadata: {
+          gateway: 'fawaterak',
           paymentGateway: topUpDto.paymentGateway,
           paymentMethod: topUpDto.paymentMethod,
         },
       },
     });
 
-    // Validating and updating user wallet balance logic should ideally be transactional or rely on aggregation
-    // For now, mirroring previous logic which implies external payment verification?
-    // The comment said: // Here you would integrate with payment gateway
-    // And update user balance
+    const invoice = await this.fawaterakService.createInvoiceLink({
+      amount: topUpDto.amount,
+      currency: 'EGP',
+      customer: {
+        first_name: user.firstName,
+        last_name: user.lastName,
+        email: user.email,
+        phone: user.phoneNumber,
+        address: 'N/A',
+      },
+      redirectionUrls: {
+        successUrl: topUpDto.successUrl,
+        failUrl: topUpDto.failUrl,
+        pendingUrl: topUpDto.pendingUrl,
+      },
+      payLoad: { referenceId: transaction.id },
+    });
 
-    // Sync with User entity walletAmount
-    await this.updateUserWallet(userId, topUpDto.amount, 'add', this.prisma);
+    const updated = await this.prisma.walletTransaction.update({
+      where: { id: transaction.id },
+      data: {
+        metadata: {
+          ...(transaction.metadata as any),
+          invoiceId: invoice.invoiceId,
+          invoiceKey: invoice.invoiceKey,
+          paymentUrl: invoice.url,
+        },
+      },
+    });
 
     return {
-      transaction,
-      paymentUrl: 'https://payment-gateway-mock.com/pay', // Mock URL
+      paymentUrl: invoice.url,
+      transactionId: updated.id,
+      invoiceId: invoice.invoiceId,
     };
   }
 
@@ -187,7 +242,7 @@ export class WalletService {
     });
   }
 
-  private async updateUserWallet(
+  async updateUserWallet(
     userId: string,
     amount: number,
     type: 'add' | 'subtract',
@@ -205,5 +260,16 @@ export class WalletService {
         data: { walletAmount: newBalance },
       });
     }
+  }
+
+  async getTopUpStatus(userId: string, transactionId: string) {
+    const tx = await this.prisma.walletTransaction.findFirst({
+      where: { id: transactionId, userId, isTopup: true, type: TransactionType.DEPOSIT },
+      select: { paymentStatus: true },
+    });
+    if (!tx) {
+      throw new NotFoundException('Topup transaction not found');
+    }
+    return { status: tx.paymentStatus || 'PAID' };
   }
 }
