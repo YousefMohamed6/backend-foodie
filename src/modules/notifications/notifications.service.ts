@@ -4,7 +4,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 
 @Injectable()
 export class NotificationsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(private prisma: PrismaService) { }
 
   async findAll(userId: string, type?: string) {
     const where: Prisma.NotificationWhereInput = { userId };
@@ -33,7 +33,7 @@ export class NotificationsService {
       },
     });
     if (!notification) {
-      throw new NotFoundException('Notification not found');
+      throw new NotFoundException('NOTIFICATION_NOT_FOUND');
     }
     return this.prisma.notification.update({
       where: { id },
@@ -57,7 +57,7 @@ export class NotificationsService {
       },
     });
     if (!notification) {
-      throw new NotFoundException('Notification not found');
+      throw new NotFoundException('NOTIFICATION_NOT_FOUND');
     }
     return this.prisma.notification.delete({
       where: { id },

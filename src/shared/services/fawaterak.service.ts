@@ -16,7 +16,7 @@ export class FawaterakService {
   private get baseUrl() {
     const v = this.configService.get<string>('FAWATERAK_BASE_URL');
     if (!v) {
-      throw new BadRequestException('FAWATERAK_BASE_URL is not configured');
+      throw new BadRequestException('PAYMENT_CONFIG_INVALID');
     }
     return v.replace(/\/+$/, '');
   }
@@ -24,7 +24,7 @@ export class FawaterakService {
   private get apiKey() {
     const v = this.configService.get<string>('FAWATERAK_API_KEY');
     if (!v) {
-      throw new BadRequestException('FAWATERAK_API_KEY is not configured');
+      throw new BadRequestException('PAYMENT_CONFIG_INVALID');
     }
     return v;
   }
@@ -32,7 +32,7 @@ export class FawaterakService {
   private get vendorKey() {
     const v = this.configService.get<string>('FAWATERAK_VENDOR_KEY');
     if (!v) {
-      throw new BadRequestException('FAWATERAK_VENDOR_KEY is not configured');
+      throw new BadRequestException('PAYMENT_CONFIG_INVALID');
     }
     return v;
   }
@@ -76,7 +76,7 @@ export class FawaterakService {
 
     const json = (await res.json()) as CreateInvoiceLinkResponse;
     if (!res.ok || json.status !== 'success' || !('data' in json)) {
-      throw new BadRequestException('Failed to create Fawaterak invoice');
+      throw new BadRequestException('INVOICE_CREATION_FAILED');
     }
 
     return json.data;

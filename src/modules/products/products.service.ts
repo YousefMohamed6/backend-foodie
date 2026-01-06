@@ -26,7 +26,7 @@ export class ProductsService {
   async create(createProductDto: CreateProductDto, user: User) {
     const vendor = await this.vendorsService.findByAuthor(user.id);
     if (!vendor) {
-      throw new NotFoundException('Vendor profile not found for this user');
+      throw new NotFoundException('VENDOR_NOT_FOUND');
     }
 
     const { extras, itemAttributes, ...productData } = createProductDto;
@@ -94,7 +94,7 @@ export class ProductsService {
       include: { vendor: true, extras: true, itemAttributes: true },
     });
     if (!product) {
-      throw new NotFoundException(`Product with ID ${id} not found`);
+      throw new NotFoundException('PRODUCT_NOT_FOUND');
     }
     return this.mapProductResponse(product);
   }
@@ -102,15 +102,13 @@ export class ProductsService {
   async update(id: string, updateProductDto: UpdateProductDto, user: User) {
     const product = await this.prisma.product.findUnique({ where: { id } });
     if (!product) {
-      throw new NotFoundException(`Product with ID ${id} not found`);
+      throw new NotFoundException('PRODUCT_NOT_FOUND');
     }
 
     const vendor = await this.vendorsService.findByAuthor(user.id);
 
     if (!vendor || product.vendorId !== vendor.id) {
-      throw new ForbiddenException(
-        'You are not authorized to update this product',
-      );
+      throw new ForbiddenException('FORBIDDEN');
     }
 
     const { extras, itemAttributes, ...updateData } = updateProductDto;
@@ -144,14 +142,12 @@ export class ProductsService {
   async remove(id: string, user: User) {
     const product = await this.prisma.product.findUnique({ where: { id } });
     if (!product) {
-      throw new NotFoundException(`Product with ID ${id} not found`);
+      throw new NotFoundException('PRODUCT_NOT_FOUND');
     }
     const vendor = await this.vendorsService.findByAuthor(user.id);
 
     if (!vendor || product.vendorId !== vendor.id) {
-      throw new ForbiddenException(
-        'You are not authorized to delete this product',
-      );
+      throw new ForbiddenException('FORBIDDEN');
     }
 
     return this.prisma.product.delete({ where: { id } });

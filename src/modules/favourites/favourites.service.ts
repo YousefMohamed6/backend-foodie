@@ -7,7 +7,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 
 @Injectable()
 export class FavouritesService {
-  constructor(private prisma: PrismaService) {}
+  constructor(private prisma: PrismaService) { }
 
   async getFavoriteVendors(userId: string) {
     return this.prisma.favoriteVendor.findMany({
@@ -27,7 +27,7 @@ export class FavouritesService {
       },
     });
     if (existing) {
-      throw new ConflictException('Already in favorites');
+      throw new ConflictException('ALREADY_FAVORITED');
     }
     return this.prisma.favoriteVendor.create({
       data: { userId, vendorId },
@@ -46,7 +46,7 @@ export class FavouritesService {
       });
       return { message: 'Removed from favorites' };
     } catch (error) {
-      throw new NotFoundException('Not found in favorites');
+      throw new NotFoundException('NOT_IN_FAVORITES');
     }
   }
 
@@ -72,7 +72,7 @@ export class FavouritesService {
       },
     });
     if (existing) {
-      throw new ConflictException('Already in favorites');
+      throw new ConflictException('ALREADY_FAVORITED');
     }
     return this.prisma.favoriteProduct.create({
       data: { userId, productId },
@@ -91,7 +91,7 @@ export class FavouritesService {
       });
       return { message: 'Removed from favorites' };
     } catch (error) {
-      throw new NotFoundException('Not found in favorites');
+      throw new NotFoundException('NOT_IN_FAVORITES');
     }
   }
 }

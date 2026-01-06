@@ -23,10 +23,10 @@ export class OrderPricingService {
             where: { id: createOrderDto.vendorId },
             include: { subscriptionPlan: true },
         });
-        if (!vendor) throw new NotFoundException('Vendor not found');
+        if (!vendor) throw new NotFoundException('VENDOR_NOT_FOUND');
 
         const address = await this.prisma.address.findUnique({ where: { id: createOrderDto.addressId } });
-        if (!address) throw new NotFoundException('Delivery address not found');
+        if (!address) throw new NotFoundException('ADDRESS_NOT_FOUND');
 
         const distance = calculateDistance(
             Number(vendor.latitude),

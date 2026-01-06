@@ -58,7 +58,7 @@ export function calculateSubtotal(
     for (const item of items) {
         const product = productMap.get(item.productId);
         if (!product) {
-            throw new NotFoundException(`Product ${item.productId} not found`);
+            throw new NotFoundException('PRODUCT_NOT_FOUND');
         }
 
         const price = product.discountPrice

@@ -17,7 +17,7 @@ export class CouponsService {
     private prisma: PrismaService,
     @Inject(forwardRef(() => VendorsService))
     private vendorsService: VendorsService,
-  ) {}
+  ) { }
 
   async create(createCouponDto: CreateCouponDto, user: User) {
     let vendorId = createCouponDto.vendorId || null;
@@ -52,9 +52,6 @@ export class CouponsService {
 
   async findOne(id: string) {
     const coupon = await this.prisma.coupon.findUnique({ where: { id } });
-    if (!coupon) {
-      throw new NotFoundException();
-    }
     return coupon;
   }
 
@@ -88,16 +85,16 @@ export class CouponsService {
       where: { code },
     });
     if (!coupon) {
-      throw new NotFoundException('Invalid coupon code');
+      throw new NotFoundException('INVALID_COUPON');
     }
     if (!coupon.isActive) {
-      throw new BadRequestException('Coupon inactive');
+      throw new BadRequestException('COUPON_INACTIVE');
     }
     if (new Date(coupon.expiresAt).getTime() < Date.now()) {
-      throw new BadRequestException('Coupon expired');
+      throw new BadRequestException('COUPON_EXPIRED');
     }
     if (orderAmount < Number(coupon.minOrderAmount || 0)) {
-      throw new BadRequestException('Order amount below minimum');
+      throw new BadRequestException('ORDER_AMOUNT_TOO_LOW');
     }
     if (
       !coupon.isPublic &&
@@ -105,7 +102,7 @@ export class CouponsService {
       vendorId &&
       coupon.vendorId !== vendorId
     ) {
-      throw new BadRequestException('Coupon not valid for this vendor');
+      throw new BadRequestException('COUPON_VENDOR_MISMATCH');
     }
     let discountValue = 0;
     if ((coupon.discountType || 'percentage') === 'percentage') {

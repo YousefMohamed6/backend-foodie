@@ -13,7 +13,7 @@ export class OrderManagementService {
             select: { zoneId: true },
         });
         if (!manager?.zoneId) {
-            throw new ForbiddenException('Manager has no assigned zone');
+            throw new ForbiddenException('MANAGER_NO_ZONE');
         }
         return manager.zoneId;
     }
@@ -21,14 +21,14 @@ export class OrderManagementService {
     async validateManagerZoneAccess(managerId: string, vendorZoneId: string | null) {
         const zoneId = await this.getManagerZoneId(managerId);
         if (vendorZoneId !== zoneId) {
-            throw new ForbiddenException('Access denied: Order outside your zone');
+            throw new ForbiddenException('ORDER_OUTSIDE_ZONE');
         }
         return zoneId;
     }
 
     async getManagerPendingCashOrders(user: User) {
         if (user.role !== UserRole.MANAGER) {
-            throw new ForbiddenException('Access denied');
+            throw new ForbiddenException('ACCESS_DENIED');
         }
 
         const zoneId = await this.getManagerZoneId(user.id);
@@ -49,7 +49,7 @@ export class OrderManagementService {
 
     async getManagerCashSummary(user: User, date: string) {
         if (user.role !== UserRole.MANAGER) {
-            throw new ForbiddenException('Access denied');
+            throw new ForbiddenException('ACCESS_DENIED');
         }
 
         const startOfDay = new Date(date);
@@ -75,7 +75,7 @@ export class OrderManagementService {
 
     async getDriverPendingCashOrders(driverId: string, user: User) {
         if (user.role === UserRole.DRIVER && user.id !== driverId) {
-            throw new ForbiddenException('Access denied');
+            throw new ForbiddenException('ACCESS_DENIED');
         }
 
         if (user.role === UserRole.MANAGER) {
@@ -85,7 +85,7 @@ export class OrderManagementService {
                 select: { zoneId: true },
             });
             if (driver?.zoneId !== managerZoneId) {
-                throw new ForbiddenException('Access denied: Driver outside your zone');
+                throw new ForbiddenException('DRIVER_OUTSIDE_ZONE');
             }
         }
 

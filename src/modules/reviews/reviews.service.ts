@@ -92,7 +92,7 @@ export class ReviewsService {
       include: { images: true, ratings: true, customer: true },
     });
     if (!review) {
-      throw new NotFoundException();
+      throw new NotFoundException('REVIEW_NOT_FOUND');
     }
     return this.mapReviewResponse(review)!;
   }
@@ -100,7 +100,7 @@ export class ReviewsService {
   async update(id: string, updateReviewDto: UpdateReviewDto, user: User) {
     const review = await this.findOne(id);
     if (review.customerId !== user.id) {
-      throw new NotFoundException();
+      throw new NotFoundException('REVIEW_NOT_FOUND');
     }
 
     const { images, reviewAttributes, ...rest } = updateReviewDto;
@@ -147,7 +147,7 @@ export class ReviewsService {
   async remove(id: string, user: User) {
     const review = await this.findOne(id);
     if (review.customerId !== user.id) {
-      throw new NotFoundException();
+      throw new NotFoundException('REVIEW_NOT_FOUND');
     }
     return this.prisma.review.delete({ where: { id } });
   }
@@ -171,7 +171,7 @@ export class ReviewsService {
     });
     if (!review) {
       throw new NotFoundException(
-        'Review not found for this product in this order',
+        'REVIEW_NOT_FOUND_FOR_PRODUCT_IN_ORDER',
       );
     }
     return this.mapReviewResponse(review);

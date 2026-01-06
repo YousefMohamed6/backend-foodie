@@ -58,6 +58,7 @@
     "hpp": "^0.2.3",
     "joi": "^18.0.2",
     "jwks-rsa": "^3.2.0",
+    "nestjs-i18n": "^10.6.0",
     "nodemailer": "^7.0.12",
     "passport": "^0.7.0",
     "passport-apple": "^2.0.2",

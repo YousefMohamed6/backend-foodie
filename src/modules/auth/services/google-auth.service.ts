@@ -50,11 +50,11 @@ export class GoogleAuthService {
       const payload = ticket.getPayload();
 
       if (!payload) {
-        throw new UnauthorizedException('Invalid Google token: no payload');
+        throw new UnauthorizedException('INVALID_GOOGLE_TOKEN');
       }
 
       if (!payload.email_verified) {
-        throw new UnauthorizedException('Google email not verified');
+        throw new UnauthorizedException('GOOGLE_EMAIL_NOT_VERIFIED');
       }
 
       this.logger.log(
@@ -74,7 +74,7 @@ export class GoogleAuthService {
       this.logger.error(
         `Google token verification failed: ${(error as Error).message}`,
       );
-      throw new UnauthorizedException('Invalid Google ID token');
+      throw new UnauthorizedException('INVALID_GOOGLE_TOKEN');
     }
   }
 }

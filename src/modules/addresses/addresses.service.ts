@@ -18,7 +18,7 @@ export class AddressesService {
     });
     if (!profile) {
       // In a real app, this should be handled at user signup
-      throw new ForbiddenException('User does not have a customer profile');
+      throw new ForbiddenException('MISSING_CUSTOMER_PROFILE');
     }
 
     if (createAddressDto.isDefault) {
@@ -57,7 +57,7 @@ export class AddressesService {
       where: { customer: { userId: user.id }, isDefault: true },
     });
     if (!address) {
-      throw new NotFoundException('Default address not found');
+      throw new NotFoundException('DEFAULT_ADDRESS_NOT_FOUND');
     }
     return address;
   }
@@ -68,10 +68,10 @@ export class AddressesService {
       include: { customer: true },
     });
     if (!address) {
-      throw new NotFoundException(`Address with ID ${id} not found`);
+      throw new NotFoundException('ADDRESS_NOT_FOUND');
     }
     if (address.customer.userId !== user.id) {
-      throw new ForbiddenException('Access to this address is denied');
+      throw new ForbiddenException('ACCESS_DENIED');
     }
     return address;
   }

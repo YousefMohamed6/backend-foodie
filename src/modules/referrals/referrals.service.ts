@@ -12,12 +12,12 @@ export class ReferralsService {
   constructor(
     private prisma: PrismaService,
     private walletService: WalletService,
-  ) {}
+  ) { }
 
   async getReferralCode(userId: string) {
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
     if (!user) {
-      throw new NotFoundException('User not found');
+      throw new NotFoundException('USER_NOT_FOUND');
     }
     if (!user.referralCode) {
       const referralCode = Math.random()
@@ -47,7 +47,7 @@ export class ReferralsService {
       throw new NotFoundException('User not found');
     }
     if (user.referredBy) {
-      throw new BadRequestException('You have already been referred');
+      throw new BadRequestException('ALREADY_REFERRED');
     }
 
     const referrer = await this.prisma.user.findUnique({
@@ -55,11 +55,11 @@ export class ReferralsService {
     });
 
     if (!referrer) {
-      throw new NotFoundException('Invalid referral code');
+      throw new NotFoundException('INVALID_REFERRAL_CODE');
     }
 
     if (referrer.id === userId) {
-      throw new BadRequestException('You cannot refer yourself');
+      throw new BadRequestException('SELF_REFERRAL_NOT_ALLOWED');
     }
 
     await this.prisma.user.update({
@@ -94,7 +94,7 @@ export class ReferralsService {
       where: { referralCode: code },
     });
     if (!referrer) {
-      throw new NotFoundException('Referred user not found');
+      throw new NotFoundException('REFERRER_NOT_FOUND');
     }
     return referrer;
   }

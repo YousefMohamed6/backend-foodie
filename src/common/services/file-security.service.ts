@@ -37,15 +37,11 @@ export class FileSecurityService {
 
     async validateImage(file: Express.Multer.File): Promise<void> {
         if (!this.ALLOWED_IMAGE_MIMES.includes(file.mimetype)) {
-            throw new BadRequestException(
-                `Invalid image type. Allowed: ${this.ALLOWED_IMAGE_MIMES.join(', ')}`,
-            );
+            throw new BadRequestException('INVALID_IMAGE_TYPE');
         }
 
         if (file.size > this.MAX_IMAGE_SIZE) {
-            throw new BadRequestException(
-                `Image too large. Maximum size: ${this.MAX_IMAGE_SIZE / 1024 / 1024}MB`,
-            );
+            throw new BadRequestException('IMAGE_TOO_LARGE');
         }
 
         await this.verifyFileSignature(file);
@@ -53,29 +49,21 @@ export class FileSecurityService {
 
     async validateVideo(file: Express.Multer.File): Promise<void> {
         if (!this.ALLOWED_VIDEO_MIMES.includes(file.mimetype)) {
-            throw new BadRequestException(
-                `Invalid video type. Allowed: ${this.ALLOWED_VIDEO_MIMES.join(', ')}`,
-            );
+            throw new BadRequestException('INVALID_VIDEO_TYPE');
         }
 
         if (file.size > this.MAX_VIDEO_SIZE) {
-            throw new BadRequestException(
-                `Video too large. Maximum size: ${this.MAX_VIDEO_SIZE / 1024 / 1024}MB`,
-            );
+            throw new BadRequestException('VIDEO_TOO_LARGE');
         }
     }
 
     async validateDocument(file: Express.Multer.File): Promise<void> {
         if (!this.ALLOWED_DOCUMENT_MIMES.includes(file.mimetype)) {
-            throw new BadRequestException(
-                `Invalid document type. Allowed: ${this.ALLOWED_DOCUMENT_MIMES.join(', ')}`,
-            );
+            throw new BadRequestException('INVALID_DOCUMENT_TYPE');
         }
 
         if (file.size > this.MAX_DOCUMENT_SIZE) {
-            throw new BadRequestException(
-                `Document too large. Maximum size: ${this.MAX_DOCUMENT_SIZE / 1024 / 1024}MB`,
-            );
+            throw new BadRequestException('DOCUMENT_TOO_LARGE');
         }
 
         await this.verifyFileSignature(file);
@@ -90,7 +78,7 @@ export class FileSecurityService {
                 })
                 .toBuffer();
         } catch (error) {
-            throw new BadRequestException('Failed to process image');
+            throw new BadRequestException('IMAGE_PROCESSING_FAILED');
         }
     }
 
@@ -109,13 +97,13 @@ export class FileSecurityService {
                 .jpeg({ quality, progressive: true })
                 .toBuffer();
         } catch (error) {
-            throw new BadRequestException('Failed to optimize image');
+            throw new BadRequestException('IMAGE_OPTIMIZATION_FAILED');
         }
     }
 
     private async verifyFileSignature(file: Express.Multer.File): Promise<void> {
         if (!file.buffer || file.buffer.length === 0) {
-            throw new BadRequestException('Empty file');
+            throw new BadRequestException('FILE_EMPTY');
         }
 
         const signature = this.FILE_SIGNATURES[file.mimetype];
@@ -129,9 +117,7 @@ export class FileSecurityService {
         );
 
         if (!signatureMatch) {
-            throw new BadRequestException(
-                'File signature mismatch. File may be disguised or corrupted.',
-            );
+            throw new BadRequestException('FILE_SIGNATURE_MISMATCH');
         }
     }
 

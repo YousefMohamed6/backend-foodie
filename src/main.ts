@@ -5,7 +5,6 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import session from 'express-session';
 import helmet from 'helmet';
 import { AppModule } from './app.module';
-import { GlobalExceptionFilter } from './common/filters/global-exception.filter';
 import { SecureLoggingInterceptor } from './common/interceptors/secure-logging.interceptor';
 import { securityHeadersConfig } from './config/security-headers.config';
 const cookieParser = require('cookie-parser');
@@ -66,7 +65,8 @@ async function bootstrap() {
     }),
   );
 
-  app.useGlobalFilters(new GlobalExceptionFilter());
+  // Global Exception Filter is registered in AppModule using APP_FILTER
+  // app.useGlobalFilters(new GlobalExceptionFilter());
   app.useGlobalInterceptors(new SecureLoggingInterceptor());
 
   app.useGlobalPipes(

@@ -3,11 +3,11 @@ import { ConfigService } from '@nestjs/config';
 
 @Injectable()
 export class UploadService {
-  constructor(private configService: ConfigService) {}
+  constructor(private configService: ConfigService) { }
 
   uploadFile(file: Express.Multer.File) {
     if (!file) {
-      throw new BadRequestException('File is empty');
+      throw new BadRequestException('FILE_EMPTY');
     }
 
     const host =
@@ -28,7 +28,7 @@ export class UploadService {
 
   uploadDriverDocument(file: Express.Multer.File) {
     if (!file) {
-      throw new BadRequestException('File is empty');
+      throw new BadRequestException('FILE_EMPTY');
     }
 
     const host =

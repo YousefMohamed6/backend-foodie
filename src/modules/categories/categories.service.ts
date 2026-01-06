@@ -26,7 +26,7 @@ export class CategoriesService {
     if (user.role === UserRole.VENDOR) {
       const vendor = await this.vendorsService.findByAuthor(user.id);
       if (!vendor) {
-        throw new NotFoundException('Vendor profile not found');
+        throw new NotFoundException('VENDOR_NOT_FOUND');
       }
       vendorId = vendor.id;
     }
@@ -123,7 +123,7 @@ export class CategoriesService {
       },
     });
     if (!category) {
-      throw new NotFoundException(`Category with ID ${id} not found`);
+      throw new NotFoundException('NOT_FOUND');
     }
     return category;
   }
@@ -134,7 +134,7 @@ export class CategoriesService {
     if (user.role === UserRole.VENDOR) {
       const vendor = await this.vendorsService.findByAuthor(user.id);
       if (category.vendorId !== vendor?.id) {
-        throw new ForbiddenException('You can only update your own categories');
+        throw new ForbiddenException('FORBIDDEN');
       }
     }
 
@@ -172,7 +172,7 @@ export class CategoriesService {
     if (user.role === UserRole.VENDOR) {
       const vendor = await this.vendorsService.findByAuthor(user.id);
       if (category.vendorId !== vendor?.id) {
-        throw new ForbiddenException('You can only delete your own categories');
+        throw new ForbiddenException('FORBIDDEN');
       }
     }
 

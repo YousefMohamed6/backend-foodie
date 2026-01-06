@@ -73,10 +73,10 @@ export class WalletService {
 
   async topUp(userId: string, topUpDto: TopUpWalletDto) {
     if (topUpDto.paymentGateway.toLowerCase() !== 'fawaterak') {
-      throw new BadRequestException('Unsupported payment gateway');
+      throw new BadRequestException('UNSUPPORTED_PAYMENT_GATEWAY');
     }
     if (!topUpDto.successUrl || !topUpDto.failUrl || !topUpDto.pendingUrl) {
-      throw new BadRequestException('Redirection URLs are required');
+      throw new BadRequestException('REDIRECT_URLS_REQUIRED');
     }
 
     const user = await this.prisma.user.findUnique({
@@ -84,7 +84,7 @@ export class WalletService {
       select: { firstName: true, lastName: true, email: true, phoneNumber: true },
     });
     if (!user?.email || !user?.phoneNumber) {
-      throw new BadRequestException('User profile is missing required payment data');
+      throw new BadRequestException('MISSING_PAYMENT_DATA');
     }
 
     const transactionId = crypto.randomUUID();
@@ -147,7 +147,7 @@ export class WalletService {
     const balance = await this.getBalance(userId);
 
     if (balance < withdrawDto.amount) {
-      throw new BadRequestException('Insufficient funds');
+      throw new BadRequestException('INSUFFICIENT_FUNDS');
     }
 
     const transaction = await this.prisma.walletTransaction.create({
@@ -200,7 +200,7 @@ export class WalletService {
     const prisma = tx || this.prisma;
     const balance = await this.getBalance(userId);
     if (balance < amount) {
-      throw new BadRequestException('Insufficient wallet balance');
+      throw new BadRequestException('INSUFFICIENT_FUNDS');
     }
 
     const transaction = await prisma.walletTransaction.create({
@@ -268,7 +268,7 @@ export class WalletService {
       select: { paymentStatus: true },
     });
     if (!tx) {
-      throw new NotFoundException('Topup transaction not found');
+      throw new NotFoundException('TRANSACTION_NOT_FOUND');
     }
     return { status: tx.paymentStatus || 'PAID' };
   }

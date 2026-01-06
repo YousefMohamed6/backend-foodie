@@ -121,11 +121,11 @@ export class OrdersService {
     });
 
     if (!order) {
-      throw new NotFoundException(`Order with ID ${id} not found`);
+      throw new NotFoundException('ORDER_NOT_FOUND');
     }
 
     if (user.role === UserRole.CUSTOMER && order.authorId !== user.id) {
-      throw new ForbiddenException('Access denied');
+      throw new ForbiddenException('ACCESS_DENIED');
     }
 
     if (user.role === UserRole.MANAGER) {
@@ -164,7 +164,7 @@ export class OrdersService {
       include: { vendor: true },
     });
 
-    if (!order) throw new NotFoundException('Order not found');
+    if (!order) throw new NotFoundException('ORDER_NOT_FOUND');
 
     if (user.role === UserRole.MANAGER) {
       const managerZoneId = await this.managementService.validateManagerZoneAccess(user.id, order.vendor.zoneId);
@@ -175,11 +175,11 @@ export class OrdersService {
       });
 
       if (!driver || driver.role !== UserRole.DRIVER) {
-        throw new NotFoundException('Driver not found');
+        throw new NotFoundException('DRIVER_NOT_FOUND');
       }
 
       if (driver.zoneId !== managerZoneId) {
-        throw new ForbiddenException('Access denied: Driver outside your zone');
+        throw new ForbiddenException('ACCESS_DENIED');
       }
 
       await this.prisma.managerAuditLog.create({
@@ -206,10 +206,10 @@ export class OrdersService {
 
   async rejectOrder(id: string, user: User) {
     const order = await this.findOne(id, user);
-    if (!order) throw new NotFoundException('Order not found');
+    if (!order) throw new NotFoundException('ORDER_NOT_FOUND');
 
     if (order.driverId !== user.id) {
-      throw new ForbiddenException('You are not assigned to this order');
+      throw new ForbiddenException('DRIVER_NOT_ASSIGNED');
     }
 
     const savedOrder = await this.prisma.order.update({
@@ -233,14 +233,14 @@ export class OrdersService {
       where: { id },
     });
 
-    if (!order) throw new NotFoundException('Order not found');
+    if (!order) throw new NotFoundException('ORDER_NOT_FOUND');
 
     if (order.driverId !== user.id) {
-      throw new ForbiddenException('You are not assigned to this order');
+      throw new ForbiddenException('DRIVER_NOT_ASSIGNED');
     }
 
     if (order.status !== OrderStatus.DRIVER_PENDING) {
-      throw new BadRequestException('Order is not in pending state');
+      throw new BadRequestException('ORDER_NOT_PENDING');
     }
 
     const savedOrder = await this.prisma.order.update({
@@ -257,14 +257,14 @@ export class OrdersService {
       where: { id },
     });
 
-    if (!order) throw new NotFoundException('Order not found');
+    if (!order) throw new NotFoundException('ORDER_NOT_FOUND');
 
     if (order.driverId !== user.id) {
-      throw new ForbiddenException('You are not the driver for this order');
+      throw new ForbiddenException('DRIVER_NOT_ASSIGNED');
     }
 
     if (order.paymentMethod !== PaymentMethod.cash) {
-      throw new BadRequestException('This order is not a COD order');
+      throw new BadRequestException('NOT_COD_ORDER');
     }
 
     // Optional status check omitted for identical behavior as original
@@ -284,20 +284,20 @@ export class OrdersService {
       include: { vendor: true },
     });
 
-    if (!order) throw new NotFoundException('Order not found');
+    if (!order) throw new NotFoundException('ORDER_NOT_FOUND');
 
     if (user.role !== UserRole.MANAGER) {
-      throw new ForbiddenException('Access denied');
+      throw new ForbiddenException('ACCESS_DENIED');
     }
 
     await this.managementService.validateManagerZoneAccess(user.id, order.vendor.zoneId);
 
     if (!order.cashReportedAt) {
-      throw new BadRequestException('Driver has not reported cash collection yet');
+      throw new BadRequestException('CASH_NOT_REPORTED');
     }
 
     if (order.paymentStatus === PaymentStatus.PAID) {
-      throw new BadRequestException('Order is already marked as paid');
+      throw new BadRequestException('ORDER_ALREADY_PAID');
     }
 
     return await this.prisma.$transaction(async (tx) => {
@@ -334,7 +334,7 @@ export class OrdersService {
 
   async confirmManagerPayout(managerId: string, date: string, adminUser: User) {
     if (adminUser.role !== UserRole.ADMIN) {
-      throw new ForbiddenException('Access denied');
+      throw new ForbiddenException('ACCESS_DENIED');
     }
 
     const startOfDay = new Date(date);
@@ -350,7 +350,7 @@ export class OrdersService {
     });
 
     if (confirmations.length === 0) {
-      throw new BadRequestException('No cash confirmations found for this manager on this date');
+      throw new BadRequestException('NO_CASH_CONFIRMATIONS');
     }
 
     const totalAmount = confirmations.reduce((sum, conf) => sum + Number(conf.amount), 0);
@@ -400,7 +400,7 @@ export class OrdersService {
           items: {
             create: createOrderDto.products.map((item) => {
               const product = productMap.get(item.productId);
-              if (!product) throw new NotFoundException(`Product ${item.productId} not found`);
+              if (!product) throw new NotFoundException('PRODUCT_NOT_FOUND');
               const price = product.discountPrice ? Number(product.discountPrice) : Number(product.price);
               return {
                 productId: item.productId,

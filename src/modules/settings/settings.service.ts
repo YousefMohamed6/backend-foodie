@@ -35,7 +35,7 @@ export class SettingsService {
   async findOne(key: string) {
     const setting = await this.prisma.setting.findUnique({ where: { key } });
     if (!setting) {
-      throw new NotFoundException(`Setting with key ${key} not found`);
+      throw new NotFoundException('SETTING_NOT_FOUND');
     }
     return setting.value;
   }

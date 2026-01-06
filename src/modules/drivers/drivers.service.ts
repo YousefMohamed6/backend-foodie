@@ -18,14 +18,14 @@ export class DriversService {
     private prisma: PrismaService,
     @Inject(forwardRef(() => OrdersService))
     private ordersService: OrdersService,
-  ) {}
+  ) { }
 
   async create(createDriverDto: CreateDriverDto, userId: string) {
     const existingDriver = await this.prisma.driverProfile.findUnique({
       where: { userId },
     });
     if (existingDriver) {
-      throw new BadRequestException('Driver profile already exists');
+      throw new BadRequestException('DRIVER_PROFILE_EXISTS');
     }
 
     return this.prisma.driverProfile.create({
@@ -49,7 +49,7 @@ export class DriversService {
       include: { user: true },
     });
     if (!driver) {
-      throw new NotFoundException(`Driver with ID ${id} not found`);
+      throw new NotFoundException('DRIVER_NOT_FOUND');
     }
     return driver;
   }
@@ -99,7 +99,7 @@ export class DriversService {
   async getStatus(userId: string) {
     const driver = await this.findByUser(userId);
     if (!driver) {
-      throw new NotFoundException('Driver profile not found');
+      throw new NotFoundException('DRIVER_NOT_FOUND');
     }
     return {
       status: driver.status,
@@ -118,7 +118,7 @@ export class DriversService {
   ) {
     const driver = await this.findByUser(userId);
     if (!driver) {
-      throw new NotFoundException('Driver profile not found');
+      throw new NotFoundException('DRIVER_NOT_FOUND');
     }
 
     return this.prisma.driverProfile.update({
@@ -135,7 +135,7 @@ export class DriversService {
   async getDocuments(userId: string) {
     const driver = await this.findByUser(userId);
     if (!driver) {
-      throw new NotFoundException('Driver profile not found');
+      throw new NotFoundException('DRIVER_NOT_FOUND');
     }
     return this.prisma.driverDocument.findMany({
       where: { driverId: driver.id },
@@ -146,7 +146,7 @@ export class DriversService {
   async uploadDocument(userId: string, data: UploadDriverDocumentDto) {
     const driver = await this.findByUser(userId);
     if (!driver) {
-      throw new NotFoundException('Driver profile not found');
+      throw new NotFoundException('DRIVER_NOT_FOUND');
     }
     return this.prisma.driverDocument.create({
       data: {
@@ -174,7 +174,7 @@ export class DriversService {
   ) {
     const driver = await this.findByUser(userId);
     if (!driver) {
-      throw new NotFoundException('Driver profile not found');
+      throw new NotFoundException('DRIVER_NOT_FOUND');
     }
 
     const endDate = new Date(startDate);

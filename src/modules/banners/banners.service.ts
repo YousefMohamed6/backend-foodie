@@ -5,7 +5,7 @@ import { CreateBannerDto } from './dto/create-banner.dto';
 
 @Injectable()
 export class BannersService {
-  constructor(private prisma: PrismaService) {}
+  constructor(private prisma: PrismaService) { }
 
   async findAll(position?: string) {
     const where: Prisma.BannerWhereInput = { isActive: true };
@@ -16,7 +16,7 @@ export class BannersService {
   async findOne(id: string) {
     const banner = await this.prisma.banner.findUnique({ where: { id } });
     if (!banner) {
-      throw new NotFoundException(`Banner with ID ${id} not found`);
+      throw new NotFoundException('BANNER_NOT_FOUND');
     }
     return banner;
   }

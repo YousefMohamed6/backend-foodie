@@ -51,11 +51,11 @@ export class ChatService {
     });
 
     if (!channel) {
-      throw new NotFoundException('Channel not found');
+      throw new NotFoundException('CHANNEL_NOT_FOUND');
     }
 
     if (!channel.participants.some((p) => p.id === userId)) {
-      throw new ForbiddenException('You are not a participant in this channel');
+      throw new ForbiddenException('NOT_CHANNEL_PARTICIPANT');
     }
 
     const page = Number(query.page) || 1;
@@ -112,11 +112,11 @@ export class ChatService {
     });
 
     if (!channel) {
-      throw new NotFoundException('Channel not found');
+      throw new NotFoundException('CHANNEL_NOT_FOUND');
     }
 
     if (!channel.participants.some((p) => p.id === userId)) {
-      throw new ForbiddenException('You are not a participant in this channel');
+      throw new ForbiddenException('NOT_CHANNEL_PARTICIPANT');
     }
 
     const [message] = await this.prisma.$transaction([
@@ -188,7 +188,7 @@ export class ChatService {
     });
 
     if (!admin) {
-      throw new NotFoundException('Admin user not found');
+      throw new NotFoundException('ADMIN_NOT_FOUND');
     }
 
     const participantIds = Array.from(
@@ -220,17 +220,17 @@ export class ChatService {
     });
 
     if (!channel) {
-      throw new NotFoundException('Channel not found');
+      throw new NotFoundException('CHANNEL_NOT_FOUND');
     }
 
     // Check if channel has admin participant
     const hasAdmin = channel.participants.some((p) => p.role === 'ADMIN');
     if (!hasAdmin) {
-      throw new ForbiddenException('This is not an admin channel');
+      throw new ForbiddenException('NOT_ADMIN_CHANNEL');
     }
 
     if (!channel.participants.some((p) => p.id === userId)) {
-      throw new ForbiddenException('You are not a participant in this channel');
+      throw new ForbiddenException('NOT_CHANNEL_PARTICIPANT');
     }
 
     const [message] = await this.prisma.$transaction([

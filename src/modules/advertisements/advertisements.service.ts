@@ -5,7 +5,7 @@ import { UpdateAdvertisementDto } from './dto/update-advertisement.dto';
 
 @Injectable()
 export class AdvertisementsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(private prisma: PrismaService) { }
 
   async findAll() {
     return this.prisma.advertisement.findMany({ where: { isActive: true } });
@@ -14,7 +14,7 @@ export class AdvertisementsService {
   async findOne(id: string) {
     const ad = await this.prisma.advertisement.findUnique({ where: { id } });
     if (!ad) {
-      throw new NotFoundException(`Advertisement with ID ${id} not found`);
+      throw new NotFoundException('ADVERTISEMENT_NOT_FOUND');
     }
     return ad;
   }

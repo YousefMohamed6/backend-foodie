@@ -80,7 +80,7 @@ export class VendorsService {
       },
     });
     if (!vendor) {
-      throw new NotFoundException(`Vendor with ID ${id} not found`);
+      throw new NotFoundException('VENDOR_NOT_FOUND');
     }
     return this.mapVendorResponse(vendor);
   }

@@ -52,8 +52,9 @@ import { OnBoardingModule } from './modules/onboarding/onboarding.module';
 import { AttributesModule } from './modules/attributes/attributes.module';
 import { ReviewAttributesModule } from './modules/review-attributes/review-attributes.module';
 
-import { APP_GUARD } from '@nestjs/core';
+import { APP_FILTER, APP_GUARD } from '@nestjs/core';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
+import { GlobalExceptionFilter } from './common/filters/global-exception.filter';
 import { DeliveryModule } from './modules/delivery/delivery.module';
 import { DocumentsModule } from './modules/documents/documents.module';
 import { MapsModule } from './modules/maps/maps.module';
@@ -63,6 +64,8 @@ import { PrismaModule } from './prisma/prisma.module';
 import { SharedModule } from './shared/shared.module';
 
 import * as Joi from 'joi';
+import { AcceptLanguageResolver, HeaderResolver, I18nModule } from 'nestjs-i18n';
+
 
 @Module({
   imports: [
@@ -101,6 +104,18 @@ import * as Joi from 'joi';
         limit: 100, // 100 requests per minute
       },
     ]),
+    I18nModule.forRoot({
+      fallbackLanguage: 'ar',
+      loaderOptions: {
+        path: join(__dirname, '/i18n/'),
+        watch: true,
+      },
+      resolvers: [
+        new HeaderResolver(['x-lang']),
+        AcceptLanguageResolver,
+      ],
+    }),
+
 
     UsersModule,
     AuthModule,
@@ -155,6 +170,11 @@ import * as Joi from 'joi';
       provide: APP_GUARD,
       useClass: ThrottlerGuard,
     },
+    {
+      provide: APP_FILTER,
+      useClass: GlobalExceptionFilter,
+    },
+
   ],
 })
 export class AppModule {

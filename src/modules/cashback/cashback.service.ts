@@ -4,7 +4,7 @@ import { CreateCashbackDto } from './dto/create-cashback.dto';
 
 @Injectable()
 export class CashbackService {
-  constructor(private prisma: PrismaService) {}
+  constructor(private prisma: PrismaService) { }
 
   async findAll() {
     return this.prisma.cashback.findMany({ where: { isActive: true } });
@@ -13,7 +13,7 @@ export class CashbackService {
   async findOne(id: string) {
     const cashback = await this.prisma.cashback.findUnique({ where: { id } });
     if (!cashback) {
-      throw new NotFoundException(`Cashback with ID ${id} not found`);
+      throw new NotFoundException('CASHBACK_NOT_FOUND');
     }
     return cashback;
   }

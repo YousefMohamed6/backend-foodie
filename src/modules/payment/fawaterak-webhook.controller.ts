@@ -34,7 +34,7 @@ export class FawaterakWebhookController {
       payment_method: body.payment_method,
     });
     if (!valid) {
-      throw new BadRequestException('Invalid hashKey');
+      throw new BadRequestException('INVALID_HASH_KEY');
     }
 
     const invoiceId =

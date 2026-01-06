@@ -1,11 +1,11 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 
 @Injectable()
 export class GeolocationService {
   private readonly logger = new Logger(GeolocationService.name);
 
-  constructor(private prisma: PrismaService) {}
+  constructor(private prisma: PrismaService) { }
 
   /**
    * Calculate distance between two coordinates using Haversine formula
@@ -23,9 +23,9 @@ export class GeolocationService {
     const a =
       Math.sin(dLat / 2) * Math.sin(dLat / 2) +
       Math.cos(this.toRad(lat1)) *
-        Math.cos(this.toRad(lat2)) *
-        Math.sin(dLon / 2) *
-        Math.sin(dLon / 2);
+      Math.cos(this.toRad(lat2)) *
+      Math.sin(dLon / 2) *
+      Math.sin(dLon / 2);
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     return R * c;
   }
@@ -205,7 +205,7 @@ export class GeolocationService {
     });
 
     if (!vendor) {
-      throw new Error('Vendor not found');
+      throw new NotFoundException('VENDOR_NOT_FOUND');
     }
 
     const distance = this.calculateDistance(

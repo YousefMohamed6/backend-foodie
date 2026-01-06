@@ -5,7 +5,7 @@ import { SubscribeDto } from './dto/subscribe.dto';
 
 @Injectable()
 export class SubscriptionsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(private prisma: PrismaService) { }
 
   async getPlans() {
     return this.prisma.subscriptionPlan.findMany({ where: { isActive: true } });
@@ -16,7 +16,7 @@ export class SubscriptionsService {
       where: { id },
     });
     if (!plan) {
-      throw new NotFoundException(`Plan with ID ${id} not found`);
+      throw new NotFoundException('PLAN_NOT_FOUND');
     }
     return plan;
   }

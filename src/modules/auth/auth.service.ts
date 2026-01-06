@@ -48,7 +48,7 @@ export class AuthService {
   ) {
     const existingUser = await this.usersService.findByEmail(registerDto.email);
     if (existingUser) {
-      throw new ConflictException('Email already exists');
+      throw new ConflictException('EMAIL_ALREADY_EXISTS');
     }
 
     // Password hashing is handled in UsersService.create
@@ -63,11 +63,11 @@ export class AuthService {
     });
 
     if (!user) {
-      throw new UnauthorizedException('User not found');
+      throw new UnauthorizedException('USER_NOT_FOUND');
     }
 
     if (!user.isActive) {
-      throw new UnauthorizedException('User is inactive');
+      throw new UnauthorizedException('USER_INACTIVE');
     }
 
     return user;
@@ -83,12 +83,12 @@ export class AuthService {
       !validUser ||
       !(await bcrypt.compare(loginDto.password, validUser.password))
     ) {
-      throw new UnauthorizedException('Invalid credentials');
+      throw new UnauthorizedException('INVALID_CREDENTIALS');
     }
 
     // Ensure active
     if (!validUser.isActive) {
-      throw new UnauthorizedException('User is inactive');
+      throw new UnauthorizedException('USER_INACTIVE');
     }
 
     return this.generateTokens(validUser, context);
@@ -124,7 +124,7 @@ export class AuthService {
       lastName = socialLoginDto.lastName;
       providerId = applePayload.sub;
     } else {
-      throw new UnauthorizedException('Unsupported provider');
+      throw new UnauthorizedException('UNSUPPORTED_PROVIDER');
     }
 
     // Step 2: Find or create user with VERIFIED email
@@ -154,7 +154,7 @@ export class AuthService {
       }
     }
 
-    if (!user) throw new UnauthorizedException('User creation failed');
+    if (!user) throw new UnauthorizedException('USER_CREATION_FAILED');
 
     return this.generateTokens(user, context);
   }
@@ -179,7 +179,7 @@ export class AuthService {
       if (process.env.NODE_ENV !== 'production') {
         return { verificationId: otpKey, devOtp: otp };
       }
-      throw new BadRequestException('Failed to send verification code');
+      throw new BadRequestException('OTP_SEND_FAILED');
     }
 
     return { verificationId: otpKey };
@@ -196,7 +196,7 @@ export class AuthService {
     const storedOtp = await this.redisService.get(otpKey);
 
     if (!storedOtp || storedOtp !== code) {
-      throw new UnauthorizedException('Invalid or expired verification code');
+      throw new UnauthorizedException('INVALID_OTP');
     }
 
     // 2. Clear OTP after successful verification
@@ -205,7 +205,7 @@ export class AuthService {
     // 3. Find user and login
     const user = await this.usersService.findByPhone(phoneNumber);
     if (!user) {
-      throw new UnauthorizedException('Phone number not registered');
+      throw new UnauthorizedException('PHONE_NOT_REGISTERED');
     }
 
     return this.generateTokens(user, context);
@@ -214,7 +214,7 @@ export class AuthService {
   async forgotPassword(forgotPasswordDto: ForgotPasswordDto) {
     const user = await this.usersService.findByEmail(forgotPasswordDto.email);
     if (!user) {
-      throw new UnauthorizedException('User not found');
+      throw new UnauthorizedException('USER_NOT_FOUND');
     }
     // Generate reset token and send email
     return { message: 'Password reset link sent to email' };
@@ -224,7 +224,7 @@ export class AuthService {
     // Verify token and reset password
     const user = await this.usersService.findByEmail(resetPasswordDto.email);
     if (!user) {
-      throw new UnauthorizedException('User not found');
+      throw new UnauthorizedException('USER_NOT_FOUND');
     }
 
     await this.usersService.updatePassword(user.id, resetPasswordDto.password);
@@ -244,7 +244,7 @@ export class AuthService {
     });
 
     if (!user) {
-      throw new NotFoundException('User not found');
+      throw new NotFoundException('USER_NOT_FOUND');
     }
 
     return this.mapUserResponse(user);
@@ -265,7 +265,7 @@ export class AuthService {
       });
 
       const user = await this.usersService.findOne(payload.sub);
-      if (!user) throw new UnauthorizedException('User not found');
+      if (!user) throw new UnauthorizedException('USER_NOT_FOUND');
 
       const tokenHash = crypto
         .createHash('sha256')
@@ -276,19 +276,19 @@ export class AuthService {
         where: { token: tokenHash },
       });
 
-      if (!storedToken) throw new ForbiddenException('Invalid Refresh Token');
+      if (!storedToken) throw new ForbiddenException('INVALID_REFRESH_TOKEN');
       if (storedToken.revoked) {
         // Reuse detection: revoke all tokens for this user
         await this.revokeAllRefreshTokens(user.id);
-        throw new ForbiddenException('Refresh Token Reuse Detected');
+        throw new ForbiddenException('REFRESH_TOKEN_REUSE_DETECTED');
       }
       if (storedToken.expiresAt < new Date()) {
-        throw new ForbiddenException('Refresh Token Expired');
+        throw new ForbiddenException('REFRESH_TOKEN_EXPIRED');
       }
 
       // Validate binding
       if (storedToken.deviceId && storedToken.deviceId !== context.deviceId) {
-        throw new ForbiddenException('Device mismatch');
+        throw new ForbiddenException('DEVICE_MISMATCH');
       }
 
       // Rotate token
@@ -300,7 +300,7 @@ export class AuthService {
       return this.generateTokens(user, context);
     } catch (e) {
       if (e instanceof ForbiddenException) throw e;
-      throw new ForbiddenException('Invalid Refresh Token');
+      throw new ForbiddenException('INVALID_REFRESH_TOKEN');
     }
   }
 

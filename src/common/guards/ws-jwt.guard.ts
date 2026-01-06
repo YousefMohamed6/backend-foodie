@@ -15,7 +15,7 @@ export class WsJwtGuard implements CanActivate {
             const token = this.extractToken(client);
 
             if (!token) {
-                throw new WsException('Unauthorized access');
+                throw new WsException('UNAUTHORIZED');
             }
 
             const payload = await this.jwtService.verifyAsync(token);
@@ -26,7 +26,7 @@ export class WsJwtGuard implements CanActivate {
             return true;
         } catch (err) {
             this.logger.error(`WS Authentication failed: ${err.message}`);
-            throw new WsException('Unauthorized access');
+            throw new WsException('UNAUTHORIZED');
         }
     }
 

@@ -13,7 +13,7 @@ export class StoriesService {
   constructor(
     private prisma: PrismaService,
     private readonly vendorsService: VendorsService,
-  ) {}
+  ) { }
 
   async findAll(vendorId?: string) {
     const where: Prisma.StoryWhereInput = { isActive: true };
@@ -31,7 +31,7 @@ export class StoriesService {
       include: { vendor: true },
     });
     if (!story) {
-      throw new NotFoundException(`Story with ID ${id} not found`);
+      throw new NotFoundException('STORY_NOT_FOUND');
     }
     return story;
   }
@@ -39,7 +39,7 @@ export class StoriesService {
   async create(user: User, data: CreateStoryDto) {
     const vendor = await this.vendorsService.findByAuthor(user.id);
     if (!vendor) {
-      throw new ForbiddenException('Only vendors can create stories');
+      throw new ForbiddenException('FORBIDDEN');
     }
     return this.prisma.story.create({
       data: {
@@ -56,7 +56,7 @@ export class StoriesService {
       user.role !== UserRole.ADMIN &&
       (!vendor || story.vendorId !== vendor.id)
     ) {
-      throw new ForbiddenException('You cannot delete this story');
+      throw new ForbiddenException('STORY_DELETE_PERMISSION');
     }
     return this.prisma.story.delete({ where: { id } });
   }

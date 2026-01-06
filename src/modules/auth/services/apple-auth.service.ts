@@ -42,9 +42,7 @@ export class AppleAuthService {
       });
 
       if (!payload || !payload.sub || !payload.email) {
-        throw new UnauthorizedException(
-          'Invalid Apple token: missing required fields',
-        );
+        throw new UnauthorizedException('INVALID_APPLE_TOKEN');
       }
 
       this.logger.log(
@@ -64,7 +62,7 @@ export class AppleAuthService {
       this.logger.error(
         `Apple token verification failed: ${(error as Error).message}`,
       );
-      throw new UnauthorizedException('Invalid Apple identity token');
+      throw new UnauthorizedException('INVALID_APPLE_TOKEN');
     }
   }
 

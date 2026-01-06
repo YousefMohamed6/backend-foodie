@@ -12,7 +12,7 @@ export class GiftCardsService {
   constructor(
     private prisma: PrismaService,
     private readonly walletService: WalletService,
-  ) {}
+  ) { }
 
   async findAll() {
     return this.prisma.giftCardTemplate.findMany({
@@ -25,7 +25,7 @@ export class GiftCardsService {
       where: { id },
     });
     if (!template) {
-      throw new NotFoundException(`Gift card template with ID ${id} not found`);
+      throw new NotFoundException('GIFT_CARD_TEMPLATE_NOT_FOUND');
     }
     return template;
   }
@@ -59,15 +59,15 @@ export class GiftCardsService {
     });
 
     if (!card) {
-      throw new NotFoundException('Invalid gift card code');
+      throw new NotFoundException('INVALID_GIFT_CARD');
     }
 
     if (card.isRedeemed) {
-      throw new BadRequestException('Gift card already redeemed');
+      throw new BadRequestException('GIFT_CARD_REDEEMED');
     }
 
     if (card.expiresAt && card.expiresAt < new Date()) {
-      throw new BadRequestException('Gift card expired');
+      throw new BadRequestException('GIFT_CARD_EXPIRED');
     }
 
     // Add balance to user's wallet
