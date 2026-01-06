@@ -9,6 +9,40 @@ This document defines the REST API contract for the Restaurant/Foodie app backen
 
 ---
 
+## 📡 Standard Response Format
+
+All API responses follow a consistent structure to simplify client-side handling:
+
+### ✅ Success Response
+```json
+{
+  "success": true,
+  "data": { ... }
+}
+```
+
+### ❌ Error Response
+```json
+{
+  "success": false,
+  "message": "Human readable error message",
+  "errorCode": "ERR_ENTITY_NOT_FOUND",
+  "errors": [] // Optional array of validation errors
+}
+```
+
+### 🔑 Common Error Codes
+| Code | Description |
+|------|-------------|
+| `ERR_INTERNAL` | Unexpected server error |
+| `ERR_UNAUTHORIZED` | Invalid or expired token |
+| `ERR_FORBIDDEN` | Missing required permissions |
+| `ERR_NOT_FOUND` | Resource does not exist |
+| `ERR_BAD_REQUEST` | Validation or logic error |
+| `ERR_DATABASE` | Data persistence failure |
+
+---
+
 ## Authentication & Authorization
 
 ### User Roles

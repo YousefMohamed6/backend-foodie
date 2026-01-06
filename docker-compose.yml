@@ -1,5 +1,24 @@
 version: '3.8'
+
 services:
+  # Main Application
+  api:
+    build: .
+    restart: always
+    ports:
+      - "${PORT:-3000}:3000"
+    environment:
+      - DATABASE_URL=postgresql://${DATABASE_USER:-postgres}:${DATABASE_PASSWORD:-postgres}@db:5432/${DATABASE_NAME:-foodie_db}?schema=public
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - NODE_ENV=production
+    depends_on:
+      - db
+      - redis
+    volumes:
+      - ./uploads:/app/uploads
+
+  # Database
   db:
     image: postgres:14-alpine
     restart: always
@@ -11,6 +30,18 @@ services:
       - '${DATABASE_PORT:-5432}:5432'
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    # PostGIS support can be added by using a postgis image if needed
+    # image: postgis/postgis:14-3.2-alpine
+
+  # Cache & Queue
+  redis:
+    image: redis:alpine
+    restart: always
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis_data:/data
 
 volumes:
   postgres_data:
+  redis_data:

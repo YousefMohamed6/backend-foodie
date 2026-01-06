@@ -33,7 +33,7 @@ src/
 │   │   ├── roles.decorator.ts
 │   │   └── current-user.decorator.ts
 │   ├── filters/                    # Exception filters
-│   │   └── http-exception.filter.ts
+│   │   └── global-exception.filter.ts # 🆕 Enhanced with ERR_* codes
 │   ├── guards/                     # Auth guards
 │   │   ├── jwt-auth.guard.ts
 │   │   └── roles.guard.ts
@@ -99,6 +99,8 @@ src/
 │   │   ├── orders.module.ts
 │   │   ├── orders.controller.ts
 │   │   ├── orders.service.ts
+│   │   ├── order-pricing.service.ts  # 🆕 Pricing logic encapsulation
+│   │   ├── order-management.service.ts # 🆕 Admin/Driver logic encapsulation
 │   │   ├── entities/
 │   │   │   ├── order.entity.ts
 │   │   │   └── order-product.entity.ts

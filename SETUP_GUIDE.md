@@ -115,10 +115,10 @@ npm run start:prod
 ### Redis (Optional but Recommended)
 
 Redis is used for:
-- Job queues (BullMQ)
 - WebSocket scaling
 - Rate limiting
-- Caching
+- **Global Settings & Category Caching** (Highly Recommended for Performance)
+- Job queues (BullMQ)
 
 If Redis is not available, the application will:
 - Log jobs to console instead of processing them

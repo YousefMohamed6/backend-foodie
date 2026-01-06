@@ -73,6 +73,17 @@ pm2 save
 pm2 startup
 ```
 
+### 6. Containerized Deployment (Recommended)
+For a more stable and isolated environment, use Docker:
+
+```bash
+# 1. Build and start all services (App, DB, Redis)
+docker-compose up -d --build
+
+# 2. Run migrations inside the container
+docker-compose exec api npx prisma migrate deploy
+```
+
 ---
 
 ## 🔍 Post-Deployment Verification
