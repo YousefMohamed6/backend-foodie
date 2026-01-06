@@ -4,7 +4,7 @@ import { NestFactory } from '@nestjs/core';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import session from 'express-session';
 import helmet from 'helmet';
-import * as hpp from 'hpp';
+import hpp from 'hpp';
 import { AppModule } from './app.module';
 import { GlobalExceptionFilter } from './common/filters/global-exception.filter';
 import { SecureLoggingInterceptor } from './common/interceptors/secure-logging.interceptor';
