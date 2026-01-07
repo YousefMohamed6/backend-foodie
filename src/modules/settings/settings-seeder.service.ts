@@ -3,7 +3,7 @@ import { SettingsService } from './settings.service';
 
 @Injectable()
 export class SettingsSeederService implements OnModuleInit {
-  constructor(private readonly settingsService: SettingsService) {}
+  constructor(private readonly settingsService: SettingsService) { }
 
   async onModuleInit() {
     await this.seed();
@@ -12,6 +12,7 @@ export class SettingsSeederService implements OnModuleInit {
   async seed() {
     const defaultSettings = {
       googleMapKey: 'YOUR_GOOGLE_MAP_KEY',
+      referral_enabled: 'true',
       referral_amount: '10',
       RestaurantNearBy: JSON.stringify({
         radius: '10',

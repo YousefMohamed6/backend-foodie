@@ -23,18 +23,25 @@ process.on('uncaughtException', (error) => {
 });
 
 async function bootstrap() {
+  const isProduction = process.env.NODE_ENV === 'production';
+
   const app = await NestFactory.create(AppModule, {
-    logger: ['error', 'warn', 'log'],
+    logger: isProduction
+      ? ['error', 'warn', 'log']
+      : ['error', 'warn', 'log', 'debug'],
   });
 
   const configService = app.get(ConfigService);
   const port = configService.get<number>('app.port') || 3000;
-  const isProduction = process.env.NODE_ENV === 'production';
+
 
 
   app.use(helmet(securityHeadersConfig));
   app.use(cookieParser());
-  app.setGlobalPrefix('api/v1');
+  app.setGlobalPrefix('api/v1', {
+    exclude: ['/api', '/api/(.*)'],
+  });
+
 
 
   const allowedOrigins = configService.get<string>('ALLOWED_ORIGINS');
@@ -76,6 +83,10 @@ async function bootstrap() {
       transform: true,
       forbidNonWhitelisted: true,
       disableErrorMessages: isProduction,
+      validationError: {
+        target: !isProduction,
+        value: !isProduction,
+      },
       transformOptions: {
         enableImplicitConversion: false,
       },

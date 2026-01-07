@@ -107,7 +107,7 @@ import { AcceptLanguageResolver, HeaderResolver, I18nModule } from 'nestjs-i18n'
     I18nModule.forRoot({
       fallbackLanguage: 'ar',
       loaderOptions: {
-        path: join(__dirname, '/i18n/'),
+        path: join(__dirname, '..', 'i18n/'),
         watch: true,
       },
       resolvers: [

@@ -4,6 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
+import { SettingsService } from '../settings/settings.service';
 import { WalletService } from '../wallet/wallet.service';
 import { RedeemReferralDto } from './dto/referral.dto';
 
@@ -12,6 +13,7 @@ export class ReferralsService {
   constructor(
     private prisma: PrismaService,
     private walletService: WalletService,
+    private settingsService: SettingsService,
   ) { }
 
   async getReferralCode(userId: string) {
@@ -19,8 +21,10 @@ export class ReferralsService {
     if (!user) {
       throw new NotFoundException('USER_NOT_FOUND');
     }
-    if (!user.referralCode) {
-      const referralCode = Math.random()
+
+    let referralCode = user.referralCode;
+    if (!referralCode) {
+      referralCode = Math.random()
         .toString(36)
         .substring(2, 8)
         .toUpperCase();
@@ -28,9 +32,23 @@ export class ReferralsService {
         where: { id: userId },
         data: { referralCode },
       });
-      return { referralCode };
     }
-    return { referralCode: user.referralCode };
+
+    let amount = 0;
+    try {
+      const isEnabled = await this.settingsService.findOne('referral_enabled');
+
+      if (isEnabled === 'true') {
+        const amountSetting = await this.settingsService.findOne('referral_amount');
+        if (amountSetting) {
+          amount = Number(amountSetting);
+        }
+      }
+    } catch (error) {
+      // Ignore if setting not found
+    }
+
+    return { referralCode, amount };
   }
 
   async getHistory(userId: string) {

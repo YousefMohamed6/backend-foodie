@@ -3,11 +3,12 @@ import {
   Controller,
   Delete,
   Get,
+  NotFoundException,
   Param,
   Patch,
   Post,
   Query,
-  UseGuards,
+  UseGuards
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { type User, UserRole } from '@prisma/client';
@@ -116,7 +117,7 @@ export class DriversController {
     const driver = await this.driversService.findByUser(user.id);
     if (!driver) {
       // Should create first? Or throw error
-      throw new Error('Driver profile not found');
+      throw new NotFoundException('DRIVER_PROFILE_NOT_FOUND');
     }
     return this.driversService.update(driver.id, updateDriverDto);
   }

@@ -1,22 +1,37 @@
 import { Process, Processor } from '@nestjs/bull';
-import { NotificationService } from '../services/notification.service';
+import { PrismaService } from '../../prisma/prisma.service';
+import { FcmService } from '../services/fcm.service';
 
 @Processor('push-notification')
 export class SendPushNotificationProcessor {
-  constructor(private readonly notificationService: NotificationService) {}
+  constructor(
+    private readonly fcmService: FcmService,
+    private readonly prisma: PrismaService,
+  ) { }
 
   @Process()
   async handlePushNotificationJob(job: any) {
-    const { userId, title, body, type, metadata } = job.data || {};
+    const { userId, title, body, data } = job.data || {};
     if (!userId || !title || !body) {
       return;
     }
-    await this.notificationService.sendNotification(
-      userId,
+
+    // Get user's FCM token
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { fcmToken: true },
+    });
+
+    if (!user?.fcmToken) {
+      return;
+    }
+
+    // Send notification
+    await this.fcmService.sendNotification(
+      user.fcmToken,
       title,
       body,
-      type,
-      metadata,
+      data,
     );
   }
 }

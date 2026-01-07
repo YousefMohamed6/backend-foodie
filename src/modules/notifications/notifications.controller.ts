@@ -1,70 +1,103 @@
-import {
-  Controller,
-  Delete,
-  Get,
-  Param,
-  Patch,
-  Post,
-  Query,
-  Request,
-  UseGuards,
-} from '@nestjs/common';
-import {
-  ApiBearerAuth,
-  ApiOperation,
-  ApiQuery,
-  ApiTags,
-} from '@nestjs/swagger';
+import { Body, Controller, Post, UseGuards } from '@nestjs/common';
+import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { UserRole } from '@prisma/client';
+import { Roles } from '../../common/decorators/roles.decorator';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
-import { NotificationsService } from './notifications.service';
+import { RolesGuard } from '../../common/guards/roles.guard';
+import { NotificationService } from '../../shared/services/notification.service';
+import {
+  SendCustomNotificationDto,
+  SendRoleNotificationDto,
+} from './dto/send-notification.dto';
 
-@ApiTags('Notifications')
+@ApiTags('Admin - Notifications')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard)
-@Controller('notifications')
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Controller('admin/notifications')
 export class NotificationsController {
-  constructor(private readonly notificationsService: NotificationsService) {}
+  constructor(private readonly notificationService: NotificationService) { }
 
-  @Get()
-  @ApiOperation({ summary: 'Get user notifications' })
-  findAll(@Request() req, @Query('type') type?: string) {
-    return this.notificationsService.findAll(req.user.id, type);
+  @Post('send-to-customers')
+  @Roles(UserRole.ADMIN)
+  @ApiOperation({
+    summary: 'Send notification to all customers',
+    description:
+      'Send a broadcast notification to all active customers. Messages must be provided in both Arabic and English.',
+  })
+  async sendToCustomers(@Body() dto: SendRoleNotificationDto) {
+    const result = await this.notificationService.sendToRole(
+      UserRole.CUSTOMER,
+      dto.title,
+      dto.message,
+      dto.data,
+    );
+
+    return {
+      message: 'Notification sent to customers',
+      ...result,
+    };
   }
 
-  @Get('type/:type')
-  @ApiOperation({ summary: 'Get notification by type' })
-  findByType(@Request() req, @Param('type') type: string) {
-    return this.notificationsService.findByType(req.user.id, type);
+  @Post('send-to-vendors')
+  @Roles(UserRole.ADMIN)
+  @ApiOperation({
+    summary: 'Send notification to all vendors',
+    description:
+      'Send a broadcast notification to all active vendors. Messages must be provided in both Arabic and English.',
+  })
+  async sendToVendors(@Body() dto: SendRoleNotificationDto) {
+    const result = await this.notificationService.sendToRole(
+      UserRole.VENDOR,
+      dto.title,
+      dto.message,
+      dto.data,
+    );
+
+    return {
+      message: 'Notification sent to vendors',
+      ...result,
+    };
   }
 
-  @Post(':id/read')
-  @ApiOperation({ summary: 'Mark notification as read' })
-  markAsRead(@Param('id') id: string, @Request() req) {
-    return this.notificationsService.markAsRead(req.user.id, id);
+  @Post('send-to-drivers')
+  @Roles(UserRole.ADMIN)
+  @ApiOperation({
+    summary: 'Send notification to all drivers',
+    description:
+      'Send a broadcast notification to all active drivers. Messages must be provided in both Arabic and English.',
+  })
+  async sendToDrivers(@Body() dto: SendRoleNotificationDto) {
+    const result = await this.notificationService.sendToRole(
+      UserRole.DRIVER,
+      dto.title,
+      dto.message,
+      dto.data,
+    );
+
+    return {
+      message: 'Notification sent to drivers',
+      ...result,
+    };
   }
 
-  @Patch('mark-all-read')
-  @ApiOperation({ summary: 'Mark all notifications as read' })
-  markAllAsRead(@Request() req) {
-    return this.notificationsService.markAllAsRead(req.user.id);
-  }
+  @Post('send-custom')
+  @Roles(UserRole.ADMIN)
+  @ApiOperation({
+    summary: 'Send notification to specific users',
+    description:
+      'Send a notification to a list of specific users by their IDs. Messages must be provided in both Arabic and English.',
+  })
+  async sendCustom(@Body() dto: SendCustomNotificationDto) {
+    const result = await this.notificationService.sendCustomNotification(
+      dto.userIds,
+      dto.title,
+      dto.message,
+      dto.data,
+    );
 
-  @Delete(':id')
-  @ApiOperation({ summary: 'Delete a notification' })
-  remove(@Param('id') id: string, @Request() req) {
-    return this.notificationsService.remove(req.user.id, id);
-  }
-
-  @Delete()
-  @ApiOperation({ summary: 'Clear all notifications' })
-  clearAll(@Request() req) {
-    return this.notificationsService.clearAll(req.user.id);
-  }
-
-  @Get('templates')
-  @ApiOperation({ summary: 'Get notification template by type' })
-  @ApiQuery({ name: 'type', required: true, description: 'Notification type' })
-  getTemplate(@Query('type') type: string) {
-    return this.notificationsService.getTemplate(type);
+    return {
+      message: 'Custom notification sent',
+      ...result,
+    };
   }
 }

@@ -10,6 +10,7 @@
     "DATABASE_ERROR": "A database error occurred",
     "DUPLICATE_ENTRY": "This entry already exists",
     "EMAIL_ALREADY_EXISTS": "This email is already registered",
+    "PHONE_NUMBER_ALREADY_EXISTS": "This phone number is already registered",
     "INVALID_CREDENTIALS": "Invalid email or password",
     "USER_INACTIVE": "Your account is disabled. Please contact support.",
     "INVALID_OTP": "Invalid or expired verification code",
@@ -90,5 +91,6 @@
     "FILE_SIGNATURE_MISMATCH": "File signature mismatch",
     "PAYMENT_CONFIG_INVALID": "Payment configuration is invalid",
     "INVOICE_CREATION_FAILED": "Failed to create invoice",
-    "INVALID_HASH_KEY": "Invalid hash key"
+    "INVALID_HASH_KEY": "Invalid hash key",
+    "DRIVER_PROFILE_NOT_FOUND": "Driver profile not found"
 }

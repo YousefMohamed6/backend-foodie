@@ -32,6 +32,14 @@ export class UsersController {
     return this.usersService.findOne(req.user.id);
   }
 
+  @Patch()
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Update current user profile (alias)' })
+  updateCurrentUser(@Body() updateUserDto: UpdateUserDto, @Request() req) {
+    return this.usersService.update(req.user.id, updateUserDto);
+  }
+
   @Patch('me')
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard)

@@ -19,7 +19,8 @@
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
     "test:e2e": "jest --config ./test/jest-e2e.json",
     "doc": "compodoc -p tsconfig.json -s",
-    "doc:build": "compodoc -p tsconfig.json"
+    "doc:build": "compodoc -p tsconfig.json",
+    "set-currency": "ts-node scripts/set-default-currency.ts"
   },
   "dependencies": {
     "@adminjs/express": "^5.1.0",

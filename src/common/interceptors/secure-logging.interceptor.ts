@@ -39,6 +39,7 @@ export class SecureLoggingInterceptor implements NestInterceptor {
         const { method, url, ip, body, query } = request;
         const userAgent = request.get('user-agent') || '';
         const now = Date.now();
+        const isDevelopment = process.env.NODE_ENV !== 'production';
 
         // Sanitize and log request
         const sanitizedBody = this.maskSensitiveData(body);
@@ -48,8 +49,14 @@ export class SecureLoggingInterceptor implements NestInterceptor {
             `Incoming ${method} ${url} from ${ip} - User-Agent: ${userAgent}`,
         );
 
-        if (Object.keys(sanitizedBody || {}).length > 0) {
-            this.logger.debug(`Request Body: ${JSON.stringify(sanitizedBody)}`);
+        if (Object.keys(body || {}).length > 0) {
+            if (isDevelopment) {
+                // In development, log full body for debugging
+                this.logger.debug(`Request Body (Full): ${JSON.stringify(body, null, 2)}`);
+            } else {
+                // In production, log sanitized body
+                this.logger.debug(`Request Body: ${JSON.stringify(sanitizedBody)}`);
+            }
         }
 
         if (Object.keys(sanitizedQuery || {}).length > 0) {

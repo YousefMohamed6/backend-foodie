@@ -59,7 +59,7 @@ model User {
   firstName         String
   lastName          String
   email             String   @unique
-  phoneNumber       String?
+  phoneNumber       String?  @unique
   countryCode       String?
   password          String
   profilePictureURL String?
@@ -84,6 +84,7 @@ model User {
   appIdentifier String?
   provider      String?
   devicePlatform DevicePlatform? @map("device_platform")
+  preferredLanguage String? @default("ar") @map("preferred_language")
 
   referralCode String? @unique
   referredBy   String?
@@ -764,9 +765,9 @@ model Notification {
 model Referral {
   id           String   @id @default(uuid())
   referrerId   String
-  referrer     User     @relation("Referrer", fields: [referrerId], references: [id])
+  referrer     User     @relation("Referrer", fields: [referrerId], references: [id], onDelete: Cascade)
   referredId   String
-  referred     User     @relation("Referred", fields: [referredId], references: [id])
+  referred     User     @relation("Referred", fields: [referredId], references: [id], onDelete: Cascade)
   rewardAmount Decimal  @default(0) @db.Decimal(10, 2)
   isClaimed    Boolean  @default(false)
   createdAt    DateTime @default(now())
@@ -930,6 +931,7 @@ model Currency {
   code      String?
   isAfter   Boolean  @default(false)
   isActive  Boolean  @default(true) @map("is_active")
+  isDefault Boolean  @default(false) @map("is_default")
   symbol    String?
   decimal   Int      @default(2)
   createdAt DateTime @default(now())
@@ -942,7 +944,10 @@ model Language {
   id        String   @id @default(uuid())
   name      String
   isActive  Boolean  @default(true) @map("is_active")
-  code      String
+  code      String    @default("ar")
+  isRtl     Boolean  @default(true) @map("is_rtl")
+  image     String
+  isDefault Boolean  @default(false) @map("is_default")
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

@@ -1,8 +1,10 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
-import { DriverStatus, UserRole } from '@prisma/client';
+import { DriverStatus, TransactionType, UserRole } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../../prisma/prisma.service';
 import { RedisService } from '../../shared/services/redis.service';
+import { SettingsService } from '../settings/settings.service';
+import { WalletService } from '../wallet/wallet.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 
@@ -11,11 +13,24 @@ export class UsersService {
   constructor(
     private prisma: PrismaService,
     private redisService: RedisService,
+    private walletService: WalletService,
+    private settingsService: SettingsService,
   ) { }
 
   async create(createUserDto: CreateUserDto) {
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { referralCode: inputReferralCode, deviceId, ...userData } = createUserDto as any;
+
+    // Check if phone number already exists
+    if (userData.phoneNumber) {
+      const existingUser = await this.prisma.user.findFirst({
+        where: { phoneNumber: userData.phoneNumber },
+      });
+      if (existingUser) {
+        throw new BadRequestException('PHONE_NUMBER_ALREADY_EXISTS');
+      }
+    }
+
     const hashedPassword = await bcrypt.hash(userData.password, 10);
 
     let newReferralCode: string | undefined;
@@ -26,9 +41,17 @@ export class UsersService {
     let referrerId: string | undefined;
 
     if (inputReferralCode) {
-      const referrer = await this.prisma.user.findUnique({
+      let referrer = await this.prisma.user.findUnique({
         where: { referralCode: inputReferralCode },
       });
+
+      // Handle common confusion: 0 (zero) entered as O (letter) or vice-versa
+      // Since we generated codes with 0 and O previously, checks are needed
+      if (!referrer && inputReferralCode.includes('0')) {
+        referrer = await this.prisma.user.findUnique({
+          where: { referralCode: inputReferralCode.replace(/0/g, 'O') },
+        });
+      }
       if (!referrer) {
         throw new BadRequestException('INVALID_REFERRAL_CODE');
       }
@@ -54,12 +77,52 @@ export class UsersService {
     });
 
     if (referrerId) {
+      // Get referral settings
+      let rewardAmount = 0;
+      try {
+        const isEnabled = await this.settingsService.findOne('referral_enabled');
+        if (isEnabled === 'true') {
+          const amountSetting = await this.settingsService.findOne('referral_amount');
+          if (amountSetting) {
+            rewardAmount = Number(amountSetting);
+            // Cap referral amount at 100
+            if (rewardAmount > 100) {
+              rewardAmount = 100;
+            }
+          }
+        }
+      } catch (error) {
+        // If settings not found, use default of 0 (no reward)
+      }
+
+      // Create referral record
       await this.prisma.referral.create({
         data: {
           referrerId: referrerId,
           referredId: user.id,
+          rewardAmount,
         },
       });
+
+      // Credit referrer's wallet if reward amount is greater than 0
+      if (rewardAmount > 0) {
+        await this.prisma.walletTransaction.create({
+          data: {
+            userId: referrerId,
+            amount: rewardAmount,
+            type: TransactionType.DEPOSIT,
+            description: `Referral reward for inviting new user`,
+            paymentStatus: 'PAID',
+          },
+        });
+
+        // Update referrer's wallet balance in customer profile
+        await this.walletService.updateUserWallet(
+          referrerId,
+          rewardAmount,
+          'add',
+        );
+      }
     }
 
     const { password, ...result } = user;
@@ -67,7 +130,7 @@ export class UsersService {
   }
 
   private generateReferralCode(): string {
-    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
     let code = '';
     for (let i = 0; i < 8; i++) {
       code += chars.charAt(Math.floor(Math.random() * chars.length));

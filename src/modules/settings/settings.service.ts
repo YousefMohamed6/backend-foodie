@@ -68,4 +68,42 @@ export class SettingsService {
 
     return allSettings;
   }
+
+  async getPublicSettings() {
+    const publicKeys = [
+      'wallet_enabled',
+      'cash_on_delivery_enabled',
+      'app_name',
+      'app_version',
+      'about_us',
+      'terms_and_conditions',
+      'privacy_policy',
+      'story_enabled',
+      'google_play_link',
+      'app_store_link',
+      'website_url',
+    ];
+
+    const settings = await this.prisma.setting.findMany({
+      where: {
+        key: {
+          in: publicKeys,
+        },
+      },
+    });
+
+    const result: Record<string, any> = {};
+
+    for (const setting of settings) {
+      try {
+        // Try to parse as JSON first
+        result[setting.key] = JSON.parse(setting.value);
+      } catch {
+        // If not JSON, use as string
+        result[setting.key] = setting.value;
+      }
+    }
+
+    return result;
+  }
 }

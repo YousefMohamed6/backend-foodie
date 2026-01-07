@@ -10,11 +10,23 @@ export class SmsService {
   constructor(private configService: ConfigService) {
     const smsConfig = this.configService.get('sms');
 
-    if (smsConfig?.twilioAccountSid && smsConfig?.twilioAuthToken) {
-      this.twilioClient = twilio(
-        smsConfig.twilioAccountSid,
-        smsConfig.twilioAuthToken,
-      );
+    if (
+      smsConfig?.twilioAccountSid &&
+      smsConfig?.twilioAuthToken &&
+      smsConfig.twilioAccountSid.startsWith('AC')
+    ) {
+      try {
+        this.twilioClient = twilio(
+          smsConfig.twilioAccountSid,
+          smsConfig.twilioAuthToken,
+        );
+        this.logger.log('Twilio SMS service initialized');
+      } catch (error) {
+        this.logger.error('Failed to initialize Twilio client:', error);
+        this.logger.warn(
+          'SMS service not configured. SMS will be logged to console.',
+        );
+      }
     } else {
       this.logger.warn(
         'SMS service not configured. SMS will be logged to console.',

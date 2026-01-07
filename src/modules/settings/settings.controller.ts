@@ -11,22 +11,12 @@ import { SettingsService } from './settings.service';
 export class SettingsController {
   constructor(private readonly settingsService: SettingsService) { }
 
-  @Get()
-  @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.ADMIN)
-  @ApiOperation({ summary: 'Get all settings' })
-  findAll() {
-    return this.settingsService.findAll();
-  }
-
-  @Patch()
-  @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.ADMIN)
-  @ApiOperation({ summary: 'Update settings (Admin only)' })
-  update(@Body() settings: Record<string, string>) {
-    return this.settingsService.updateMany(settings);
+  // Specific routes must come BEFORE generic routes
+  @Get('app')
+  @ApiOperation({ summary: 'Get public app settings' })
+  async getAppSettings() {
+    const settings = await this.settingsService.getPublicSettings();
+    return settings;
   }
 
   @Get('about')
@@ -89,5 +79,24 @@ export class SettingsController {
     } catch {
       return {};
     }
+  }
+
+  // Generic routes come AFTER specific routes
+  @Get()
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN)
+  @ApiOperation({ summary: 'Get all settings (Admin only)' })
+  findAll() {
+    return this.settingsService.findAll();
+  }
+
+  @Patch()
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN)
+  @ApiOperation({ summary: 'Update settings (Admin only)' })
+  update(@Body() settings: Record<string, string>) {
+    return this.settingsService.updateMany(settings);
   }
 }

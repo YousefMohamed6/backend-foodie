@@ -10,7 +10,12 @@ export class FcmService {
   constructor(private configService: ConfigService) {
     const fcmConfig = this.configService.get('fcm');
 
-    if (fcmConfig?.serviceAccount) {
+    if (
+      fcmConfig?.serviceAccount &&
+      fcmConfig.serviceAccount.private_key &&
+      fcmConfig.serviceAccount.project_id &&
+      fcmConfig.serviceAccount.client_email
+    ) {
       try {
         if (!admin.apps.length) {
           this.firebaseAdmin = admin.initializeApp({
@@ -22,6 +27,9 @@ export class FcmService {
         this.logger.log('Firebase Admin SDK initialized');
       } catch (error) {
         this.logger.error('Failed to initialize Firebase Admin SDK:', error);
+        this.logger.warn(
+          'FCM service not configured. Push notifications will be logged to console.',
+        );
       }
     } else {
       this.logger.warn(
@@ -52,8 +60,8 @@ export class FcmService {
         },
         data: data
           ? Object.fromEntries(
-              Object.entries(data).map(([k, v]) => [k, String(v)]),
-            )
+            Object.entries(data).map(([k, v]) => [k, String(v)]),
+          )
           : {},
         android: {
           priority: 'high',
@@ -102,8 +110,8 @@ export class FcmService {
       },
       data: data
         ? Object.fromEntries(
-            Object.entries(data).map(([k, v]) => [k, String(v)]),
-          )
+          Object.entries(data).map(([k, v]) => [k, String(v)]),
+        )
         : {},
       android: {
         priority: 'high',
@@ -164,8 +172,8 @@ export class FcmService {
       },
       data: data
         ? Object.fromEntries(
-            Object.entries(data).map(([k, v]) => [k, String(v)]),
-          )
+          Object.entries(data).map(([k, v]) => [k, String(v)]),
+        )
         : {},
     };
 

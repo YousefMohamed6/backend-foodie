@@ -3,7 +3,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 
 @Injectable()
 export class CurrenciesSeederService implements OnModuleInit {
-  constructor(private prisma: PrismaService) {}
+  constructor(private prisma: PrismaService) { }
 
   async onModuleInit() {
     await this.seed();
@@ -20,6 +20,7 @@ export class CurrenciesSeederService implements OnModuleInit {
         isActive: true,
         isAfter: false,
         decimal: 2,
+        isDefault: false,
       },
       {
         code: 'EUR',
@@ -27,6 +28,7 @@ export class CurrenciesSeederService implements OnModuleInit {
         isActive: true,
         isAfter: true,
         decimal: 2,
+        isDefault: false,
       },
       {
         code: 'EGP',
@@ -34,6 +36,7 @@ export class CurrenciesSeederService implements OnModuleInit {
         isActive: true,
         isAfter: true,
         decimal: 2,
+        isDefault: true,
       },
     ];
 

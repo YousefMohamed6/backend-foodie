@@ -1,16 +1,16 @@
 import { Process, Processor } from '@nestjs/bull';
-import { NotificationService } from '../services/notification.service';
+import { EmailService } from '../services/email.service';
 
 @Processor('email')
 export class SendEmailProcessor {
-  constructor(private readonly notificationService: NotificationService) {}
+  constructor(private readonly emailService: EmailService) { }
 
   @Process()
   async handleEmailJob(job: any) {
-    const { userId, template, data } = job.data || {};
-    if (!userId || !template) {
+    const { to, subject, body } = job.data || {};
+    if (!to || !subject || !body) {
       return;
     }
-    await this.notificationService.sendEmail(userId, template, data);
+    await this.emailService.sendEmail(to, subject, body);
   }
 }

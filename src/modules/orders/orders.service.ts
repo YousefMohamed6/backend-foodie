@@ -151,8 +151,7 @@ export class OrdersService {
     await this.notificationService.sendOrderNotification(
       savedOrder.authorId,
       `notification_template_order_${updateOrderStatusDto.status.toLowerCase()}`,
-      savedOrder.id,
-      savedOrder.status,
+      { orderId: savedOrder.id, status: savedOrder.status },
     );
 
     return this.emitUpdate(savedOrder);
@@ -452,12 +451,19 @@ export class OrdersService {
         });
       }
 
-      await this.notificationService.sendVendorNotification(
-        createOrderDto.vendorId,
-        'notification_template_order_placed',
-        savedOrder.id,
-        savedOrder.status,
-      );
+      // Notify vendor about new order placed
+      const vendor = await tx.vendor.findUnique({
+        where: { id: createOrderDto.vendorId },
+        select: { authorId: true },
+      });
+
+      if (vendor?.authorId) {
+        await this.notificationService.sendOrderNotification(
+          vendor.authorId,
+          'notification_template_order_placed',
+          { orderId: savedOrder.id, status: savedOrder.status },
+        );
+      }
 
       return this.emitUpdate(savedOrder);
     });
