@@ -9,7 +9,7 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
-import { User } from '@prisma/client';
+import { User, UserRole } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 import * as crypto from 'crypto';
 import { PrismaService } from '../../prisma/prisma.service';
@@ -49,6 +49,17 @@ export class AuthService {
     const existingUser = await this.usersService.findByEmail(registerDto.email);
     if (existingUser) {
       throw new ConflictException('EMAIL_ALREADY_EXISTS');
+    }
+
+    // Security: Restrict public registration to specific roles
+    if (
+      registerDto.role &&
+      !([UserRole.CUSTOMER, UserRole.DRIVER] as UserRole[]).includes(
+        registerDto.role,
+      )
+    ) {
+      // Force to CUSTOMER or throw error. Throwing error is safer.
+      throw new ForbiddenException('ROLE_NOT_ALLOWED');
     }
 
     // Password hashing is handled in UsersService.create
@@ -139,6 +150,7 @@ export class AuthService {
         lastName: lastName || '',
         password: crypto.randomBytes(32).toString('hex'), // Random password for social users
         provider: socialLoginDto.provider,
+        devicePlatform: socialLoginDto.devicePlatform,
       } as any);
 
       this.logger.log(

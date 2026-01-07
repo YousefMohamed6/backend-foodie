@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { DriverStatus, UserRole } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../../prisma/prisma.service';
@@ -11,27 +11,68 @@ export class UsersService {
   constructor(
     private prisma: PrismaService,
     private redisService: RedisService,
-  ) {}
+  ) { }
 
   async create(createUserDto: CreateUserDto) {
-    const hashedPassword = await bcrypt.hash(createUserDto.password, 10);
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { referralCode: inputReferralCode, deviceId, ...userData } = createUserDto as any;
+    const hashedPassword = await bcrypt.hash(userData.password, 10);
+
+    let newReferralCode: string | undefined;
+    if (userData.role === UserRole.CUSTOMER || !userData.role) {
+      newReferralCode = this.generateReferralCode();
+    }
+
+    let referrerId: string | undefined;
+
+    if (inputReferralCode) {
+      const referrer = await this.prisma.user.findUnique({
+        where: { referralCode: inputReferralCode },
+      });
+      if (!referrer) {
+        throw new BadRequestException('INVALID_REFERRAL_CODE');
+      }
+      referrerId = referrer.id;
+    }
+
     const user = await this.prisma.user.create({
       data: {
-        ...createUserDto,
+        ...userData,
         password: hashedPassword,
-        role: createUserDto.role || UserRole.CUSTOMER,
+        referralCode: newReferralCode,
+        referredBy: referrerId,
+        role: userData.role || UserRole.CUSTOMER,
         customerProfile:
-          createUserDto.role === UserRole.CUSTOMER || !createUserDto.role
+          userData.role === UserRole.CUSTOMER || !userData.role
             ? { create: {} }
             : undefined,
         driverProfile:
-          createUserDto.role === UserRole.DRIVER
+          userData.role === UserRole.DRIVER
             ? { create: { status: DriverStatus.OFFLINE } }
             : undefined,
       },
     });
+
+    if (referrerId) {
+      await this.prisma.referral.create({
+        data: {
+          referrerId: referrerId,
+          referredId: user.id,
+        },
+      });
+    }
+
     const { password, ...result } = user;
     return result;
+  }
+
+  private generateReferralCode(): string {
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    let code = '';
+    for (let i = 0; i < 8; i++) {
+      code += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return code;
   }
 
   async findAll() {

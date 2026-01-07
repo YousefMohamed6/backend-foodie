@@ -1,4 +1,4 @@
-import { UserRole } from '@prisma/client';
+import { DevicePlatform, UserRole } from '@prisma/client';
 
 export class CreateUserDto {
   firstName: string;
@@ -8,4 +8,10 @@ export class CreateUserDto {
   role?: UserRole;
   phoneNumber?: string;
   zoneId?: string;
+  countryCode?: string;
+  fcmToken?: string;
+  profilePictureURL?: string;
+  devicePlatform?: DevicePlatform;
+  provider?: string;
+  referralCode?: string;
 }

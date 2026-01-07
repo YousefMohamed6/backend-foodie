@@ -34,6 +34,7 @@ async function bootstrap() {
 
   app.use(helmet(securityHeadersConfig));
   app.use(cookieParser());
+  app.setGlobalPrefix('api/v1');
 
 
   const allowedOrigins = configService.get<string>('ALLOWED_ORIGINS');

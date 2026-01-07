@@ -93,7 +93,7 @@ export class SecureLoggingInterceptor implements NestInterceptor {
         if (typeof obj === 'object') {
             const masked: any = {};
             for (const key in obj) {
-                if (obj.hasOwnProperty(key)) {
+                if (Object.prototype.hasOwnProperty.call(obj, key)) {
                     if (this.isSensitiveField(key)) {
                         masked[key] = '***REDACTED***';
                     } else if (typeof obj[key] === 'object') {

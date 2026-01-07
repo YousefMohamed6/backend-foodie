@@ -30,7 +30,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     // Try to get user from cache first
     const cachedUser = await this.redisService.get(cacheKey);
     if (cachedUser) {
-      return JSON.parse(cachedUser);
+      return cachedUser;
     }
 
     // Cache miss - fetch from database
@@ -41,7 +41,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
 
     // Cache user data with TTL matching JWT expiration (15 minutes default)
     const ttl = 15 * 60; // 15 minutes in seconds
-    await this.redisService.set(cacheKey, JSON.stringify(user), ttl);
+    await this.redisService.set(cacheKey, user, ttl);
 
     return user;
   }

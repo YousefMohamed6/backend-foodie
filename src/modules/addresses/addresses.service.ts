@@ -22,7 +22,7 @@ export class AddressesService {
     }
 
     if (createAddressDto.isDefault) {
-      return this.prisma.$transaction(async (tx) => {
+      const address = await this.prisma.$transaction(async (tx) => {
         await tx.address.updateMany({
           where: { customerId: profile.id, isDefault: true },
           data: { isDefault: false },
@@ -35,21 +35,24 @@ export class AddressesService {
           },
         });
       });
+      return this.transformAddress(address);
     }
 
-    return this.prisma.address.create({
+    const address = await this.prisma.address.create({
       data: {
         ...createAddressDto,
         customerId: profile.id,
       },
     });
+    return this.transformAddress(address);
   }
 
   async findAll(user: User) {
-    return this.prisma.address.findMany({
+    const addresses = await this.prisma.address.findMany({
       where: { customer: { userId: user.id } },
       orderBy: [{ isDefault: 'desc' }, { createdAt: 'desc' }],
     });
+    return addresses.map((addr) => this.transformAddress(addr));
   }
 
   async findDefault(user: User) {
@@ -59,7 +62,7 @@ export class AddressesService {
     if (!address) {
       throw new NotFoundException('DEFAULT_ADDRESS_NOT_FOUND');
     }
-    return address;
+    return this.transformAddress(address);
   }
 
   async findOne(id: string, user: User) {
@@ -73,7 +76,7 @@ export class AddressesService {
     if (address.customer.userId !== user.id) {
       throw new ForbiddenException('ACCESS_DENIED');
     }
-    return address;
+    return this.transformAddress(address);
   }
 
   async update(id: string, updateAddressDto: UpdateAddressDto, user: User) {
@@ -81,7 +84,7 @@ export class AddressesService {
     await this.findOne(id, user);
 
     if (updateAddressDto.isDefault) {
-      return this.prisma.$transaction(async (tx) => {
+      const address = await this.prisma.$transaction(async (tx) => {
         await tx.address.updateMany({
           where: { customer: { userId: user.id }, isDefault: true },
           data: { isDefault: false },
@@ -92,16 +95,27 @@ export class AddressesService {
           data: updateAddressDto,
         });
       });
+      return this.transformAddress(address);
     }
 
-    return this.prisma.address.update({
+    const address = await this.prisma.address.update({
       where: { id },
       data: updateAddressDto,
     });
+    return this.transformAddress(address);
   }
 
   async remove(id: string, user: User) {
     await this.findOne(id, user);
-    return this.prisma.address.delete({ where: { id } });
+    const address = await this.prisma.address.delete({ where: { id } });
+    return this.transformAddress(address);
+  }
+
+  private transformAddress(address: any) {
+    return {
+      ...address,
+      latitude: address.latitude ? Number(address.latitude) : null,
+      longitude: address.longitude ? Number(address.longitude) : null,
+    };
   }
 }

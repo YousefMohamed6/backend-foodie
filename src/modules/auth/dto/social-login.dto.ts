@@ -1,5 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsNotEmpty, IsOptional, IsString } from 'class-validator';
+import { DevicePlatform } from '@prisma/client';
+import { IsEnum, IsNotEmpty, IsOptional, IsString } from 'class-validator';
 
 export class SocialLoginDto {
   @ApiProperty({
@@ -43,4 +44,13 @@ export class SocialLoginDto {
   @IsOptional()
   @IsString()
   deviceId?: string;
+
+  @ApiProperty({
+    required: false,
+    enum: DevicePlatform,
+    description: 'Device platform (android, ios, web)',
+  })
+  @IsOptional()
+  @IsEnum(DevicePlatform)
+  devicePlatform?: DevicePlatform;
 }

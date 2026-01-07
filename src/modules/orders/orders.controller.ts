@@ -35,8 +35,9 @@ export class OrdersController {
   @Post()
   @Roles(UserRole.CUSTOMER)
   @ApiOperation({ summary: 'Create a new order' })
-  create(@Body() createOrderDto: CreateOrderDto, @Request() req) {
-    return this.ordersService.create(createOrderDto, req.user);
+  async create(@Body() createOrderDto: CreateOrderDto, @Request() req) {
+    const data = await this.ordersService.create(createOrderDto, req.user);
+    return { success: true, message: 'ORDER_SUCCESS', data };
   }
 
   @Get()
@@ -45,80 +46,101 @@ export class OrdersController {
   @ApiQuery({ name: 'status', required: false })
   @ApiQuery({ name: 'vendorId', required: false })
   @ApiQuery({ name: 'firstOrder', required: false, type: Boolean })
-  findAll(@Request() req, @Query() query: FindAllOrdersQueryDto) {
-    return this.ordersService.findAll(req.user, query);
+  async findAll(@Request() req, @Query() query: FindAllOrdersQueryDto) {
+    const data = await this.ordersService.findAll(req.user, query);
+    return { success: true, message: 'ORDER_SUCCESS', data };
   }
 
   @Get(':id')
   @Roles(UserRole.ADMIN, UserRole.CUSTOMER, UserRole.VENDOR, UserRole.DRIVER, UserRole.MANAGER)
   @ApiOperation({ summary: 'Get an order by ID' })
-  findOne(@Param('id') id: string, @Request() req) {
-    return this.ordersService.findOne(id, req.user);
+  async findOne(@Param('id') id: string, @Request() req) {
+    const data = await this.ordersService.findOne(id, req.user);
+    return { success: true, message: 'ORDER_SUCCESS', data };
   }
 
   @Patch(':id/status')
   @Roles(UserRole.ADMIN, UserRole.VENDOR, UserRole.DRIVER)
   @ApiOperation({ summary: 'Update order status' })
-  updateStatus(
+  async updateStatus(
     @Param('id') id: string,
     @Body() updateOrderStatusDto: UpdateOrderStatusDto,
     @Request() req,
   ) {
-    return this.ordersService.updateStatus(id, updateOrderStatusDto, req.user);
+    const data = await this.ordersService.updateStatus(
+      id,
+      updateOrderStatusDto,
+      req.user,
+    );
+    return { success: true, message: 'ORDER_SUCCESS', data };
   }
 
   @Get(':id/reviews/:productId')
   @ApiOperation({ summary: 'Get order review for a product' })
-  getOrderReview(
+  async getOrderReview(
     @Param('id') id: string,
     @Param('productId') productId: string,
   ) {
-    return this.ordersService.getOrderReview(id, productId);
+    const data = await this.ordersService.getOrderReview(id, productId);
+    return { success: true, message: 'ORDER_SUCCESS', data };
   }
 
   @Post(':id/assign-driver')
   @Roles(UserRole.ADMIN, UserRole.VENDOR, UserRole.MANAGER)
   @ApiOperation({ summary: 'Assign a driver to an order' })
-  assignDriver(
+  async assignDriver(
     @Param('id') id: string,
     @Body() assignDriverDto: AssignDriverDto,
     @Request() req,
   ) {
-    return this.ordersService.assignDriver(id, assignDriverDto, req.user);
+    const data = await this.ordersService.assignDriver(
+      id,
+      assignDriverDto,
+      req.user,
+    );
+    return { success: true, message: 'ORDER_SUCCESS', data };
   }
 
   @Post(':id/reject')
   @Roles(UserRole.DRIVER)
   @ApiOperation({ summary: 'Reject an assigned order' })
-  rejectOrder(@Param('id') id: string, @Request() req) {
-    return this.ordersService.rejectOrder(id, req.user);
+  async rejectOrder(@Param('id') id: string, @Request() req) {
+    const data = await this.ordersService.rejectOrder(id, req.user);
+    return { success: true, message: 'ORDER_SUCCESS', data };
   }
 
   @Post(':id/accept')
   @Roles(UserRole.DRIVER)
   @ApiOperation({ summary: 'Accept an assigned order' })
-  acceptOrder(@Param('id') id: string, @Request() req) {
-    return this.ordersService.acceptOrder(id, req.user);
+  async acceptOrder(@Param('id') id: string, @Request() req) {
+    const data = await this.ordersService.acceptOrder(id, req.user);
+    return { success: true, message: 'ORDER_SUCCESS', data };
   }
 
   @Post(':id/report-cash')
   @Roles(UserRole.DRIVER)
   @ApiOperation({ summary: 'Driver reports cash collection for COD order' })
-  reportCashCollection(@Param('id') id: string, @Request() req) {
-    return this.ordersService.reportCashCollection(id, req.user);
+  async reportCashCollection(@Param('id') id: string, @Request() req) {
+    const data = await this.ordersService.reportCashCollection(id, req.user);
+    return { success: true, message: 'ORDER_SUCCESS', data };
   }
 
   @Post(':id/confirm-cash')
   @Roles(UserRole.MANAGER)
   @ApiOperation({ summary: 'Manager confirms cash receipt for COD order' })
-  confirmCashReceipt(@Param('id') id: string, @Request() req) {
-    return this.ordersService.confirmCashReceipt(id, req.user);
+  async confirmCashReceipt(@Param('id') id: string, @Request() req) {
+    const data = await this.ordersService.confirmCashReceipt(id, req.user);
+    return { success: true, message: 'ORDER_SUCCESS', data };
   }
 
   @Get('drivers/:driverId/pending-cash-orders')
   @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.DRIVER)
   @ApiOperation({ summary: 'Get all cash orders still with a driver (Not yet handed over)' })
-  getDriverPendingCash(@Param('driverId') driverId: string, @Request() req) {
-    return this.ordersService.getDriverPendingCashOrders(driverId, req.user);
+  async getDriverPendingCash(@Param('driverId') driverId: string, @Request() req) {
+    const data = await this.ordersService.getDriverPendingCashOrders(
+      driverId,
+      req.user,
+    );
+    return { success: true, message: 'ORDER_SUCCESS', data };
   }
 }

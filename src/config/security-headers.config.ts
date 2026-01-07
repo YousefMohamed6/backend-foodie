@@ -53,7 +53,7 @@ export const securityHeadersConfig = {
 
     crossOriginEmbedderPolicy: false,
     crossOriginOpenerPolicy: { policy: 'same-origin-allow-popups' as const },
-    crossOriginResourcePolicy: { policy: 'same-site' as const },
+    crossOriginResourcePolicy: { policy: 'cross-origin' as const },
 
     hidePoweredBy: true,
 } as const;

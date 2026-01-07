@@ -11,6 +11,7 @@ export const orderInclude = {
     items: {
         include: {
             extras: true,
+            product: true,
         },
     },
 } satisfies Prisma.OrderInclude;
