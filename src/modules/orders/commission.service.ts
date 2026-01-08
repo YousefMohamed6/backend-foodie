@@ -5,7 +5,7 @@ import { SettingsService } from '../settings/settings.service';
 
 export interface CommissionCalculation {
     rate: number;
-    value: number;
+    value: number; // in standard currency units, but rounded correctly
     baseAmount: number;
 }
 
@@ -26,21 +26,25 @@ export class CommissionService {
         private settingsService: SettingsService,
     ) { }
 
+    private round(amount: number): number {
+        return Math.round(amount * 100) / 100;
+    }
+
     calculateVendorCommission(orderTotal: number, rate: number): CommissionCalculation {
         const value = (orderTotal * rate) / 100;
         return {
             rate,
-            value: Math.round(value * 100) / 100,
+            value: this.round(value),
             baseAmount: orderTotal,
         };
     }
 
-    calculateDriverCommission(deliveryFee: number, rate: number): CommissionCalculation {
-        const value = (deliveryFee * rate) / 100;
+    calculateDriverCommission(distance: number, ratePerKm: number): CommissionCalculation {
+        const value = distance * ratePerKm;
         return {
-            rate,
-            value: Math.round(value * 100) / 100,
-            baseAmount: deliveryFee,
+            rate: ratePerKm,
+            value: this.round(value),
+            baseAmount: distance,
         };
     }
 
@@ -50,6 +54,36 @@ export class CommissionService {
 
     async getDriverCommissionRate(): Promise<number> {
         return this.settingsService.getCommissionRate('driver');
+    }
+
+    async getDeliveryFeePerKm(): Promise<number> {
+        try {
+            const value = await this.settingsService.findOne('delivery_fee_per_km');
+            const rate = parseFloat(value);
+            return isNaN(rate) ? 1 : rate; // Default to 1 if not set
+        } catch {
+            return 1;
+        }
+    }
+
+    async getMinDeliveryPay(): Promise<number> {
+        try {
+            const value = await this.settingsService.findOne('min_delivery_pay');
+            const pay = parseFloat(value);
+            return isNaN(pay) ? 5 : pay; // Default to 5 if not set
+        } catch {
+            return 5;
+        }
+    }
+
+    async getMaxDriverDebt(): Promise<number> {
+        try {
+            const value = await this.settingsService.findOne('max_driver_debt');
+            const limit = parseFloat(value);
+            return isNaN(limit) ? 500 : limit; // Default to 500 if not set
+        } catch {
+            return 500;
+        }
     }
 
     async createCommissionSnapshot(

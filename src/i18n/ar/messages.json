@@ -92,5 +92,17 @@
     "PAYMENT_CONFIG_INVALID": "إعدادات الدفع غير صالحة",
     "INVOICE_CREATION_FAILED": "فشل إنشاء الفاتورة",
     "INVALID_HASH_KEY": "مفتاح التحقق غير صالح",
-    "DRIVER_PROFILE_NOT_FOUND": "ملف السائق غير موجود"
+    "DRIVER_PROFILE_NOT_FOUND": "ملف السائق غير موجود",
+    "PRICE_NON_POSITIVE": "يجب أن يكون السعر أكبر من 0",
+    "DISCOUNT_PRICE_NON_POSITIVE": "يجب أن يكون سعر الخصم أكبر من 0",
+    "DISCOUNT_EXCEEDS_PRICE": "يجب أن يكون سعر الخصم أقل من السعر الأساسي",
+    "PRICE_EXCEEDS_MAX": "السعر يتجاوز الحد الأقصى المسموح به",
+    "UNSUPPORTED_FILE_TYPE": "نوع الملف غير مدعوم",
+    "ORDER_NOT_PLACED": "تعذر إرسال الطلب",
+    "COMMISSION_ALREADY_APPLIED": "تم تطبيق العمولة بالفعل",
+    "INVALID_ORDER_STATUS": "حالة الطلب غير صالحة",
+    "ORDER_NOT_ACCEPTED_BY_DRIVER": "لم يتم قبول الطلب من قبل السائق",
+    "CANNOT_ASSIGN_DRIVER_TO_CLOSED_ORDER": "لا يمكن تعيين سائق لطلب مكتمل أو ملغى",
+    "USE_SPECIFIC_ENDPOINT_FOR_THIS_STATUS_CHANGE": "يتطلب تغيير الحالة استخدام نقطة نهاية مخصصة (مثل الإكمال أو قبول المتجر)",
+    "ORDER_NOT_READY_YET": "الطلب لم يجهز بعد"
 }

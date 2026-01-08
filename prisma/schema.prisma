@@ -43,16 +43,16 @@ enum OnboardingType {
 }
 
 enum OrderStatus {
-  PLACED              @map("Order Placed")
-  VENDOR_ACCEPTED     @map("Vendor Accepted")
-  VENDOR_REJECTED     @map("Vendor Rejected")
-  CANCELLED           @map("Order Cancelled")
-  DRIVER_PENDING      @map("Driver Pending")
-  DRIVER_ACCEPTED     @map("Driver Accepted")
-  DRIVER_REJECTED     @map("Driver Rejected")
-  SHIPPED             @map("Order Shipped")
-  IN_TRANSIT          @map("In Transit")
-  COMPLETED           @map("Order Completed")
+  PLACED          @map("Order Placed")
+  VENDOR_ACCEPTED @map("Vendor Accepted")
+  VENDOR_REJECTED @map("Vendor Rejected")
+  CANCELLED       @map("Order Cancelled")
+  DRIVER_PENDING  @map("Driver Pending")
+  DRIVER_ACCEPTED @map("Driver Accepted")
+  DRIVER_REJECTED @map("Driver Rejected")
+  SHIPPED         @map("Order Shipped")
+  IN_TRANSIT      @map("In Transit")
+  COMPLETED       @map("Order Completed")
 }
 
 enum CommissionSource {
@@ -87,10 +87,10 @@ model User {
   subscriptionPlan       SubscriptionPlan? @relation(fields: [subscriptionPlanId], references: [id])
   subscriptionExpiryDate DateTime?
 
-  appIdentifier String?
-  provider      String?
-  devicePlatform DevicePlatform? @map("device_platform")
-  preferredLanguage String? @default("ar") @map("preferred_language")
+  appIdentifier     String?
+  provider          String?
+  devicePlatform    DevicePlatform? @map("device_platform")
+  preferredLanguage String?         @default("ar") @map("preferred_language")
 
   referralCode String? @unique
   referredBy   String?
@@ -102,7 +102,7 @@ model User {
   ordersAsDriver     Order[]             @relation("OrderDriver")
   walletTransactions WalletTransaction[]
   reviews            Review[]
-  reviewsAsDriver    Review[] @relation("ReviewDriver")
+  reviewsAsDriver    Review[]            @relation("ReviewDriver")
   subscriptions      Subscription[]
   cashbackRedeems    CashbackRedeem[]
   withdrawMethod     WithdrawMethod?
@@ -111,19 +111,26 @@ model User {
   chatMessages  ChatMessage[]
   chatChannels  ChatChannel[]  @relation("UserChannels")
 
-  referralsAsReferrer Referral[]        @relation("Referrer")
-  referralsAsReferred Referral[]        @relation("Referred")
-  favoriteVendors     FavoriteVendor[]
-  favoriteProducts    FavoriteProduct[]
-  userGiftCards       UserGiftCard[]
-  dineInBookings      DineInBooking[]
-  refreshTokens       RefreshToken[]
-  managerAuditLogs    ManagerAuditLog[]   @relation("ManagerLogs")
-  driverAuditLogs     ManagerAuditLog[]   @relation("DriverManagerLogs")
-  managerCashConfirmations ManagerCashConfirmation[] @relation("ManagerCashConfirmations")
-  driverCashConfirmations  ManagerCashConfirmation[] @relation("DriverCashConfirmations")
+  referralsAsReferrer      Referral[]                  @relation("Referrer")
+  referralsAsReferred      Referral[]                  @relation("Referred")
+  favoriteVendors          FavoriteVendor[]
+  favoriteProducts         FavoriteProduct[]
+  userGiftCards            UserGiftCard[]
+  dineInBookings           DineInBooking[]
+  refreshTokens            RefreshToken[]
+  managerAuditLogs         ManagerAuditLog[]           @relation("ManagerLogs")
+  driverAuditLogs          ManagerAuditLog[]           @relation("DriverManagerLogs")
+  managerCashConfirmations ManagerCashConfirmation[]   @relation("ManagerCashConfirmations")
+  driverCashConfirmations  ManagerCashConfirmation[]   @relation("DriverCashConfirmations")
   managerPayouts           ManagerPayoutConfirmation[] @relation("ManagerPayouts")
   adminPayoutConfirmations ManagerPayoutConfirmation[] @relation("AdminPayoutConfirmations")
+
+  // Analytics relations
+  activityLogs       UserActivityLog[]
+  driverMetrics      DriverMetricsSnapshot[]     @relation("DriverMetrics")
+  customerMetrics    CustomerEngagementMetrics[] @relation("CustomerMetrics")
+  subscriptionEvents SubscriptionEventLog[]      @relation("SubscriptionEvents")
+  deliveryEvents     DeliveryEvent[]             @relation("DriverDeliveryEvents")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -162,14 +169,38 @@ model DriverProfile {
   carNumber     String?
   carPictureURL String?
 
-  rating      Decimal          @default(0) @db.Decimal(2, 1)
-  totalOrders Int              @default(0)
-  documents   DriverDocument[]
+  rating       Decimal          @default(0) @db.Decimal(2, 1)
+  totalOrders  Int              @default(0)
+  walletAmount Decimal          @default(0) @map("wallet_amount") @db.Decimal(10, 2)
+  documents    DriverDocument[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@map("driver_profiles")
+}
+
+model AdminWallet {
+  id           String  @id @default(uuid())
+  walletAmount Decimal @default(0) @map("wallet_amount") @db.Decimal(10, 2)
+  updatedAt    DateTime @updatedAt
+
+  transactions PlatformTransaction[]
+
+  @@map("admin_wallets")
+}
+
+model PlatformTransaction {
+  id        String   @id @default(uuid())
+  walletId  String   @map("wallet_id")
+  wallet    AdminWallet @relation(fields: [walletId], references: [id])
+  amount    Decimal  @db.Decimal(10, 2)
+  type      String   // CREDIT, DEBIT
+  reason    String
+  orderId   String?  @map("order_id")
+  createdAt DateTime @default(now())
+
+  @@map("platform_transactions")
 }
 
 model Vendor {
@@ -228,13 +259,15 @@ model Vendor {
   dineInBookings  DineInBooking[]
 
   subscriptionId String?
-  subscription   Subscription? @relation("VendorSubscription", fields: [subscriptionId], references: [id])
-  advertisements  Advertisement[]
-  schedules  VendorSchedule[]
-  commission VendorCommission?
+  subscription   Subscription?     @relation("VendorSubscription", fields: [subscriptionId], references: [id])
+  advertisements Advertisement[]
+  schedules      VendorSchedule[]
+  commission     VendorCommission?
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt             DateTime                @default(now())
+  updatedAt             DateTime                @updatedAt
+  VendorMetricsSnapshot VendorMetricsSnapshot[]
+  deliveryEvents        DeliveryEvent[]         @relation("VendorDeliveryEvents")
 
   @@map("vendors")
 }
@@ -307,14 +340,14 @@ model Product {
   vendorId String @map("vendor_id")
   vendor   Vendor @relation(fields: [vendorId], references: [id])
 
-  takeawayOption Boolean @default(true) @map("takeaway")
-  isVeg          Boolean @default(false) @map("is_veg")
+  takeawayOption Boolean            @default(true) @map("takeaway")
+  isVeg          Boolean            @default(false) @map("is_veg")
   calories       String?
   gram           String?
   fats           String?
   proteins       String?
   itemAttributes ProductAttribute[]
-  isApprove      Boolean @default(true)
+  isApprove      Boolean            @default(true)
 
   extras           ProductExtra[]
   reviews          Review[]
@@ -398,46 +431,52 @@ model Order {
   notes          String?
   takeAway       Boolean       @default(false)
   scheduleTime   DateTime?
-  status         OrderStatus @default(PLACED)
+  estimatedReadyAt DateTime?     @map("estimated_ready_at")
+  isReadyNotificationSent Boolean   @default(false) @map("is_ready_notification_sent")
+  status         OrderStatus   @default(PLACED)
   paymentStatus  PaymentStatus @default(UNPAID) @map("payment_status")
-  cashReportedAt DateTime? @map("cash_reported_at")
+  cashReportedAt DateTime?     @map("cash_reported_at")
 
-  chatChannels       ChatChannel[]
-  walletTransactions WalletTransaction[]
-  reviews            Review[]
-  managerAuditLogs        ManagerAuditLog[] @relation("OrderManagerLogs")
+  chatChannels             ChatChannel[]
+  walletTransactions       WalletTransaction[]
+  reviews                  Review[]
+  managerAuditLogs         ManagerAuditLog[]         @relation("OrderManagerLogs")
   managerCashConfirmations ManagerCashConfirmation[] @relation("OrderCashConfirmations")
 
-  createdAt      DateTime    @default(now())
+  createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   // Financial Fields
-  orderSubtotal            Decimal   @db.Decimal(10, 2) @default(0)
-  orderTotal               Decimal   @db.Decimal(10, 2) @default(0)
-  discountAmount           Decimal   @db.Decimal(10, 2) @default(0)
-  
+  orderSubtotal  Decimal @default(0) @db.Decimal(10, 2)
+  orderTotal     Decimal @default(0) @db.Decimal(10, 2)
+  discountAmount Decimal @default(0) @db.Decimal(10, 2)
+
   // Delivery Docs
-  distanceInKm             Decimal   @db.Decimal(10, 2) @default(0)
-  deliveryPricePerKm       Decimal   @db.Decimal(10, 2) @default(0)
+  distanceInKm       Decimal @default(0) @db.Decimal(10, 2)
+  deliveryPricePerKm Decimal @default(0) @db.Decimal(10, 2)
 
   // Commission Docs
-  adminCommissionPercentage Decimal   @db.Decimal(10, 2) @default(0)
-  adminCommissionAmount     Decimal   @db.Decimal(10, 2) @default(0)
-  
-  vendorEarnings           Decimal   @db.Decimal(10, 2) @default(0)
+  adminCommissionPercentage Decimal @default(0) @db.Decimal(10, 2)
+  adminCommissionAmount     Decimal @default(0) @db.Decimal(10, 2)
+
+  vendorEarnings Decimal @default(0) @db.Decimal(10, 2)
 
   // Status-based Commission Tracking
-  vendorCommissionApplied   Boolean   @default(false) @map("vendor_commission_applied")
-  driverCommissionApplied   Boolean   @default(false) @map("driver_commission_applied")
-  vendorCommissionRate      Decimal   @db.Decimal(10, 4) @default(0) @map("vendor_commission_rate")
-  vendorCommissionValue     Decimal   @db.Decimal(10, 2) @default(0) @map("vendor_commission_value")
-  driverCommissionRate      Decimal   @db.Decimal(10, 4) @default(0) @map("driver_commission_rate")
-  driverCommissionValue     Decimal   @db.Decimal(10, 2) @default(0) @map("driver_commission_value")
-  platformTotalCommission   Decimal   @db.Decimal(10, 2) @default(0) @map("platform_total_commission")
-  vendorNet                 Decimal   @db.Decimal(10, 2) @default(0) @map("vendor_net")
-  driverNet                 Decimal   @db.Decimal(10, 2) @default(0) @map("driver_net")
+  vendorCommissionApplied Boolean @default(false) @map("vendor_commission_applied")
+  driverCommissionApplied Boolean @default(false) @map("driver_commission_applied")
+  vendorCommissionRate    Decimal @default(0) @map("vendor_commission_rate") @db.Decimal(10, 4)
+  vendorCommissionValue   Decimal @default(0) @map("vendor_commission_value") @db.Decimal(10, 2)
+  driverCommissionRate    Decimal @default(0) @map("driver_commission_rate") @db.Decimal(10, 4)
+  driverCommissionValue   Decimal @default(0) @map("driver_commission_value") @db.Decimal(10, 2)
+  platformTotalCommission Decimal @default(0) @map("platform_total_commission") @db.Decimal(10, 2)
+  vendorNet               Decimal @default(0) @map("vendor_net") @db.Decimal(10, 2)
+  driverNet               Decimal @default(0) @map("driver_net") @db.Decimal(10, 2)
 
   commissionSnapshots OrderCommissionSnapshot[]
+
+  // Analytics relations
+  lifecycleEvents OrderLifecycleEvent[]
+  deliveryEvents  DeliveryEvent[]
 
   @@map("orders")
 }
@@ -515,8 +554,9 @@ model Zone {
   users   User[]
   vendors Vendor[]
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt              DateTime                 @default(now())
+  updatedAt              DateTime                 @updatedAt
+  ZonePerformanceMetrics ZonePerformanceMetrics[]
 
   @@map("zones")
 }
@@ -560,12 +600,14 @@ model Subscription {
   paymentMethod String?
   paymentId     String?
 
-
-  vendors       Vendor[] @relation("VendorSubscription")
+  vendors            Vendor[]            @relation("VendorSubscription")
   walletTransactions WalletTransaction[]
+  
+  // Analytics relations
+  eventLogs          SubscriptionEventLog[]
 
-  createdAt     DateTime           @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt            DateTime               @default(now())
+  updatedAt            DateTime               @updatedAt
 
   @@map("subscriptions")
 }
@@ -622,27 +664,27 @@ model WalletTransaction {
   orderId String? @map("order_id")
   order   Order?  @relation(fields: [orderId], references: [id]) // Added FK relation
 
-  subscriptionId  String?  @map("subscription_id")
+  subscriptionId  String?       @map("subscription_id")
   subscription    Subscription? @relation(fields: [subscriptionId], references: [id])
-  paymentStatus   String?  @map("payment_status")
-  transactionUser String   @default("customer")
-  description     String?  @map("note")
+  paymentStatus   String?       @map("payment_status")
+  transactionUser String        @default("customer")
+  description     String?       @map("note")
   referenceId     String?
   metadata        Json?
-  createdAt       DateTime @default(now()) @map("date")
-  updatedAt       DateTime @updatedAt
+  createdAt       DateTime      @default(now()) @map("date")
+  updatedAt       DateTime      @updatedAt
 
   @@map("wallet_transactions")
 }
 
 model WithdrawMethod {
-  id          String   @id @default(uuid())
-  userId      String   @unique
-  user        User     @relation(fields: [userId], references: [id])
+  id        String   @id @default(uuid())
+  userId    String   @unique
+  user      User     @relation(fields: [userId], references: [id])
   provider  String   @default("stripe")
   config    Json?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@map("withdraw_methods")
 }
@@ -728,14 +770,14 @@ model DriverDocument {
 }
 
 model ChatChannel {
-  id              String        @id @default(uuid())
-  name            String?
-  participants    User[]        @relation("UserChannels")
-  messages        ChatMessage[]
-  lastMessageText String?       @map("last_message")
-  lastMessageTime DateTime?
-  orderId         String? @map("order_id")
-  order           Order?  @relation(fields: [orderId], references: [id])
+  id                     String        @id @default(uuid())
+  name                   String?
+  participants           User[]        @relation("UserChannels")
+  messages               ChatMessage[]
+  lastMessageText        String?       @map("last_message")
+  lastMessageTime        DateTime?
+  orderId                String?       @map("order_id")
+  order                  Order?        @relation(fields: [orderId], references: [id])
   chatType               String?
   customerId             String?
   customerName           String?
@@ -743,8 +785,8 @@ model ChatChannel {
   restaurantId           String?
   restaurantName         String?
   restaurantProfileImage String?
-  createdAt              DateTime @default(now())
-  updatedAt              DateTime @updatedAt
+  createdAt              DateTime      @default(now())
+  updatedAt              DateTime      @updatedAt
 
   @@map("chat_channels")
 }
@@ -906,7 +948,7 @@ model Banner {
   position     String   @default("top")
   redirectType String?  @map("redirect_type")
   redirectId   String?  @map("redirect_id")
-  isActive       Boolean  @default(true) @map("is_active")
+  isActive     Boolean  @default(true) @map("is_active")
   order        Int      @default(0)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
@@ -922,7 +964,7 @@ model Advertisement {
   redirectType String?  @map("redirect_type")
   redirectId   String?  @map("redirect_id")
   redirectUrl  String?
-  isActive       Boolean  @default(true) @map("is_active")
+  isActive     Boolean  @default(true) @map("is_active")
   vendorId     String?
   vendor       Vendor?  @relation(fields: [vendorId], references: [id])
   createdAt    DateTime @default(now())
@@ -963,7 +1005,7 @@ model Language {
   id        String   @id @default(uuid())
   name      String
   isActive  Boolean  @default(true) @map("is_active")
-  code      String    @default("ar")
+  code      String   @default("ar")
   isRtl     Boolean  @default(true) @map("is_rtl")
   image     String
   isDefault Boolean  @default(false) @map("is_default")
@@ -986,13 +1028,13 @@ model EmailTemplate {
 }
 
 model OnBoarding {
-  id          String   @id @default(uuid())
+  id          String         @id @default(uuid())
   title       String
-  description String   @db.Text
+  description String         @db.Text
   image       String
   type        OnboardingType @default(customerApp)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
 
   @@map("onboarding")
 }
@@ -1093,14 +1135,14 @@ model ManagerCashConfirmation {
 }
 
 model ManagerPayoutConfirmation {
-  id        String   @id @default(uuid())
-  managerId String   @map("manager_id")
-  manager   User     @relation("ManagerPayouts", fields: [managerId], references: [id])
-  adminId   String   @map("admin_id")
-  admin     User     @relation("AdminPayoutConfirmations", fields: [adminId], references: [id])
-  amount    Decimal  @db.Decimal(10, 2)
+  id         String   @id @default(uuid())
+  managerId  String   @map("manager_id")
+  manager    User     @relation("ManagerPayouts", fields: [managerId], references: [id])
+  adminId    String   @map("admin_id")
+  admin      User     @relation("AdminPayoutConfirmations", fields: [adminId], references: [id])
+  amount     Decimal  @db.Decimal(10, 2)
   payoutDate DateTime @map("payout_date")
-  createdAt DateTime @default(now())
+  createdAt  DateTime @default(now())
 
   @@map("manager_payout_confirmations")
 }
@@ -1112,9 +1154,9 @@ model OrderCommissionSnapshot {
   vendorId        String?          @map("vendor_id")
   driverId        String?          @map("driver_id")
   source          CommissionSource
-  commissionRate  Decimal          @db.Decimal(10, 4) @map("commission_rate")
-  commissionValue Decimal          @db.Decimal(10, 2) @map("commission_value")
-  baseAmount      Decimal          @db.Decimal(10, 2) @map("base_amount")
+  commissionRate  Decimal          @map("commission_rate") @db.Decimal(10, 4)
+  commissionValue Decimal          @map("commission_value") @db.Decimal(10, 2)
+  baseAmount      Decimal          @map("base_amount") @db.Decimal(10, 2)
   createdAt       DateTime         @default(now()) @map("created_at")
 
   @@index([orderId])
@@ -1123,4 +1165,420 @@ model OrderCommissionSnapshot {
   @@index([source])
   @@index([createdAt])
   @@map("order_commission_snapshots")
+}
+
+// ============================================================================
+// ANALYTICS TABLES - Comprehensive tracking for all business events
+// ============================================================================
+
+
+
+// 3. User Activity Log - Track all user interactions
+model UserActivityLog {
+  id     String @id @default(uuid())
+  userId String @map("user_id")
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  activityType     String @map("activity_type") // LOGIN, SEARCH, VIEW_VENDOR, ORDER, etc.
+  activityCategory String @map("activity_category") // AUTH, BROWSE, ORDER, PROFILE
+
+  resourceType String? @map("resource_type") // vendor, product, order
+  resourceId   String? @map("resource_id")
+
+  sessionId      String?         @map("session_id")
+  devicePlatform DevicePlatform? @map("device_platform")
+  appVersion     String?         @map("app_version")
+
+  latitude  Decimal? @db.Decimal(10, 8)
+  longitude Decimal? @db.Decimal(11, 8)
+
+  metadata Json? // Search query, filters, etc.
+
+  timestamp DateTime @default(now())
+
+  @@index([userId])
+  @@index([activityType])
+  @@index([timestamp])
+  @@index([sessionId])
+  @@index([resourceType, resourceId])
+  @@map("user_activity_logs")
+}
+
+// 4. Vendor Metrics Snapshot - Daily vendor performance
+model VendorMetricsSnapshot {
+  id       String @id @default(uuid())
+  vendorId String @map("vendor_id")
+  vendor   Vendor @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+
+  snapshotDate DateTime @map("snapshot_date")
+  snapshotType String   @map("snapshot_type") // HOURLY, DAILY, WEEKLY, MONTHLY
+
+  totalOrders          Int @default(0)
+  completedOrders      Int @default(0)
+  cancelledOrders      Int @default(0)
+  vendorRejectedOrders Int @default(0) @map("vendor_rejected_orders")
+
+  totalRevenue      Decimal @default(0) @db.Decimal(10, 2)
+  netRevenue        Decimal @default(0) @db.Decimal(10, 2)
+  commissionPaid    Decimal @default(0) @db.Decimal(10, 2)
+  averageOrderValue Decimal @default(0) @db.Decimal(10, 2)
+
+  averageAcceptanceTime Int?     @map("avg_acceptance_time_seconds")
+  acceptanceRate        Decimal? @db.Decimal(5, 2)
+
+  subscriptionPlanId String? @map("subscription_plan_id")
+  isOnFreePlan       Boolean @default(false) @map("is_on_free_plan")
+
+  uniqueCustomers Int @default(0)
+  repeatCustomers Int @default(0)
+  newCustomers    Int @default(0)
+
+  activeProducts  Int @default(0)
+  productsOrdered Int @default(0)
+
+  totalProductsSold   Int     @default(0) @map("total_products_sold")
+  totalDiscountsGiven Decimal @default(0) @map("total_discounts_given") @db.Decimal(10, 2)
+
+  createdAt DateTime @default(now())
+
+  @@unique([vendorId, snapshotDate, snapshotType])
+  @@index([vendorId])
+  @@index([snapshotDate])
+  @@index([snapshotType])
+  @@map("vendor_metrics_snapshots")
+}
+
+// 5. Driver Metrics Snapshot - Daily driver performance
+model DriverMetricsSnapshot {
+  id       String @id @default(uuid())
+  driverId String @map("driver_id")
+  driver   User   @relation("DriverMetrics", fields: [driverId], references: [id], onDelete: Cascade)
+
+  snapshotDate DateTime @map("snapshot_date")
+  snapshotType String   @map("snapshot_type") // DAILY, WEEKLY, MONTHLY
+
+  totalAssignments    Int @default(0)
+  acceptedAssignments Int @default(0)
+  rejectedAssignments Int @default(0)
+  completedDeliveries Int @default(0)
+
+  averageDeliveryTime Int?     @map("avg_delivery_time_minutes")
+  averageRating       Decimal? @db.Decimal(2, 1)
+  totalRatings        Int      @default(0)
+
+  totalEarnings  Decimal @default(0) @db.Decimal(10, 2)
+  netEarnings    Decimal @default(0) @db.Decimal(10, 2)
+  commissionPaid Decimal @default(0) @db.Decimal(10, 2)
+  totalTips      Decimal @default(0) @db.Decimal(10, 2)
+
+  totalOnlineMinutes Int?     @map("total_online_minutes")
+  totalActiveMinutes Int?     @map("total_active_minutes")
+  totalDistanceKm    Decimal? @map("total_distance_km") @db.Decimal(10, 2)
+
+  zoneId        String?
+  uniqueVendors Int     @default(0)
+
+  createdAt DateTime @default(now())
+
+  @@unique([driverId, snapshotDate, snapshotType])
+  @@index([driverId])
+  @@index([snapshotDate])
+  @@map("driver_metrics_snapshots")
+}
+
+// 6. Customer Engagement Metrics - Customer behavior tracking
+model CustomerEngagementMetrics {
+  id         String @id @default(uuid())
+  customerId String @map("customer_id")
+  customer   User   @relation("CustomerMetrics", fields: [customerId], references: [id], onDelete: Cascade)
+
+  snapshotDate DateTime @map("snapshot_date")
+  snapshotType String   @map("snapshot_type") // DAILY, WEEKLY, MONTHLY
+
+  totalOrders     Int @default(0)
+  completedOrders Int @default(0)
+  cancelledOrders Int @default(0)
+
+  totalSpent        Decimal @default(0) @db.Decimal(10, 2)
+  averageOrderValue Decimal @default(0) @db.Decimal(10, 2)
+
+  uniqueVendorsOrdered Int     @default(0)
+  favoriteVendorId     String? @map("favorite_vendor_id")
+  preferredCategoryId  String? @map("preferred_category_id")
+
+  daysSinceLastOrder Int?     @map("days_since_last_order")
+  orderFrequency     Decimal? @db.Decimal(5, 2)
+
+  referralsGiven Int @default(0)
+  reviewsWritten Int @default(0)
+
+  walletBalance Decimal @default(0) @db.Decimal(10, 2)
+  walletTopUps  Int     @default(0)
+
+  createdAt DateTime @default(now())
+
+  @@unique([customerId, snapshotDate, snapshotType])
+  @@index([customerId])
+  @@index([snapshotDate])
+  @@map("customer_engagement_metrics")
+}
+
+// 7. Subscription Event Log - Track subscription lifecycle
+model SubscriptionEventLog {
+  id             String       @id @default(uuid())
+  subscriptionId String       @map("subscription_id")
+  subscription   Subscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+
+  vendorId String? @map("vendor_id")
+  userId   String  @map("user_id")
+  user     User    @relation("SubscriptionEvents", fields: [userId], references: [id])
+
+  eventType      String  @map("event_type") // SUBSCRIBED, RENEWED, CANCELLED, UPGRADED, DOWNGRADED, EXPIRED
+  previousPlanId String? @map("previous_plan_id")
+  newPlanId      String  @map("new_plan_id")
+  planName       String  @map("plan_name")
+  planPrice      Decimal @db.Decimal(10, 2)
+
+  amountPaid    Decimal @db.Decimal(10, 2)
+  paymentMethod String?
+  paymentStatus String?
+
+  startDate DateTime
+  endDate   DateTime
+
+  metadata Json?
+
+  eventTimestamp DateTime @default(now())
+
+  @@index([subscriptionId])
+  @@index([userId])
+  @@index([vendorId])
+  @@index([eventType])
+  @@index([eventTimestamp])
+  @@map("subscription_event_logs")
+}
+
+// 8. Payment Transaction Log - Comprehensive payment tracking
+model PaymentTransactionLog {
+  id String @id @default(uuid())
+
+  transactionType String @map("transaction_type") // ORDER_PAYMENT, WALLET_TOPUP, SUBSCRIPTION_PAYMENT, WITHDRAWAL
+  referenceId     String @map("reference_id")
+  referenceType   String @map("reference_type")
+
+  userId   String   @map("user_id")
+  userRole UserRole @map("user_role")
+
+  amount         Decimal @db.Decimal(10, 2)
+  currency       String  @default("EGP")
+  paymentMethod  String  @map("payment_method")
+  paymentGateway String? @map("payment_gateway")
+
+  status         String // PENDING, COMPLETED, FAILED, REFUNDED
+  previousStatus String? @map("previous_status")
+
+  gatewayTransactionId String? @map("gateway_transaction_id")
+  gatewayResponse      Json?   @map("gateway_response")
+
+  errorCode    String? @map("error_code")
+  errorMessage String? @map("error_message") @db.Text
+
+  initiatedAt DateTime  @default(now()) @map("initiated_at")
+  completedAt DateTime? @map("completed_at")
+
+  metadata Json?
+
+  @@index([userId])
+  @@index([referenceId])
+  @@index([status])
+  @@index([paymentMethod])
+  @@index([initiatedAt])
+  @@map("payment_transaction_logs")
+}
+
+// 9. Platform Metrics Summary - Platform-wide KPIs
+model PlatformMetricsSummary {
+  id String @id @default(uuid())
+
+  summaryDate DateTime @map("summary_date")
+  summaryType String   @map("summary_type") // DAILY, WEEKLY, MONTHLY
+
+  totalOrders       Int     @default(0)
+  completedOrders   Int     @default(0)
+  cancelledOrders   Int     @default(0)
+  averageOrderValue Decimal @default(0) @db.Decimal(10, 2)
+
+  grossMerchandiseValue Decimal @default(0) @map("gmv") @db.Decimal(10, 2)
+  totalRevenue          Decimal @default(0) @db.Decimal(10, 2)
+  vendorCommissions     Decimal @default(0) @db.Decimal(10, 2)
+  driverCommissions     Decimal @default(0) @db.Decimal(10, 2)
+  platformRevenue       Decimal @default(0) @db.Decimal(10, 2)
+
+  subscriptionRevenue Decimal @default(0) @db.Decimal(10, 2)
+
+  activeCustomers Int @default(0)
+  activeVendors   Int @default(0)
+  activeDrivers   Int @default(0)
+  newCustomers    Int @default(0)
+  newVendors      Int @default(0)
+  newDrivers      Int @default(0)
+
+  totalSearches Int @default(0)
+  totalReviews  Int @default(0)
+
+  createdAt DateTime @default(now())
+
+  @@unique([summaryDate, summaryType])
+  @@index([summaryDate])
+  @@map("platform_metrics_summaries")
+}
+
+// 10. Zone Performance Metrics - Manager & zone analytics
+model ZonePerformanceMetrics {
+  id     String @id @default(uuid())
+  zoneId String @map("zone_id")
+  zone   Zone   @relation(fields: [zoneId], references: [id], onDelete: Cascade)
+
+  snapshotDate DateTime @map("snapshot_date")
+  snapshotType String   @map("snapshot_type") // DAILY, WEEKLY, MONTHLY
+
+  totalOrders         Int  @default(0)
+  completedOrders     Int  @default(0)
+  averageDeliveryTime Int? @map("avg_delivery_time_minutes")
+
+  totalRevenue      Decimal @default(0) @db.Decimal(10, 2)
+  averageOrderValue Decimal @default(0) @db.Decimal(10, 2)
+
+  activeVendors  Int @default(0)
+  activeDrivers  Int @default(0)
+  totalCustomers Int @default(0)
+
+  managerId              String? @map("manager_id")
+  totalDriverAssignments Int     @default(0)
+  cashCollections        Decimal @default(0) @db.Decimal(10, 2)
+
+  createdAt DateTime @default(now())
+
+  @@unique([zoneId, snapshotDate, snapshotType])
+  @@index([zoneId])
+  @@index([snapshotDate])
+  @@map("zone_performance_metrics")
+}
+
+// 11. Product Performance Metrics - Track product popularity
+model ProductPerformanceMetrics {
+  id        String @id @default(uuid())
+  productId String @map("product_id")
+  vendorId  String @map("vendor_id")
+
+  snapshotDate DateTime @map("snapshot_date")
+  snapshotType String   @map("snapshot_type") // DAILY, WEEKLY, MONTHLY
+
+  totalOrders       Int     @default(0)
+  totalQuantitySold Int     @default(0)
+  totalRevenue      Decimal @default(0) @db.Decimal(10, 2)
+
+  averagePrice       Decimal @default(0) @db.Decimal(10, 2)
+  totalDiscountGiven Decimal @default(0) @db.Decimal(10, 2)
+
+  uniqueCustomers Int @default(0)
+  totalViews      Int @default(0)
+  totalFavorites  Int @default(0)
+
+  conversionRate Decimal? @map("conversion_rate") @db.Decimal(5, 2)
+
+  createdAt DateTime @default(now())
+
+  @@unique([productId, snapshotDate, snapshotType])
+  @@index([productId])
+  @@index([vendorId])
+  @@index([snapshotDate])
+  @@map("product_performance_metrics")
+}
+
+// 12. Entity Change Log - Track CRUD operations on all entities
+model EntityChangeLog {
+  id String @id @default(uuid())
+
+  entityType String @map("entity_type") // Order, Product, Vendor, User, etc.
+  entityId   String @map("entity_id")
+
+  changeType String @map("change_type") // CREATE, UPDATE, DELETE
+
+  actorId   String?   @map("actor_id")
+  actorRole UserRole? @map("actor_role")
+
+  previousValue Json?    @map("previous_value")
+  newValue      Json?    @map("new_value")
+  changedFields String[] @map("changed_fields")
+  ipAddress String? @map("ip_address")
+  userAgent String? @map("user_agent")
+
+  timestamp DateTime @default(now())
+
+  @@index([entityType, entityId])
+  @@index([actorId])
+  @@index([changeType])
+  @@index([timestamp])
+  @@map("entity_change_logs")
+}
+
+model OrderLifecycleEvent {
+  id String @id @default(uuid())
+
+  orderId String @map("order_id")
+  order   Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  eventType      String  @map("event_type")
+  previousStatus String? @map("previous_status")
+  newStatus      String? @map("new_status")
+
+  actorId   String?   @map("actor_id")
+  actorRole UserRole? @map("actor_role")
+
+  timeSincePrevious Int?  @map("time_since_previous") // In seconds
+  locationLat       Float? @map("location_lat")
+  locationLng       Float? @map("location_lng")
+
+  metadata Json?
+
+  eventTimestamp DateTime @default(now()) @map("event_timestamp")
+
+  @@index([orderId])
+  @@index([eventType])
+  @@index([eventTimestamp])
+  @@map("order_lifecycle_events")
+}
+
+model DeliveryEvent {
+  id String @id @default(uuid())
+
+  orderId String @map("order_id")
+  order   Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  driverId String @map("driver_id")
+  driver   User   @relation("DriverDeliveryEvents", fields: [driverId], references: [id])
+
+  vendorId String @map("vendor_id")
+  vendor   Vendor @relation("VendorDeliveryEvents", fields: [vendorId], references: [id])
+
+  eventType String @map("event_type") // PICKUP_STARTED, PICKED_UP, ON_WAY, ARRIVED, DELIVERED
+  status    String
+
+  latitude  Float
+  longitude Float
+
+  distanceCovered Float? @map("distance_covered") // meters
+  duration        Int?   // seconds
+  averageSpeed    Float? @map("average_speed") // km/h
+
+  metadata Json?
+
+  eventTimestamp DateTime @default(now()) @map("event_timestamp")
+
+  @@index([orderId])
+  @@index([driverId])
+  @@index([vendorId])
+  @@index([eventTimestamp])
+  @@map("delivery_events")
 }

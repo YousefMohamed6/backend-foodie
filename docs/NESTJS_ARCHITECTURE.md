@@ -5,18 +5,19 @@ This document outlines a **completely native NestJS backend architecture** for t
 
 ## Technology Stack
 
-- **Framework**: NestJS 10.x
+- **Framework**: NestJS 11.x
 - **Language**: TypeScript 5.x
-- **Database**: PostgreSQL 14+ (with TypeORM) or Prisma
-- **Authentication**: Native JWT (Passport.js) + bcrypt for password hashing
-- **OTP/SMS**: Twilio, AWS SNS, or similar SMS service
+- **Database**: PostgreSQL 14+ with PostGIS
+- **ORM**: Prisma (Type-safety & Auto-migrations)
+- **Authentication**: Native JWT (Passport.js) + bcrypt
+- **OTP/SMS**: Twilio or similar
 - **Email**: Nodemailer, SendGrid, or AWS SES
-- **Social Auth**: Passport.js strategies (Google, Apple) - no Firebase
+- **Social Auth**: Passport.js strategies + Token Verification (Google, Apple)
 - **Validation**: class-validator, class-transformer
-- **Queue**: BullMQ with Redis
+- **Queue**: Bull with Redis
 - **Cache**: Redis
-- **File Storage**: Multer + AWS S3 (or local storage) + Sharp (image processing) + FFmpeg (video processing)
-- **Push Notifications**: Firebase Admin SDK (server-side only, for sending notifications)
+- **File Storage**: AWS S3 + Sharp (image processing)
+- **Push Notifications**: Firebase Cloud Messaging (FCM)
 - **Real-time**: Native Socket.io WebSocket Gateway with Redis adapter
 - **API Documentation**: Swagger/OpenAPI
 

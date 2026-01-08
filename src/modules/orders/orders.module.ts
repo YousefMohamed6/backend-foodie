@@ -1,4 +1,5 @@
 import { Module, forwardRef } from '@nestjs/common';
+import { AnalyticsModule } from '../analytics/analytics.module';
 import { AuthModule } from '../auth/auth.module';
 import { CashbackModule } from '../cashback/cashback.module';
 import { CouponsModule } from '../coupons/coupons.module';
@@ -14,6 +15,7 @@ import { OrderManagementService } from './order-management.service';
 import { OrderPricingService } from './order-pricing.service';
 import { OrdersController } from './orders.controller';
 import { OrdersGateway } from './orders.gateway';
+import { OrdersSchedulerService } from './orders.scheduler.service';
 import { OrdersService } from './orders.service';
 
 @Module({
@@ -27,6 +29,7 @@ import { OrdersService } from './orders.service';
     ReviewsModule,
     SettingsModule,
     forwardRef(() => AuthModule),
+    AnalyticsModule,
   ],
   controllers: [OrdersController, ManagerCashController],
   providers: [
@@ -35,6 +38,7 @@ import { OrdersService } from './orders.service';
     OrderPricingService,
     OrderManagementService,
     CommissionService,
+    OrdersSchedulerService,
   ],
   exports: [
     OrdersService,

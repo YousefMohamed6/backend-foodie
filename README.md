@@ -44,6 +44,13 @@ The production-ready API service powering the Foodie ecosystem. This backend pro
 - **Real-time WebSocket**: Order tracking and live chat
 - **Redis Pub/Sub**: Multi-instance WebSocket scaling
 
+### 📊 **Analytics & Reporting**
+- **Lifecycle Tracking**: Detailed tracking of every order state change (Created, Accepted, Assigned, Picked Up, Delivered)
+- **Delivery Metrics**: Track distance, duration, and speed for every delivery
+- **Financial Snapshots**: Commission and revenue breakdown per order
+- **Zone Performance**: Aggregated metrics for delivery zones
+- **Product Insights**: Popularity and conversion tracking for items
+
 ### 📦 **File & Media Management**
 - **AWS S3 Integration**: Cloud storage for images and videos
 - **Local Storage Fallback**: Development-friendly file system storage

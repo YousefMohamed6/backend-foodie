@@ -10,6 +10,7 @@ import {
   IsNumber,
   IsOptional,
   IsString,
+  Min,
   ValidateNested,
 } from 'class-validator';
 import { OrderItemDto } from './order-item.dto';
@@ -50,11 +51,7 @@ export class CreateOrderDto {
   @ApiPropertyOptional()
   @IsOptional()
   @IsNumber()
-  deliveryCharge?: number;
-
-  @ApiPropertyOptional()
-  @IsOptional()
-  @IsNumber()
+  @Min(0)
   tipAmount?: number;
 
   @ApiPropertyOptional()

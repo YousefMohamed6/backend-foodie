@@ -92,5 +92,17 @@
     "PAYMENT_CONFIG_INVALID": "Payment configuration is invalid",
     "INVOICE_CREATION_FAILED": "Failed to create invoice",
     "INVALID_HASH_KEY": "Invalid hash key",
-    "DRIVER_PROFILE_NOT_FOUND": "Driver profile not found"
+    "DRIVER_PROFILE_NOT_FOUND": "Driver profile not found",
+    "PRICE_NON_POSITIVE": "Price must be greater than 0",
+    "DISCOUNT_PRICE_NON_POSITIVE": "Discount price must be greater than 0",
+    "DISCOUNT_EXCEEDS_PRICE": "Discount price must be less than the regular price",
+    "PRICE_EXCEEDS_MAX": "Price cannot exceed the maximum allowed limit",
+    "UNSUPPORTED_FILE_TYPE": "Unsupported file type",
+    "ORDER_NOT_PLACED": "Order could not be placed",
+    "COMMISSION_ALREADY_APPLIED": "Commission has already been applied",
+    "INVALID_ORDER_STATUS": "Invalid order status",
+    "ORDER_NOT_ACCEPTED_BY_DRIVER": "Order not accepted by driver",
+    "CANNOT_ASSIGN_DRIVER_TO_CLOSED_ORDER": "Cannot assign driver to a completed or cancelled order",
+    "USE_SPECIFIC_ENDPOINT_FOR_THIS_STATUS_CHANGE": "Status change requires specific endpoint (e.g. completion or vendor acceptance)",
+    "ORDER_NOT_READY_YET": "The order is not ready yet."
 }

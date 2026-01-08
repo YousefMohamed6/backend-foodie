@@ -53,6 +53,8 @@ import { AttributesModule } from './modules/attributes/attributes.module';
 import { ReviewAttributesModule } from './modules/review-attributes/review-attributes.module';
 
 import { APP_FILTER, APP_GUARD } from '@nestjs/core';
+import { EventEmitterModule } from '@nestjs/event-emitter';
+import { ScheduleModule } from '@nestjs/schedule';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { GlobalExceptionFilter } from './common/filters/global-exception.filter';
 import { DeliveryModule } from './modules/delivery/delivery.module';
@@ -105,6 +107,8 @@ import { AcceptLanguageResolver, HeaderResolver, I18nModule } from 'nestjs-i18n'
         limit: 100, // 100 requests per minute
       },
     ]),
+    EventEmitterModule.forRoot(),
+    ScheduleModule.forRoot(),
     I18nModule.forRoot({
       fallbackLanguage: 'ar',
       loaderOptions: {

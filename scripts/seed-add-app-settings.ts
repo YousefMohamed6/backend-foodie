@@ -70,10 +70,6 @@ async function addAppSettings() {
             value: 'ar',
         },
         {
-            key: 'delivery_charge',
-            value: '15',
-        },
-        {
             key: 'vendor_commission_rate',
             value: '10',
         },
@@ -141,6 +137,26 @@ async function addAppSettings() {
         {
             key: 'order_timeout_minutes',
             value: '30',
+        },
+        {
+            key: 'max_product_price',
+            value: '10000',
+        },
+        {
+            key: 'min_delivery_fee',
+            value: '10',
+        },
+        {
+            key: 'max_driver_debt',
+            value: '500',
+        },
+        {
+            key: 'delivery_fee_per_km',
+            value: '2',
+        },
+        {
+            key: 'min_delivery_pay',
+            value: '8',
         },
 
     ];

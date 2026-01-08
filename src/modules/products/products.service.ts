@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ForbiddenException,
   forwardRef,
   Inject,
@@ -28,6 +29,11 @@ export class ProductsService {
     if (!vendor) {
       throw new NotFoundException('VENDOR_NOT_FOUND');
     }
+
+    await this.validateProductPrice(
+      createProductDto.price,
+      createProductDto.discountPrice,
+    );
 
     const { extras, itemAttributes, ...productData } = createProductDto;
 
@@ -111,6 +117,25 @@ export class ProductsService {
       throw new ForbiddenException('FORBIDDEN');
     }
 
+    // Validate price if provided
+    if (
+      updateProductDto.price !== undefined ||
+      updateProductDto.discountPrice !== undefined
+    ) {
+      const newPrice =
+        updateProductDto.price !== undefined
+          ? updateProductDto.price
+          : Number(product.price);
+      const newDiscountPrice =
+        updateProductDto.discountPrice !== undefined
+          ? updateProductDto.discountPrice
+          : product.discountPrice
+            ? Number(product.discountPrice)
+            : undefined;
+
+      await this.validateProductPrice(newPrice, newDiscountPrice);
+    }
+
     const { extras, itemAttributes, ...updateData } = updateProductDto;
 
     const attributeData = this.parseItemAttributes(itemAttributes);
@@ -170,6 +195,32 @@ export class ProductsService {
       take: l,
     });
     return products.map((p) => this.mapProductResponse(p));
+  }
+
+  private async validateProductPrice(price: number, discountPrice?: number) {
+    if (price <= 0) {
+      throw new BadRequestException('PRICE_NON_POSITIVE');
+    }
+
+    if (discountPrice !== undefined && discountPrice !== null) {
+      if (discountPrice <= 0) {
+        throw new BadRequestException('DISCOUNT_PRICE_NON_POSITIVE');
+      }
+      if (discountPrice >= price) {
+        throw new BadRequestException('DISCOUNT_EXCEEDS_PRICE');
+      }
+    }
+
+    const maxPriceSetting = await this.prisma.setting.findUnique({
+      where: { key: 'max_product_price' },
+    });
+
+    if (maxPriceSetting && maxPriceSetting.value) {
+      const maxPrice = Number(maxPriceSetting.value);
+      if (!isNaN(maxPrice) && price > maxPrice) {
+        throw new BadRequestException('PRICE_EXCEEDS_MAX');
+      }
+    }
   }
 
   private parseItemAttributes(

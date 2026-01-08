@@ -3,11 +3,10 @@ import {
   Controller,
   Get,
   Param,
-  Patch,
   Post,
   Query,
   Request,
-  UseGuards,
+  UseGuards
 } from '@nestjs/common';
 import {
   ApiBearerAuth,
@@ -21,8 +20,9 @@ import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { AssignDriverDto } from './dto/assign-driver.dto';
 import { CreateOrderDto } from './dto/create-order.dto';
+import { DriverReportProblemDto } from './dto/driver-report-problem.dto';
 import { FindAllOrdersQueryDto } from './dto/find-all-orders-query.dto';
-import { UpdateOrderStatusDto } from './dto/update-order-status.dto';
+import { VendorAcceptOrderDto } from './dto/vendor-accept-order.dto';
 import { OrdersService } from './orders.service';
 
 @ApiTags('Orders')
@@ -59,20 +59,15 @@ export class OrdersController {
     return { success: true, message: 'ORDER_SUCCESS', data };
   }
 
-  @Patch(':id/status')
-  @Roles(UserRole.ADMIN, UserRole.VENDOR, UserRole.DRIVER)
-  @ApiOperation({ summary: 'Update order status' })
-  async updateStatus(
+  @Post(':id/cancel')
+  @Roles(UserRole.ADMIN, UserRole.CUSTOMER, UserRole.VENDOR, UserRole.MANAGER)
+  @ApiOperation({ summary: 'Cancel an order' })
+  async cancelOrder(
     @Param('id') id: string,
-    @Body() updateOrderStatusDto: UpdateOrderStatusDto,
     @Request() req,
   ) {
-    const data = await this.ordersService.updateStatus(
-      id,
-      updateOrderStatusDto,
-      req.user,
-    );
-    return { success: true, message: 'ORDER_SUCCESS', data };
+    const data = await this.ordersService.cancelOrder(id, req.user);
+    return { success: true, message: 'ORDER_CANCELLED', data };
   }
 
   @Get(':id/reviews/:productId')
@@ -117,6 +112,26 @@ export class OrdersController {
     return { success: true, message: 'ORDER_SUCCESS', data };
   }
 
+  @Post(':id/report-problem')
+  @Roles(UserRole.DRIVER)
+  @ApiOperation({ summary: 'Driver reports a problem with the order (Emergency cancel)' })
+  async reportProblem(
+    @Param('id') id: string,
+    @Body() dto: DriverReportProblemDto,
+    @Request() req,
+  ) {
+    const data = await this.ordersService.reportDeliveryProblem(id, dto, req.user);
+    return { success: true, message: 'PROBLEM_REPORTED', data };
+  }
+
+  @Post(':id/pickup')
+  @Roles(UserRole.DRIVER)
+  @ApiOperation({ summary: 'Driver confirms order pickup from vendor' })
+  async confirmPickup(@Param('id') id: string, @Request() req) {
+    const data = await this.ordersService.confirmPickup(id, req.user);
+    return { success: true, message: 'ORDER_PICKED_UP', data };
+  }
+
   @Post(':id/report-cash')
   @Roles(UserRole.DRIVER)
   @ApiOperation({ summary: 'Driver reports cash collection for COD order' })
@@ -144,11 +159,17 @@ export class OrdersController {
     return { success: true, message: 'ORDER_SUCCESS', data };
   }
 
+
+
   @Post(':id/vendor-accept')
   @Roles(UserRole.ADMIN, UserRole.VENDOR)
   @ApiOperation({ summary: 'Vendor accepts order (triggers vendor commission if on free plan)' })
-  async vendorAcceptOrder(@Param('id') id: string, @Request() req) {
-    const data = await this.ordersService.vendorAcceptOrder(id, req.user);
+  async vendorAcceptOrder(
+    @Param('id') id: string,
+    @Body() vendorAcceptOrderDto: VendorAcceptOrderDto,
+    @Request() req,
+  ) {
+    const data = await this.ordersService.vendorAcceptOrder(id, req.user, vendorAcceptOrderDto);
     return { success: true, message: 'ORDER_ACCEPTED', data };
   }
 

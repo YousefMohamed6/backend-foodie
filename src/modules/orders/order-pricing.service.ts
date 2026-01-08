@@ -13,11 +13,12 @@ export class OrderPricingService {
 
     async calculatePricing(createOrderDto: CreateOrderDto, subtotal: number) {
         const settings = await this.prisma.setting.findMany({
-            where: { key: { in: ['admin_commission_percentage', 'delivery_price_per_km'] } },
+            where: { key: { in: ['vendor_commission_rate', 'driver_commission_rate', 'min_delivery_fee', 'delivery_fee_per_km'] } },
         });
 
-        const commissionPercentSetting = Number(settings.find((s) => s.key === 'admin_commission_percentage')?.value || 0);
-        const deliveryPricePerKm = Number(settings.find((s) => s.key === 'delivery_price_per_km')?.value || 0);
+        const commissionPercentSetting = Number(settings.find((s) => s.key === 'vendor_commission_rate')?.value || 0);
+        const minDeliveryFee = Number(settings.find((s) => s.key === 'min_delivery_fee')?.value || 0);
+        const deliveryFeePerKm = Number(settings.find((s) => s.key === 'delivery_fee_per_km')?.value || 0);
 
         const vendor = await this.prisma.vendor.findUnique({
             where: { id: createOrderDto.vendorId },
@@ -35,8 +36,9 @@ export class OrderPricingService {
             Number(address.longitude),
         );
 
-        const deliveryCharge = distance * deliveryPricePerKm;
-        createOrderDto.deliveryCharge = deliveryCharge;
+        // deliveryFee = max(calculatedDistanceFee, settings.minDeliveryFee)
+        const calculatedDistanceFee = distance * deliveryFeePerKm;
+        const deliveryCharge = Math.max(calculatedDistanceFee, minDeliveryFee);
 
         let adminCommissionPercentage = 0;
         if (vendor.subscriptionPlan && Number(vendor.subscriptionPlan.price.toString()) === 0) {
@@ -55,14 +57,13 @@ export class OrderPricingService {
         }
 
         const vendorEarnings = subtotal - adminCommissionAmount - discountAmount;
-        let totalAmount = subtotal - (discountAmount + (createOrderDto.deliveryCharge || 0) + (createOrderDto.tipAmount || 0));
+        let totalAmount = subtotal + deliveryCharge + (createOrderDto.tipAmount || 0) - discountAmount;
         totalAmount = Math.max(totalAmount, 0);
 
         return {
             vendor,
             address,
             distance,
-            deliveryPricePerKm,
             adminCommissionPercentage,
             adminCommissionAmount,
             discountAmount,

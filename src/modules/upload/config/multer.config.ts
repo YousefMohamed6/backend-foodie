@@ -27,7 +27,7 @@ export const multerOptions = {
       // Reject file
       cb(
         new HttpException(
-          `Unsupported file type ${extname(file.originalname)}`,
+          'UNSUPPORTED_FILE_TYPE',
           HttpStatus.BAD_REQUEST,
         ),
         false,
@@ -74,7 +74,7 @@ export const multerImageOptions = {
     } else {
       cb(
         new HttpException(
-          `Unsupported file type ${extname(file.originalname)}. Images only.`,
+          'INVALID_IMAGE_TYPE',
           HttpStatus.BAD_REQUEST,
         ),
         false,

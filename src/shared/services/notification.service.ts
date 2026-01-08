@@ -41,6 +41,7 @@ export class NotificationService {
   async getLocalizedNotification(
     userId: string,
     templateKey: string,
+    data?: Record<string, any>,
   ): Promise<{ subject: string; message: string }> {
     // Get user's preferred language
     const language = await this.getUserLanguage(userId);
@@ -63,7 +64,17 @@ export class NotificationService {
 
       // Return the message in user's preferred language
       // Fallback to Arabic if the language doesn't exist in template
-      return template[language] || template.ar || template.en;
+      let content = template[language] || template.ar || template.en;
+
+      if (data) {
+        Object.keys(data).forEach(key => {
+          const placeholder = `{${key}}`;
+          content.message = content.message.replace(new RegExp(placeholder, 'g'), data[key]);
+          content.subject = content.subject.replace(new RegExp(placeholder, 'g'), data[key]);
+        });
+      }
+
+      return content;
     } catch (error) {
       // If JSON parse fails or structure is invalid
       return {
@@ -92,7 +103,7 @@ export class NotificationService {
     }
 
     // Get localized notification
-    const notification = await this.getLocalizedNotification(userId, templateKey);
+    const notification = await this.getLocalizedNotification(userId, templateKey, orderData);
 
     // Send notification
     await this.fcmService.sendNotification(

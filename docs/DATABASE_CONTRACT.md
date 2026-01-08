@@ -36,6 +36,7 @@ Based on the `BACKEND_API_CONTRACT.md`, the schema is designed as follows:
 * **Users:** Multi-role support (Customer, Vendor, Driver, Admin) with centralized authentication.
 * **Vendors & Zones:** Geographic Polygon support to define delivery boundaries, dynamic taxes, and localized delivery charges.
 * **Orders:** A robust state machine tracking the lifecycle from `Order Placed` to `Order Completed`.
+* **Analytics:** Comprehensive event tracking via `OrderLifecycleEvents`, `DeliveryEvents`, and `UserActivityLogs` for business intelligence.
 * **Wallet System:** A strict audit trail linking every transaction to a `userId`, ensuring no balance discrepancies during high concurrency.
 
 ---

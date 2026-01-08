@@ -107,6 +107,46 @@ async function seedNotificationTemplates() {
                 message: 'تم توصيل طلبك. استمتع بوجبتك!',
             },
         },
+        notification_template_order_ready: {
+            en: {
+                subject: 'Order Ready!',
+                message: 'Your order from {vendorName} is ready.',
+            },
+            ar: {
+                subject: 'الطلب جاهز!',
+                message: 'طلبك من {vendorName} جاهز.',
+            },
+        },
+        notification_template_manager_order_ready: {
+            en: {
+                subject: 'Order Ready',
+                message: 'Order #{orderId} from {vendorName} is prepared and ready for delivery.',
+            },
+            ar: {
+                subject: 'الطلب جاهز',
+                message: 'الطلب #{orderId} من {vendorName} تم تحضيره وجاهز للتوصيل.',
+            },
+        },
+        notification_template_manager_driver_accepted: {
+            en: {
+                subject: 'Driver Accepted Order',
+                message: 'Driver {driverName} has accepted order #{orderId} from {vendorName}.',
+            },
+            ar: {
+                subject: 'تم قبول الطلب من السائق',
+                message: 'السائق {driverName} قبل الطلب #{orderId} من {vendorName}.',
+            },
+        },
+        notification_template_manager_driver_rejected: {
+            en: {
+                subject: 'Driver Rejected Order',
+                message: 'Driver {driverName} has rejected order #{orderId} from {vendorName}. Please reassign.',
+            },
+            ar: {
+                subject: 'تم رفض الطلب من السائق',
+                message: 'السائق {driverName} رفض الطلب #{orderId} من {vendorName}. يرجى إعادة التعيين.',
+            },
+        },
     };
 
     let addedCount = 0;

@@ -414,6 +414,13 @@ Body: {
 Response: OrderModel
 ```
 
+#### Confirm Order Pickup
+```
+POST /api/v1/orders/{orderId}/pickup
+Headers: Authorization: Bearer {token} (driver)
+Response: OrderModel
+```
+
 ---
 
 ## Wallet & Transactions

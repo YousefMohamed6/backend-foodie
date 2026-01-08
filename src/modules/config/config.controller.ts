@@ -20,8 +20,8 @@ export class ConfigController {
         isRtl: true,
         image: true,
         isDefault: true,
-        createdAt: true,
-        updatedAt: true,
+        createdAt: false,
+        updatedAt: false,
       },
     });
     return { languages };

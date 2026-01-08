@@ -219,6 +219,30 @@ export class WalletService {
     return transaction;
   }
 
+  async refund(
+    userId: string,
+    amount: number,
+    description: string,
+    orderId?: string,
+    tx?: Prisma.TransactionClient,
+  ) {
+    const prisma = tx || this.prisma;
+    const transaction = await prisma.walletTransaction.create({
+      data: {
+        userId,
+        amount,
+        type: TransactionType.DEPOSIT,
+        description,
+        orderId,
+      },
+    });
+
+    // Sync with User entity walletAmount
+    await this.updateUserWallet(userId, amount, 'add', prisma);
+
+    return transaction;
+  }
+
   async getWithdrawMethod(userId: string) {
     return this.prisma.withdrawMethod.findUnique({
       where: { userId },
@@ -257,6 +281,128 @@ export class WalletService {
       const newBalance = type === 'add' ? current + amount : current - amount;
       await prisma.customerProfile.update({
         where: { userId },
+        data: { walletAmount: newBalance },
+      });
+    }
+  }
+
+  async updateVendorWallet(
+    vendorId: string,
+    amount: number,
+    type: 'add' | 'subtract',
+    tx?: Prisma.TransactionClient,
+  ) {
+    const prisma = tx || this.prisma;
+    const vendor = await prisma.vendor.findUnique({
+      where: { id: vendorId },
+    });
+    if (vendor) {
+      const current = vendor.walletAmount.toNumber();
+      const newBalance = type === 'add' ? current + amount : current - amount;
+      await prisma.vendor.update({
+        where: { id: vendorId },
+        data: { walletAmount: newBalance },
+      });
+    }
+  }
+
+  async addVendorEarnings(
+    vendorId: string,
+    userId: string, // Vendor's author/user ID
+    amount: number,
+    orderId: string,
+    tx?: Prisma.TransactionClient,
+  ) {
+    const prisma = tx || this.prisma;
+    await prisma.walletTransaction.create({
+      data: {
+        userId,
+        amount,
+        type: TransactionType.DEPOSIT,
+        description: `Earnings for order ${orderId}`,
+        orderId,
+        transactionUser: 'vendor',
+      },
+    });
+    await this.updateVendorWallet(vendorId, amount, 'add', prisma);
+  }
+
+  async addDriverEarnings(
+    driverId: string, // Driver's user ID
+    amount: number,
+    orderId: string,
+    tx?: Prisma.TransactionClient,
+  ) {
+    const prisma = tx || this.prisma;
+    await prisma.walletTransaction.create({
+      data: {
+        userId: driverId,
+        amount,
+        type: TransactionType.DEPOSIT,
+        description: `Earnings for order ${orderId}`,
+        orderId,
+        transactionUser: 'driver',
+      },
+    });
+    await this.updateDriverWallet(driverId, amount, 'add', prisma);
+  }
+
+  async addAdminCommission(
+    amount: number,
+    orderId: string,
+    tx?: Prisma.TransactionClient,
+  ) {
+    const prisma = tx || this.prisma;
+    let wallet = await prisma.adminWallet.findFirst();
+    if (!wallet) {
+      wallet = await prisma.adminWallet.create({ data: { walletAmount: 0 } });
+    }
+
+    await prisma.platformTransaction.create({
+      data: {
+        walletId: wallet.id,
+        amount,
+        type: 'CREDIT',
+        reason: `Commission from order ${orderId}`,
+        orderId,
+      },
+    });
+
+    await this.updateAdminWallet(amount, 'add', prisma);
+  }
+
+  async updateDriverWallet(
+    driverId: string,
+    amount: number,
+    type: 'add' | 'subtract',
+    tx?: Prisma.TransactionClient,
+  ) {
+    const prisma = tx || this.prisma;
+    const profile = await prisma.driverProfile.findUnique({
+      where: { userId: driverId },
+    });
+    if (profile) {
+      const current = profile.walletAmount.toNumber();
+      const newBalance = type === 'add' ? current + amount : current - amount;
+      await prisma.driverProfile.update({
+        where: { userId: driverId },
+        data: { walletAmount: newBalance },
+      });
+    }
+  }
+
+  async updateAdminWallet(
+    amount: number,
+    type: 'add' | 'subtract',
+    tx?: Prisma.TransactionClient,
+  ) {
+    const prisma = tx || this.prisma;
+    const wallet = await prisma.adminWallet.findFirst();
+    if (wallet) {
+      const current = wallet.walletAmount.toNumber();
+      const newBalance = type === 'add' ? current + amount : current - amount;
+      await prisma.adminWallet.update({
+        where: { id: wallet.id },
         data: { walletAmount: newBalance },
       });
     }
