@@ -74,20 +74,12 @@ async function addAppSettings() {
             value: '15',
         },
         {
-            key: 'vendor_commission_percentage',
+            key: 'vendor_commission_rate',
+            value: '10',
+        },
+        {
+            key: 'driver_commission_rate',
             value: '15',
-        },
-        {
-            key: 'vendor_commission_type',
-            value: 'percentage',
-        },
-        {
-            key: 'driver_commission_percentage',
-            value: '15',
-        },
-        {
-            key: 'driver_commission_type',
-            value: 'percentage',
         },
         {
             key: 'contact_email',

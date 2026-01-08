@@ -58,6 +58,7 @@ import { GlobalExceptionFilter } from './common/filters/global-exception.filter'
 import { DeliveryModule } from './modules/delivery/delivery.module';
 import { DocumentsModule } from './modules/documents/documents.module';
 import { MapsModule } from './modules/maps/maps.module';
+import { MarsoulModule } from './modules/marsoul/marsoul.module';
 import { PaymentModule } from './modules/payment/payment.module';
 import { VendorTypesModule } from './modules/vendor-types/vendor-types.module';
 import { PrismaModule } from './prisma/prisma.module';
@@ -162,6 +163,7 @@ import { AcceptLanguageResolver, HeaderResolver, I18nModule } from 'nestjs-i18n'
     PaymentModule,
     MapsModule,
     ManagerAuditModule,
+    MarsoulModule,
   ],
   controllers: [AppController],
   providers: [

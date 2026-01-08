@@ -43,15 +43,21 @@ enum OnboardingType {
 }
 
 enum OrderStatus {
-  PLACED         @map("Order Placed")
-  ACCEPTED       @map("Order Accepted")
-  REJECTED       @map("Order Rejected")
-  CANCELLED      @map("Order Cancelled")
-  DRIVER_PENDING  @map("Driver Pending")
-  DRIVER_ACCEPTED @map("Driver Accepted")
-  SHIPPED         @map("Order Shipped")
-  IN_TRANSIT     @map("In Transit")
-  COMPLETED      @map("Order Completed")
+  PLACED              @map("Order Placed")
+  VENDOR_ACCEPTED     @map("Vendor Accepted")
+  VENDOR_REJECTED     @map("Vendor Rejected")
+  CANCELLED           @map("Order Cancelled")
+  DRIVER_PENDING      @map("Driver Pending")
+  DRIVER_ACCEPTED     @map("Driver Accepted")
+  DRIVER_REJECTED     @map("Driver Rejected")
+  SHIPPED             @map("Order Shipped")
+  IN_TRANSIT          @map("In Transit")
+  COMPLETED           @map("Order Completed")
+}
+
+enum CommissionSource {
+  VENDOR @map("vendor")
+  DRIVER @map("driver")
 }
 
 model User {
@@ -419,6 +425,19 @@ model Order {
   adminCommissionAmount     Decimal   @db.Decimal(10, 2) @default(0)
   
   vendorEarnings           Decimal   @db.Decimal(10, 2) @default(0)
+
+  // Status-based Commission Tracking
+  vendorCommissionApplied   Boolean   @default(false) @map("vendor_commission_applied")
+  driverCommissionApplied   Boolean   @default(false) @map("driver_commission_applied")
+  vendorCommissionRate      Decimal   @db.Decimal(10, 4) @default(0) @map("vendor_commission_rate")
+  vendorCommissionValue     Decimal   @db.Decimal(10, 2) @default(0) @map("vendor_commission_value")
+  driverCommissionRate      Decimal   @db.Decimal(10, 4) @default(0) @map("driver_commission_rate")
+  driverCommissionValue     Decimal   @db.Decimal(10, 2) @default(0) @map("driver_commission_value")
+  platformTotalCommission   Decimal   @db.Decimal(10, 2) @default(0) @map("platform_total_commission")
+  vendorNet                 Decimal   @db.Decimal(10, 2) @default(0) @map("vendor_net")
+  driverNet                 Decimal   @db.Decimal(10, 2) @default(0) @map("driver_net")
+
+  commissionSnapshots OrderCommissionSnapshot[]
 
   @@map("orders")
 }
@@ -1084,4 +1103,24 @@ model ManagerPayoutConfirmation {
   createdAt DateTime @default(now())
 
   @@map("manager_payout_confirmations")
+}
+
+model OrderCommissionSnapshot {
+  id              String           @id @default(uuid())
+  orderId         String           @map("order_id")
+  order           Order            @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  vendorId        String?          @map("vendor_id")
+  driverId        String?          @map("driver_id")
+  source          CommissionSource
+  commissionRate  Decimal          @db.Decimal(10, 4) @map("commission_rate")
+  commissionValue Decimal          @db.Decimal(10, 2) @map("commission_value")
+  baseAmount      Decimal          @db.Decimal(10, 2) @map("base_amount")
+  createdAt       DateTime         @default(now()) @map("created_at")
+
+  @@index([orderId])
+  @@index([vendorId])
+  @@index([driverId])
+  @@index([source])
+  @@index([createdAt])
+  @@map("order_commission_snapshots")
 }

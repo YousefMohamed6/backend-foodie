@@ -7,6 +7,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import {
+  CommissionSource,
   OrderStatus,
   PaymentMethod,
   PaymentStatus,
@@ -22,6 +23,7 @@ import { CouponsService } from '../coupons/coupons.service';
 import { ProductsService } from '../products/products.service';
 import { ReviewsService } from '../reviews/reviews.service';
 import { WalletService } from '../wallet/wallet.service';
+import { CommissionService } from './commission.service';
 import { AssignDriverDto } from './dto/assign-driver.dto';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { UpdateOrderStatusDto } from './dto/update-order-status.dto';
@@ -55,6 +57,7 @@ export class OrdersService {
     private notificationService: NotificationService,
     private pricingService: OrderPricingService,
     private managementService: OrderManagementService,
+    private commissionService: CommissionService,
   ) { }
 
   async create(createOrderDto: CreateOrderDto, user: User) {
@@ -215,7 +218,7 @@ export class OrdersService {
       where: { id },
       data: {
         driverId: null,
-        status: OrderStatus.ACCEPTED,
+        status: OrderStatus.DRIVER_REJECTED,
       },
       include: orderInclude,
     });
@@ -226,6 +229,188 @@ export class OrdersService {
   async getOrderReview(orderId: string, productId: string) {
     return this.reviewsService.findByOrderAndProduct(orderId, productId);
   }
+
+  async vendorRejectOrder(id: string, user: User) {
+    const order = await this.prisma.order.findUnique({
+      where: { id },
+      include: { vendor: true },
+    });
+
+    if (!order) throw new NotFoundException('ORDER_NOT_FOUND');
+
+    if (user.role === UserRole.VENDOR && order.vendor.authorId !== user.id) {
+      throw new ForbiddenException('ACCESS_DENIED');
+    }
+
+    if (order.status !== OrderStatus.PLACED) {
+      throw new BadRequestException('ORDER_NOT_PLACED');
+    }
+
+    const savedOrder = await this.prisma.order.update({
+      where: { id },
+      data: { status: OrderStatus.VENDOR_REJECTED },
+      include: orderInclude,
+    });
+
+    await this.notificationService.sendOrderNotification(
+      order.authorId,
+      'notification_template_order_rejected',
+      { orderId: savedOrder.id, status: savedOrder.status },
+    );
+
+    return this.emitUpdate(savedOrder);
+  }
+
+
+  async vendorAcceptOrder(id: string, user: User) {
+    const order = await this.prisma.order.findUnique({
+      where: { id },
+      include: { vendor: true },
+    });
+
+    if (!order) throw new NotFoundException('ORDER_NOT_FOUND');
+
+    if (user.role === UserRole.VENDOR && order.vendor.authorId !== user.id) {
+      throw new ForbiddenException('ACCESS_DENIED');
+    }
+
+    if (order.status !== OrderStatus.PLACED) {
+      throw new BadRequestException('ORDER_NOT_PLACED');
+    }
+
+    if (order.vendorCommissionApplied) {
+      throw new BadRequestException('COMMISSION_ALREADY_APPLIED');
+    }
+
+    return await this.prisma.$transaction(async (tx) => {
+      const isFreePlan = await this.commissionService.isVendorOnFreePlan(order.vendorId);
+
+      let vendorCommissionRate = 0;
+      let vendorCommissionValue = 0;
+      let vendorNet = Number(order.orderTotal);
+
+      if (isFreePlan) {
+        vendorCommissionRate = await this.commissionService.getVendorCommissionRate();
+        const calculation = this.commissionService.calculateVendorCommission(
+          Number(order.orderTotal),
+          vendorCommissionRate,
+        );
+        vendorCommissionValue = calculation.value;
+        vendorNet = Number(order.orderTotal) - vendorCommissionValue;
+
+        await this.commissionService.createCommissionSnapshot(
+          {
+            orderId: id,
+            vendorId: order.vendorId,
+            source: CommissionSource.VENDOR,
+            commissionRate: vendorCommissionRate,
+            commissionValue: vendorCommissionValue,
+            baseAmount: Number(order.orderTotal),
+          },
+          tx,
+        );
+      }
+
+      const updateData: Prisma.OrderUpdateInput = {
+        status: OrderStatus.VENDOR_ACCEPTED,
+        vendorCommissionApplied: true,
+        vendorCommissionRate,
+        vendorCommissionValue,
+        vendorNet,
+      };
+
+      if (order.driverCommissionApplied) {
+        const platformTotal = vendorCommissionValue + Number(order.driverCommissionValue);
+        updateData.platformTotalCommission = platformTotal;
+      }
+
+      const savedOrder = await tx.order.update({
+        where: { id },
+        data: updateData,
+        include: orderInclude,
+      });
+
+      await this.notificationService.sendOrderNotification(
+        order.authorId,
+        'notification_template_order_accepted',
+        { orderId: savedOrder.id, status: savedOrder.status },
+      );
+
+      return this.emitUpdate(savedOrder);
+    });
+  }
+
+  async markOrderDelivered(id: string, user: User) {
+    const order = await this.prisma.order.findUnique({
+      where: { id },
+      include: { vendor: true },
+    });
+
+    if (!order) throw new NotFoundException('ORDER_NOT_FOUND');
+
+    if (user.role === UserRole.DRIVER && order.driverId !== user.id) {
+      throw new ForbiddenException('ACCESS_DENIED');
+    }
+
+    const validStatuses: OrderStatus[] = [
+      OrderStatus.DRIVER_ACCEPTED,
+      OrderStatus.SHIPPED,
+      OrderStatus.IN_TRANSIT,
+    ];
+    if (!validStatuses.includes(order.status)) {
+      throw new BadRequestException('INVALID_ORDER_STATUS');
+    }
+
+    if (order.driverCommissionApplied) {
+      throw new BadRequestException('COMMISSION_ALREADY_APPLIED');
+    }
+
+    return await this.prisma.$transaction(async (tx) => {
+      const driverCommissionRate = await this.commissionService.getDriverCommissionRate();
+      const calculation = this.commissionService.calculateDriverCommission(
+        Number(order.deliveryCharge),
+        driverCommissionRate,
+      );
+      const driverCommissionValue = calculation.value;
+      const driverNet = Number(order.deliveryCharge) - driverCommissionValue;
+
+      await this.commissionService.createCommissionSnapshot(
+        {
+          orderId: id,
+          driverId: order.driverId ?? undefined,
+          source: CommissionSource.DRIVER,
+          commissionRate: driverCommissionRate,
+          commissionValue: driverCommissionValue,
+          baseAmount: Number(order.deliveryCharge),
+        },
+        tx,
+      );
+
+      const platformTotal = Number(order.vendorCommissionValue) + driverCommissionValue;
+
+      const savedOrder = await tx.order.update({
+        where: { id },
+        data: {
+          status: OrderStatus.COMPLETED,
+          driverCommissionApplied: true,
+          driverCommissionRate,
+          driverCommissionValue,
+          driverNet,
+          platformTotalCommission: platformTotal,
+        },
+        include: orderInclude,
+      });
+
+      await this.notificationService.sendOrderNotification(
+        order.authorId,
+        'notification_template_order_completed',
+        { orderId: savedOrder.id, status: savedOrder.status },
+      );
+
+      return this.emitUpdate(savedOrder);
+    });
+  }
+
 
   async acceptOrder(id: string, user: User) {
     const order = await this.prisma.order.findUnique({
@@ -492,6 +677,27 @@ export class OrdersService {
     }
     return where;
   }
+
+  async getCommissionReport(startDate?: Date, endDate?: Date) {
+    return this.commissionService.getPlatformCommissionTotal(startDate, endDate);
+  }
+
+  async getVendorCommissionReport(vendorId: string, startDate?: Date, endDate?: Date) {
+    return this.commissionService.getVendorNetReceivables(vendorId, startDate, endDate);
+  }
+
+  async getDriverCommissionReport(driverId: string, startDate?: Date, endDate?: Date) {
+    return this.commissionService.getDriverEarnings(driverId, startDate, endDate);
+  }
+
+  async getMonthlyCommissionReport(year: number, month: number) {
+    return this.commissionService.getMonthlyCommissionReport(year, month);
+  }
+
+  async getOrderCommissionSnapshots(orderId: string) {
+    return this.commissionService.getOrderCommissionSnapshots(orderId);
+  }
+
 
 
   private emitUpdate(order: any) {

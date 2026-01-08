@@ -69,6 +69,17 @@ export class SettingsService {
     return allSettings;
   }
 
+  async getCommissionRate(type: 'vendor' | 'driver'): Promise<number> {
+    const key = type === 'vendor' ? 'vendor_commission_rate' : 'driver_commission_rate';
+    try {
+      const value = await this.findOne(key);
+      const rate = parseFloat(value);
+      return isNaN(rate) ? 0 : rate;
+    } catch {
+      return 0;
+    }
+  }
+
   async getPublicSettings() {
     const publicKeys = [
       'wallet_enabled',

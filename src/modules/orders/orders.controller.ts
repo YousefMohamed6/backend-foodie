@@ -143,4 +143,98 @@ export class OrdersController {
     );
     return { success: true, message: 'ORDER_SUCCESS', data };
   }
+
+  @Post(':id/vendor-accept')
+  @Roles(UserRole.ADMIN, UserRole.VENDOR)
+  @ApiOperation({ summary: 'Vendor accepts order (triggers vendor commission if on free plan)' })
+  async vendorAcceptOrder(@Param('id') id: string, @Request() req) {
+    const data = await this.ordersService.vendorAcceptOrder(id, req.user);
+    return { success: true, message: 'ORDER_ACCEPTED', data };
+  }
+
+  @Post(':id/vendor-reject')
+  @Roles(UserRole.ADMIN, UserRole.VENDOR)
+  @ApiOperation({ summary: 'Vendor rejects order' })
+  async vendorRejectOrder(@Param('id') id: string, @Request() req) {
+    const data = await this.ordersService.vendorRejectOrder(id, req.user);
+    return { success: true, message: 'ORDER_REJECTED', data };
+  }
+
+  @Post(':id/complete')
+  @Roles(UserRole.ADMIN, UserRole.DRIVER)
+  @ApiOperation({ summary: 'Mark order as completed (triggers driver commission)' })
+  async markOrderCompleted(@Param('id') id: string, @Request() req) {
+    const data = await this.ordersService.markOrderDelivered(id, req.user);
+    return { success: true, message: 'ORDER_COMPLETED', data };
+  }
+
+  @Get(':id/commission-snapshots')
+  @Roles(UserRole.ADMIN)
+  @ApiOperation({ summary: 'Get commission snapshots for an order' })
+  async getOrderCommissionSnapshots(@Param('id') id: string) {
+    const data = await this.ordersService.getOrderCommissionSnapshots(id);
+    return { success: true, message: 'COMMISSION_SNAPSHOTS_RETRIEVED', data };
+  }
+
+  @Get('reports/commission')
+  @Roles(UserRole.ADMIN)
+  @ApiOperation({ summary: 'Get platform commission report' })
+  @ApiQuery({ name: 'startDate', required: false })
+  @ApiQuery({ name: 'endDate', required: false })
+  async getCommissionReport(
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+  ) {
+    const start = startDate ? new Date(startDate) : undefined;
+    const end = endDate ? new Date(endDate) : undefined;
+    const data = await this.ordersService.getCommissionReport(start, end);
+    return { success: true, message: 'COMMISSION_REPORT_RETRIEVED', data };
+  }
+
+  @Get('reports/commission/monthly/:year/:month')
+  @Roles(UserRole.ADMIN)
+  @ApiOperation({ summary: 'Get monthly commission report' })
+  async getMonthlyCommissionReport(
+    @Param('year') year: string,
+    @Param('month') month: string,
+  ) {
+    const data = await this.ordersService.getMonthlyCommissionReport(
+      parseInt(year),
+      parseInt(month),
+    );
+    return { success: true, message: 'MONTHLY_COMMISSION_REPORT_RETRIEVED', data };
+  }
+
+  @Get('reports/vendor/:vendorId/commission')
+  @Roles(UserRole.ADMIN, UserRole.VENDOR)
+  @ApiOperation({ summary: 'Get vendor commission report' })
+  @ApiQuery({ name: 'startDate', required: false })
+  @ApiQuery({ name: 'endDate', required: false })
+  async getVendorCommissionReport(
+    @Param('vendorId') vendorId: string,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+  ) {
+    const start = startDate ? new Date(startDate) : undefined;
+    const end = endDate ? new Date(endDate) : undefined;
+    const data = await this.ordersService.getVendorCommissionReport(vendorId, start, end);
+    return { success: true, message: 'VENDOR_COMMISSION_REPORT_RETRIEVED', data };
+  }
+
+  @Get('reports/driver/:driverId/commission')
+  @Roles(UserRole.ADMIN, UserRole.DRIVER)
+  @ApiOperation({ summary: 'Get driver commission report' })
+  @ApiQuery({ name: 'startDate', required: false })
+  @ApiQuery({ name: 'endDate', required: false })
+  async getDriverCommissionReport(
+    @Param('driverId') driverId: string,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+  ) {
+    const start = startDate ? new Date(startDate) : undefined;
+    const end = endDate ? new Date(endDate) : undefined;
+    const data = await this.ordersService.getDriverCommissionReport(driverId, start, end);
+    return { success: true, message: 'DRIVER_COMMISSION_REPORT_RETRIEVED', data };
+  }
 }
+
