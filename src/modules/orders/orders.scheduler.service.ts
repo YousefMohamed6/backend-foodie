@@ -1,8 +1,10 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
-import { OrderStatus, UserRole } from '@prisma/client';
+import { OrderStatus, PaymentMethod, UserRole } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { NotificationService } from '../../shared/services/notification.service';
+import { SettingsService } from '../settings/settings.service';
+import { WalletService } from '../wallet/wallet.service';
 
 import { AnalyticsTrackingService } from '../analytics/analytics-tracking.service';
 
@@ -14,6 +16,8 @@ export class OrdersSchedulerService {
         private readonly prisma: PrismaService,
         private readonly notificationService: NotificationService,
         private readonly analyticsTrackingService: AnalyticsTrackingService,
+        private readonly settingsService: SettingsService,
+        private readonly walletService: WalletService,
     ) { }
 
     /**
@@ -140,6 +144,178 @@ export class OrdersSchedulerService {
         } catch (error) {
             this.logger.error(
                 `Failed to process ready order ${order.id}: ${error.message}`,
+            );
+        }
+    }
+
+    /**
+     * Auto-cancel orders that vendors haven't accepted within the timeout period
+     * Runs every 5 minutes
+     */
+    @Cron(CronExpression.EVERY_5_MINUTES)
+    async autoCancelUnacceptedOrders() {
+        this.logger.debug('Checking for unaccepted orders to auto-cancel...');
+
+        try {
+            // Check if auto-cancel is enabled
+            const isEnabled = await this.settingsService.findOne('vendor_auto_cancel_enabled')
+                .catch(() => 'true');
+
+            if (isEnabled !== 'true') {
+                this.logger.debug('Vendor auto-cancel is disabled. Skipping.');
+                return;
+            }
+
+            // Get timeout in minutes
+            const timeoutMinutesStr = await this.settingsService.findOne('order_timeout_minutes')
+                .catch(() => '30');
+            const timeoutMinutes = parseInt(timeoutMinutesStr || '30', 10);
+
+            const cutoffTime = new Date();
+            cutoffTime.setMinutes(cutoffTime.getMinutes() - timeoutMinutes);
+
+            // Find orders that are still in PLACED status and created before cutoff
+            const ordersToCancel = await this.prisma.order.findMany({
+                where: {
+                    status: OrderStatus.PLACED,
+                    createdAt: {
+                        lte: cutoffTime,
+                    },
+                },
+                include: {
+                    vendor: {
+                        select: {
+                            id: true,
+                            title: true,
+                            zoneId: true,
+                        },
+                    },
+                },
+            });
+
+            if (ordersToCancel.length > 0) {
+                this.logger.log(`Found ${ordersToCancel.length} orders to auto-cancel due to vendor timeout`);
+            }
+
+            for (const order of ordersToCancel) {
+                await this.handleOrderAutoCancel(order, timeoutMinutes);
+            }
+        } catch (error) {
+            this.logger.error(
+                `Failed to check for unaccepted orders: ${error.message}`,
+                error.stack,
+            );
+        }
+    }
+
+    private async handleOrderAutoCancel(order: any, timeoutMinutes: number) {
+        try {
+            await this.prisma.$transaction(async (tx) => {
+                // 1. Update order status to CANCELLED
+                await tx.order.update({
+                    where: { id: order.id },
+                    data: {
+                        status: OrderStatus.CANCELLED,
+                    },
+                });
+
+                // 2. If wallet payment, refund the customer
+                if (order.paymentMethod === PaymentMethod.wallet) {
+                    // Check if there's a held balance to refund
+                    const heldBalance = await tx.heldBalance.findUnique({
+                        where: { orderId: order.id },
+                    });
+
+                    if (heldBalance) {
+                        // Refund the held amount
+                        await this.walletService.refund(
+                            order.authorId,
+                            Number(heldBalance.totalAmount),
+                            `Order ${order.id} auto-cancelled: Vendor did not accept within ${timeoutMinutes} minutes`,
+                            order.id,
+                            tx,
+                        );
+
+                        // Update held balance status
+                        await tx.heldBalance.update({
+                            where: { orderId: order.id },
+                            data: {
+                                status: 'REFUNDED',
+                                releasedAt: new Date(),
+                            },
+                        });
+                    } else {
+                        // Direct refund if no held balance record
+                        await this.walletService.refund(
+                            order.authorId,
+                            Number(order.totalAmount),
+                            `Order ${order.id} auto-cancelled: Vendor did not accept within ${timeoutMinutes} minutes`,
+                            order.id,
+                            tx,
+                        );
+                    }
+
+                    this.logger.log(`Refunded wallet payment for auto-cancelled order ${order.id}`);
+                }
+            });
+
+            // 3. Send notification to customer
+            await this.notificationService.sendOrderNotification(
+                order.authorId,
+                'notification_template_order_auto_cancelled',
+                {
+                    orderId: order.id,
+                    vendorName: order.vendor?.title || 'Vendor',
+                    reason: `Order was automatically cancelled because the vendor did not accept it within ${timeoutMinutes} minutes. If you paid via wallet, your payment has been refunded.`,
+                    status: OrderStatus.CANCELLED,
+                },
+            );
+
+            // 4. Notify zone managers about the auto-cancellation
+            if (order.vendor?.zoneId) {
+                const managers = await this.prisma.user.findMany({
+                    where: {
+                        role: UserRole.MANAGER,
+                        zoneId: order.vendor.zoneId,
+                        isActive: true,
+                        fcmToken: { not: null },
+                    },
+                    select: { id: true },
+                });
+
+                if (managers.length > 0) {
+                    await this.notificationService.sendBulkNotifications(
+                        managers.map((m) => m.id),
+                        'notification_template_manager_order_auto_cancelled',
+                        {
+                            orderId: order.id,
+                            vendorName: order.vendor.title,
+                            reason: `Vendor did not accept within ${timeoutMinutes} minutes`,
+                        },
+                    );
+                }
+            }
+
+            // 5. Track the cancellation
+            this.analyticsTrackingService.trackOrderLifecycle({
+                orderId: order.id,
+                eventType: 'ORDER_CANCELLED',
+                previousStatus: OrderStatus.PLACED,
+                newStatus: OrderStatus.CANCELLED,
+                actorId: 'system',
+                actorRole: undefined,
+                metadata: {
+                    reason: 'VENDOR_TIMEOUT',
+                    timeoutMinutes,
+                    createdAt: order.createdAt,
+                },
+            });
+
+            this.logger.log(`Auto-cancelled order ${order.id} due to vendor timeout (${timeoutMinutes} min)`);
+        } catch (error) {
+            this.logger.error(
+                `Failed to auto-cancel order ${order.id}: ${error.message}`,
+                error.stack,
             );
         }
     }

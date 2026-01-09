@@ -139,6 +139,10 @@ async function addAppSettings() {
             value: '30',
         },
         {
+            key: 'vendor_auto_cancel_enabled',
+            value: 'true',
+        },
+        {
             key: 'max_product_price',
             value: '10000',
         },
@@ -157,6 +161,26 @@ async function addAppSettings() {
         {
             key: 'min_delivery_pay',
             value: '8',
+        },
+        {
+            key: 'wallet_auto_release_enabled',
+            value: 'true',
+        },
+        {
+            key: 'wallet_auto_release_days',
+            value: '7',
+        },
+        {
+            key: 'wallet_otp_required_risk_threshold',
+            value: '61',
+        },
+        {
+            key: 'wallet_dispute_max_per_month',
+            value: '3',
+        },
+        {
+            key: 'wallet_require_customer_confirmation',
+            value: 'false',
         },
 
     ];

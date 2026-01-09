@@ -257,5 +257,34 @@ export class OrdersController {
     const data = await this.ordersService.getDriverCommissionReport(driverId, start, end);
     return { success: true, message: 'DRIVER_COMMISSION_REPORT_RETRIEVED', data };
   }
-}
 
+  // === WALLET PROTECTION ENDPOINTS ===
+
+  @Post(':id/confirm-delivery')
+  @Roles(UserRole.CUSTOMER)
+  @ApiOperation({ summary: 'Customer confirms delivery receipt - releases wallet funds' })
+  async confirmDelivery(@Param('id') id: string, @Request() req) {
+    const data = await this.ordersService.confirmDeliveryReceipt(id, req.user);
+    return { success: true, message: 'DELIVERY_CONFIRMED', data };
+  }
+
+  @Post(':id/dispute')
+  @Roles(UserRole.CUSTOMER)
+  @ApiOperation({ summary: 'Customer disputes non-receipt of order' })
+  async createDispute(
+    @Param('id') id: string,
+    @Body() dto: { reason: string; evidence?: { photos?: string[]; notes?: string } },
+    @Request() req,
+  ) {
+    const data = await this.ordersService.createOrderDispute(id, req.user, dto.reason, dto.evidence);
+    return { success: true, message: 'DISPUTE_CREATED', data };
+  }
+
+  @Get(':id/protection-status')
+  @Roles(UserRole.ADMIN, UserRole.CUSTOMER, UserRole.MANAGER)
+  @ApiOperation({ summary: 'Get wallet protection status for order' })
+  async getProtectionStatus(@Param('id') id: string, @Request() req) {
+    const data = await this.ordersService.getOrderProtectionStatus(id, req.user);
+    return { success: true, message: 'PROTECTION_STATUS_RETRIEVED', data };
+  }
+}

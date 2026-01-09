@@ -181,8 +181,8 @@ model DriverProfile {
 }
 
 model AdminWallet {
-  id           String  @id @default(uuid())
-  walletAmount Decimal @default(0) @map("wallet_amount") @db.Decimal(10, 2)
+  id           String   @id @default(uuid())
+  walletAmount Decimal  @default(0) @map("wallet_amount") @db.Decimal(10, 2)
   updatedAt    DateTime @updatedAt
 
   transactions PlatformTransaction[]
@@ -191,14 +191,14 @@ model AdminWallet {
 }
 
 model PlatformTransaction {
-  id        String   @id @default(uuid())
-  walletId  String   @map("wallet_id")
+  id        String      @id @default(uuid())
+  walletId  String      @map("wallet_id")
   wallet    AdminWallet @relation(fields: [walletId], references: [id])
-  amount    Decimal  @db.Decimal(10, 2)
-  type      String   // CREDIT, DEBIT
+  amount    Decimal     @db.Decimal(10, 2)
+  type      String // CREDIT, DEBIT
   reason    String
-  orderId   String?  @map("order_id")
-  createdAt DateTime @default(now())
+  orderId   String?     @map("order_id")
+  createdAt DateTime    @default(now())
 
   @@map("platform_transactions")
 }
@@ -421,21 +421,21 @@ model Order {
   driverId String? @map("driver_id")
   driver   User?   @relation("OrderDriver", fields: [driverId], references: [id])
 
-  items          OrderItem[]
-  addressId      String?       @map("address_id")
-  address        Address?      @relation(fields: [addressId], references: [id])
-  paymentMethod  PaymentMethod @map("payment_method")
-  totalAmount    Decimal       @db.Decimal(10, 2)
-  deliveryCharge Decimal       @default(0) @db.Decimal(10, 2)
-  tipAmount      Decimal       @default(0) @map("tip_amount") @db.Decimal(10, 2)
-  notes          String?
-  takeAway       Boolean       @default(false)
-  scheduleTime   DateTime?
-  estimatedReadyAt DateTime?     @map("estimated_ready_at")
-  isReadyNotificationSent Boolean   @default(false) @map("is_ready_notification_sent")
-  status         OrderStatus   @default(PLACED)
-  paymentStatus  PaymentStatus @default(UNPAID) @map("payment_status")
-  cashReportedAt DateTime?     @map("cash_reported_at")
+  items                   OrderItem[]
+  addressId               String?       @map("address_id")
+  address                 Address?      @relation(fields: [addressId], references: [id])
+  paymentMethod           PaymentMethod @map("payment_method")
+  totalAmount             Decimal       @db.Decimal(10, 2)
+  deliveryCharge          Decimal       @default(0) @db.Decimal(10, 2)
+  tipAmount               Decimal       @default(0) @map("tip_amount") @db.Decimal(10, 2)
+  notes                   String?
+  takeAway                Boolean       @default(false)
+  scheduleTime            DateTime?
+  estimatedReadyAt        DateTime?     @map("estimated_ready_at")
+  isReadyNotificationSent Boolean       @default(false) @map("is_ready_notification_sent")
+  status                  OrderStatus   @default(PLACED)
+  paymentStatus           PaymentStatus @default(UNPAID) @map("payment_status")
+  cashReportedAt          DateTime?     @map("cash_reported_at")
 
   chatChannels             ChatChannel[]
   walletTransactions       WalletTransaction[]
@@ -477,6 +477,10 @@ model Order {
   // Analytics relations
   lifecycleEvents OrderLifecycleEvent[]
   deliveryEvents  DeliveryEvent[]
+
+  // Wallet Protection relations
+  heldBalance HeldBalance?
+  disputes    Dispute[]
 
   @@map("orders")
 }
@@ -602,12 +606,12 @@ model Subscription {
 
   vendors            Vendor[]            @relation("VendorSubscription")
   walletTransactions WalletTransaction[]
-  
-  // Analytics relations
-  eventLogs          SubscriptionEventLog[]
 
-  createdAt            DateTime               @default(now())
-  updatedAt            DateTime               @updatedAt
+  // Analytics relations
+  eventLogs SubscriptionEventLog[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@map("subscriptions")
 }
@@ -652,6 +656,21 @@ enum TransactionType {
   REFUND     @map("refund")
 }
 
+enum BalanceType {
+  PAYMENT  @map("payment")
+  HELD     @map("held")
+  RELEASED @map("released")
+  REFUNDED @map("refunded")
+}
+
+enum DeliveryConfirmationType {
+  CUSTOMER_CONFIRMATION @map("customer_confirmation")
+  OTP_CONFIRMED         @map("otp_confirmed")
+  PHOTO_PROOF           @map("photo_proof")
+  TIMEOUT_RELEASE       @map("timeout_release")
+  ADMIN_RESOLUTION      @map("admin_resolution")
+}
+
 model WalletTransaction {
   id            String           @id @default(uuid())
   userId        String           @map("user_id")
@@ -662,7 +681,7 @@ model WalletTransaction {
   isTopup       Boolean          @default(false) @map("is_top_up")
 
   orderId String? @map("order_id")
-  order   Order?  @relation(fields: [orderId], references: [id]) // Added FK relation
+  order   Order?  @relation(fields: [orderId], references: [id])
 
   subscriptionId  String?       @map("subscription_id")
   subscription    Subscription? @relation(fields: [subscriptionId], references: [id])
@@ -671,8 +690,17 @@ model WalletTransaction {
   description     String?       @map("note")
   referenceId     String?
   metadata        Json?
-  createdAt       DateTime      @default(now()) @map("date")
-  updatedAt       DateTime      @updatedAt
+
+  // Wallet Protection Fields
+  balanceType              BalanceType?              @map("balance_type")
+  heldBalanceId            String?                   @map("held_balance_id")
+  heldBalance              HeldBalance?              @relation(fields: [heldBalanceId], references: [id])
+  deliveryConfirmationType DeliveryConfirmationType? @map("delivery_confirmation_type")
+  deliveryConfirmationTime DateTime?                 @map("delivery_confirmation_time")
+  resolutionReason         String?                   @map("resolution_reason")
+
+  createdAt DateTime @default(now()) @map("date")
+  updatedAt DateTime @updatedAt
 
   @@map("wallet_transactions")
 }
@@ -687,6 +715,101 @@ model WithdrawMethod {
   updatedAt DateTime @updatedAt
 
   @@map("withdraw_methods")
+}
+
+enum HeldBalanceStatus {
+  HELD     @map("held")
+  RELEASED @map("released")
+  REFUNDED @map("refunded")
+  DISPUTED @map("disputed")
+}
+
+enum DisputeStatus {
+  PENDING               @map("pending")
+  UNDER_REVIEW          @map("under_review")
+  RESOLVED_CUSTOMER_WIN @map("resolved_customer_win")
+  RESOLVED_DRIVER_WIN   @map("resolved_driver_win")
+  RESOLVED_PARTIAL      @map("resolved_partial")
+  FRAUD_DETECTED        @map("fraud_detected")
+}
+
+model HeldBalance {
+  id         String  @id @default(uuid())
+  orderId    String  @unique @map("order_id")
+  order      Order   @relation(fields: [orderId], references: [id])
+  customerId String  @map("customer_id")
+  vendorId   String  @map("vendor_id")
+  driverId   String? @map("driver_id")
+
+  totalAmount  Decimal @map("total_amount") @db.Decimal(10, 2)
+  vendorAmount Decimal @map("vendor_amount") @db.Decimal(10, 2)
+  driverAmount Decimal @map("driver_amount") @db.Decimal(10, 2)
+  adminAmount  Decimal @map("admin_amount") @db.Decimal(10, 2)
+
+  status     HeldBalanceStatus @default(HELD)
+  holdReason String            @map("hold_reason")
+
+  createdAt       DateTime                  @default(now()) @map("created_at")
+  releasedAt      DateTime?                 @map("released_at")
+  releaseType     DeliveryConfirmationType? @map("release_type")
+  autoReleaseDate DateTime?                 @map("auto_release_date")
+
+  disputeId String?  @map("dispute_id")
+  dispute   Dispute? @relation(fields: [disputeId], references: [id])
+
+  walletTransactions WalletTransaction[]
+
+  @@map("held_balances")
+}
+
+model Dispute {
+  id         String  @id @default(uuid())
+  orderId    String  @map("order_id")
+  order      Order   @relation(fields: [orderId], references: [id])
+  customerId String  @map("customer_id")
+  driverId   String? @map("driver_id")
+
+  reason           String  @db.Text
+  customerEvidence Json?   @map("customer_evidence")
+  driverResponse   String? @map("driver_response") @db.Text
+  driverEvidence   Json?   @map("driver_evidence")
+
+  status   DisputeStatus @default(PENDING)
+  priority String        @default("MEDIUM") // LOW | MEDIUM | HIGH
+
+  assignedTo     String? @map("assigned_to")
+  resolution     String? @db.Text
+  resolutionType String? @map("resolution_type") // FULL_REFUND | FULL_RELEASE | PARTIAL | FRAUD
+
+  createdAt  DateTime  @default(now()) @map("created_at")
+  resolvedAt DateTime? @map("resolved_at")
+
+  heldBalances HeldBalance[]
+  auditLogs    DisputeAuditLog[]
+
+  @@map("disputes")
+}
+
+model DisputeAuditLog {
+  id        String  @id @default(uuid())
+  disputeId String  @map("dispute_id")
+  dispute   Dispute @relation(fields: [disputeId], references: [id], onDelete: Cascade)
+
+  actorId   String  @map("actor_id")
+  actorRole String  @map("actor_role")
+  action    String // STATUS_CHANGED | EVIDENCE_ADDED | ASSIGNED | RESOLVED
+  oldValue  String? @map("old_value") @db.Text
+  newValue  String? @map("new_value") @db.Text
+  reason    String? @db.Text
+  metadata  Json?
+
+  ipAddress String? @map("ip_address")
+  userAgent String? @map("user_agent")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([disputeId])
+  @@map("dispute_audit_logs")
 }
 
 model Coupon {
@@ -1171,8 +1294,6 @@ model OrderCommissionSnapshot {
 // ANALYTICS TABLES - Comprehensive tracking for all business events
 // ============================================================================
 
-
-
 // 3. User Activity Log - Track all user interactions
 model UserActivityLog {
   id     String @id @default(uuid())
@@ -1511,8 +1632,8 @@ model EntityChangeLog {
   previousValue Json?    @map("previous_value")
   newValue      Json?    @map("new_value")
   changedFields String[] @map("changed_fields")
-  ipAddress String? @map("ip_address")
-  userAgent String? @map("user_agent")
+  ipAddress     String?  @map("ip_address")
+  userAgent     String?  @map("user_agent")
 
   timestamp DateTime @default(now())
 
@@ -1536,7 +1657,7 @@ model OrderLifecycleEvent {
   actorId   String?   @map("actor_id")
   actorRole UserRole? @map("actor_role")
 
-  timeSincePrevious Int?  @map("time_since_previous") // In seconds
+  timeSincePrevious Int?   @map("time_since_previous") // In seconds
   locationLat       Float? @map("location_lat")
   locationLng       Float? @map("location_lng")
 
@@ -1569,7 +1690,7 @@ model DeliveryEvent {
   longitude Float
 
   distanceCovered Float? @map("distance_covered") // meters
-  duration        Int?   // seconds
+  duration        Int? // seconds
   averageSpeed    Float? @map("average_speed") // km/h
 
   metadata Json?

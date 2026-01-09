@@ -8,7 +8,10 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import {
+  BalanceType,
   CommissionSource,
+  DeliveryConfirmationType,
+  HeldBalanceStatus,
   OrderStatus,
   PaymentMethod,
   PaymentStatus,
@@ -27,6 +30,8 @@ import { CashbackService } from '../cashback/cashback.service';
 import { CouponsService } from '../coupons/coupons.service';
 import { ProductsService } from '../products/products.service';
 import { ReviewsService } from '../reviews/reviews.service';
+import { SettingsService } from '../settings/settings.service';
+import { WalletProtectionService } from '../wallet/wallet-protection.service';
 import { WalletService } from '../wallet/wallet.service';
 import { CommissionService } from './commission.service';
 import { AssignDriverDto } from './dto/assign-driver.dto';
@@ -58,6 +63,8 @@ export class OrdersService {
     private couponsService: CouponsService,
     private cashbackService: CashbackService,
     private walletService: WalletService,
+    private walletProtectionService: WalletProtectionService,
+    private settingsService: SettingsService,
     private reviewsService: ReviewsService,
     private ordersGateway: OrdersGateway,
     private notificationService: NotificationService,
@@ -677,11 +684,28 @@ export class OrdersService {
         );
       }
 
-      await this.notificationService.sendOrderNotification(
-        order.authorId,
-        'notification_template_order_completed',
-        { orderId: savedOrder.id, status: savedOrder.status },
-      );
+      // --- WALLET PROTECTION: For wallet payments, funds remain HELD ---
+      // Driver has marked order as delivered, but funds are NOT released
+      // Customer must confirm delivery OR wait for auto-release timeout
+      if (currentOrder.paymentMethod === PaymentMethod.wallet) {
+        // Send notification requesting delivery confirmation
+        await this.notificationService.sendOrderNotification(
+          order.authorId,
+          'notification_template_confirm_delivery',
+          {
+            orderId: savedOrder.id,
+            status: savedOrder.status,
+            message: 'Please confirm you received your order to release payment to the vendor and driver.',
+          },
+        );
+      } else {
+        // COD: Send regular completion notification
+        await this.notificationService.sendOrderNotification(
+          order.authorId,
+          'notification_template_order_completed',
+          { orderId: savedOrder.id, status: savedOrder.status },
+        );
+      }
 
       // Track Order Delivered
       this.analyticsTrackingService.trackOrderLifecycle({
@@ -831,32 +855,28 @@ export class OrdersService {
         include: orderInclude,
       });
 
-      // 3. Handle Wallet Transfers (Wallet Payment: credit at SHIPPED)
+      // 3. Handle Wallet Transfers
       if (order.paymentMethod === PaymentMethod.wallet) {
-        // Vendor Earnings
-        await this.walletService.addVendorEarnings(
-          order.vendorId,
-          order.vendor.authorId,
-          Number(savedOrder.vendorNet),
-          savedOrder.id,
-          tx,
-        );
+        // *** WALLET PROTECTION: DO NOT release funds here ***
+        // Funds remain HELD until customer confirms delivery or timeout
 
-        // Driver Earnings (Portion of delivery fee + 100% Tip)
+        // Update HeldBalance with calculated amounts and driver info
         const driverTotal = Number(savedOrder.driverNet) + Number(savedOrder.tipAmount);
-        await this.walletService.addDriverEarnings(
-          order.driverId!,
-          driverTotal,
-          savedOrder.id,
-          tx,
-        );
-
-        // Admin Wallet (Vendor commission + Platform cut from delivery fee)
-        await this.walletService.addAdminCommission(
-          platformTotal,
-          savedOrder.id,
-          tx,
-        );
+        await tx.heldBalance.update({
+          where: { orderId: order.id },
+          data: {
+            driverId: order.driverId,
+            vendorAmount: Number(savedOrder.vendorNet),
+            driverAmount: driverTotal,
+            adminAmount: platformTotal,
+            // Recalculate auto-release date from shipping
+            autoReleaseDate: (() => {
+              const date = new Date();
+              date.setDate(date.getDate() + 7); // 7 days from shipped
+              return date;
+            })(),
+          },
+        });
       }
 
       // Track in Analytics
@@ -1089,15 +1109,44 @@ export class OrdersService {
       });
 
       if (createOrderDto.paymentMethod === PaymentMethod.wallet) {
-        await this.walletService.pay(
-          user.id,
-          calcs.totalAmount,
-          `Payment for order at vendor ${createOrderDto.vendorId}`,
-          savedOrder.id,
-          tx,
-        );
+        // Step 1: Deduct from customer wallet (funds are HELD, not released)
+        await tx.walletTransaction.create({
+          data: {
+            userId: user.id,
+            amount: calcs.totalAmount,
+            type: TransactionType.PAYMENT,
+            description: `Payment for order ${savedOrder.id} - HELD pending delivery confirmation`,
+            orderId: savedOrder.id,
+            transactionUser: 'customer',
+            balanceType: BalanceType.HELD,
+          },
+        });
 
-        // Update order status to paid
+        // Deduct from customer available balance
+        await this.walletService.updateUserWallet(user.id, calcs.totalAmount, 'subtract', tx);
+
+        // Step 2: Create HeldBalance record
+        const autoReleaseDays = await this.settingsService.findOne('wallet_auto_release_days').catch(() => '7');
+        const autoReleaseDate = new Date();
+        autoReleaseDate.setDate(autoReleaseDate.getDate() + parseInt(autoReleaseDays || '7'));
+
+        await tx.heldBalance.create({
+          data: {
+            orderId: savedOrder.id,
+            customerId: user.id,
+            vendorId: createOrderDto.vendorId,
+            driverId: null, // Will be set when driver is assigned
+            totalAmount: calcs.totalAmount,
+            vendorAmount: calcs.vendorEarnings || 0, // Initial estimate
+            driverAmount: 0, // Calculated at SHIPPED
+            adminAmount: calcs.adminCommissionAmount || 0, // Initial estimate
+            status: HeldBalanceStatus.HELD,
+            holdReason: 'awaiting_delivery_confirmation',
+            autoReleaseDate,
+          },
+        });
+
+        // Update order status to paid (but funds are HELD)
         await tx.order.update({
           where: { id: savedOrder.id },
           data: { paymentStatus: PaymentStatus.PAID },
@@ -1295,5 +1344,143 @@ export class OrdersService {
       return savedOrder;
     });
   }
-}
 
+  /**
+   * Customer confirms they received the order - releases wallet funds
+   */
+  async confirmDeliveryReceipt(
+    orderId: string,
+    user: User,
+    confirmationType: DeliveryConfirmationType = DeliveryConfirmationType.CUSTOMER_CONFIRMATION,
+  ) {
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      include: { heldBalance: true },
+    });
+
+    if (!order) throw new NotFoundException('ORDER_NOT_FOUND');
+    if (order.authorId !== user.id) throw new ForbiddenException('NOT_YOUR_ORDER');
+    if (order.status !== OrderStatus.COMPLETED) {
+      throw new BadRequestException('ORDER_NOT_DELIVERED_YET');
+    }
+    if (order.paymentMethod !== PaymentMethod.wallet) {
+      throw new BadRequestException('NOT_A_WALLET_ORDER');
+    }
+    if (!order.heldBalance || order.heldBalance.status !== HeldBalanceStatus.HELD) {
+      throw new BadRequestException('NO_HELD_BALANCE_OR_ALREADY_PROCESSED');
+    }
+
+    // Release held funds to vendor, driver, admin
+    await this.walletProtectionService.releaseHeldBalance(
+      orderId,
+      confirmationType,
+      'Customer confirmed delivery receipt',
+    );
+
+    return {
+      success: true,
+      message: 'DELIVERY_CONFIRMED',
+      releasedAmount: Number(order.heldBalance.totalAmount),
+    };
+  }
+
+  /**
+   * Customer disputes that they didn't receive the order
+   */
+  async createOrderDispute(
+    orderId: string,
+    user: User,
+    reason: string,
+    evidence?: { photos?: string[]; notes?: string },
+  ) {
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      include: { heldBalance: true, disputes: true },
+    });
+
+    if (!order) throw new NotFoundException('ORDER_NOT_FOUND');
+    if (order.authorId !== user.id) throw new ForbiddenException('NOT_YOUR_ORDER');
+    if (order.status !== OrderStatus.COMPLETED) {
+      throw new BadRequestException('ORDER_NOT_DELIVERED_YET');
+    }
+    if (order.paymentMethod !== PaymentMethod.wallet) {
+      throw new BadRequestException('NOT_A_WALLET_ORDER');
+    }
+    if (!order.heldBalance || order.heldBalance.status !== HeldBalanceStatus.HELD) {
+      throw new BadRequestException('NO_HELD_BALANCE_OR_ALREADY_PROCESSED');
+    }
+    if (order.disputes && order.disputes.length > 0) {
+      throw new BadRequestException('DISPUTE_ALREADY_EXISTS');
+    }
+
+    // Create dispute - this will also mark HeldBalance as DISPUTED
+    const dispute = await this.walletProtectionService.createDispute(
+      orderId,
+      user.id,
+      reason,
+      evidence,
+    );
+
+    // Notify driver
+    if (order.driverId) {
+      await this.notificationService.sendCustomNotification(
+        [order.driverId],
+        { en: 'Delivery Disputed', ar: 'نزاع على التوصيل' },
+        {
+          en: `Customer has disputed delivery for order ${orderId}. Please respond.`,
+          ar: `اعترض العميل على توصيل الطلب ${orderId}. يرجى الرد.`,
+        },
+        { orderId, disputeId: dispute.id, type: 'DISPUTE_CREATED' },
+      );
+    }
+
+    return {
+      success: true,
+      message: 'DISPUTE_CREATED',
+      disputeId: dispute.id,
+    };
+  }
+
+  /**
+   * Get order with held balance and dispute info
+   */
+  async getOrderProtectionStatus(orderId: string, user: User) {
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      include: {
+        heldBalance: true,
+        disputes: {
+          orderBy: { createdAt: 'desc' },
+          take: 1,
+        },
+      },
+    });
+
+    if (!order) throw new NotFoundException('ORDER_NOT_FOUND');
+    if (order.authorId !== user.id && user.role !== UserRole.ADMIN && user.role !== UserRole.MANAGER) {
+      throw new ForbiddenException('ACCESS_DENIED');
+    }
+
+    return {
+      orderId: order.id,
+      paymentMethod: order.paymentMethod,
+      status: order.status,
+      heldBalance: order.heldBalance ? {
+        status: order.heldBalance.status,
+        totalAmount: Number(order.heldBalance.totalAmount),
+        autoReleaseDate: order.heldBalance.autoReleaseDate,
+        releasedAt: order.heldBalance.releasedAt,
+        releaseType: order.heldBalance.releaseType,
+      } : null,
+      dispute: order.disputes[0] ? {
+        id: order.disputes[0].id,
+        status: order.disputes[0].status,
+        reason: order.disputes[0].reason,
+        createdAt: order.disputes[0].createdAt,
+        resolvedAt: order.disputes[0].resolvedAt,
+      } : null,
+      canConfirmDelivery: order.heldBalance?.status === HeldBalanceStatus.HELD,
+      canDispute: order.heldBalance?.status === HeldBalanceStatus.HELD && order.disputes.length === 0,
+    };
+  }
+}
