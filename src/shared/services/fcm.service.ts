@@ -60,8 +60,8 @@ export class FcmService {
         },
         data: data
           ? Object.fromEntries(
-            Object.entries(data).map(([k, v]) => [k, String(v)]),
-          )
+              Object.entries(data).map(([k, v]) => [k, String(v)]),
+            )
           : {},
         android: {
           priority: 'high',
@@ -110,8 +110,8 @@ export class FcmService {
       },
       data: data
         ? Object.fromEntries(
-          Object.entries(data).map(([k, v]) => [k, String(v)]),
-        )
+            Object.entries(data).map(([k, v]) => [k, String(v)]),
+          )
         : {},
       android: {
         priority: 'high',
@@ -172,8 +172,8 @@ export class FcmService {
       },
       data: data
         ? Object.fromEntries(
-          Object.entries(data).map(([k, v]) => [k, String(v)]),
-        )
+            Object.entries(data).map(([k, v]) => [k, String(v)]),
+          )
         : {},
     };
 

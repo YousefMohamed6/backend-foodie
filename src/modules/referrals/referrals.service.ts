@@ -4,6 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
+import { APP_SETTINGS } from '../settings/settings.constants';
 import { SettingsService } from '../settings/settings.service';
 import { WalletService } from '../wallet/wallet.service';
 import { RedeemReferralDto } from './dto/referral.dto';
@@ -14,7 +15,7 @@ export class ReferralsService {
     private prisma: PrismaService,
     private walletService: WalletService,
     private settingsService: SettingsService,
-  ) { }
+  ) {}
 
   async getReferralCode(userId: string) {
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
@@ -24,10 +25,7 @@ export class ReferralsService {
 
     let referralCode = user.referralCode;
     if (!referralCode) {
-      referralCode = Math.random()
-        .toString(36)
-        .substring(2, 8)
-        .toUpperCase();
+      referralCode = Math.random().toString(36).substring(2, 8).toUpperCase();
       await this.prisma.user.update({
         where: { id: userId },
         data: { referralCode },
@@ -36,10 +34,14 @@ export class ReferralsService {
 
     let amount = 0;
     try {
-      const isEnabled = await this.settingsService.findOne('referral_enabled');
+      const isEnabled = await this.settingsService.findOne(
+        APP_SETTINGS.REFERRAL_ENABLED,
+      );
 
       if (isEnabled === 'true') {
-        const amountSetting = await this.settingsService.findOne('referral_amount');
+        const amountSetting = await this.settingsService.findOne(
+          APP_SETTINGS.REFERRAL_AMOUNT,
+        );
         if (amountSetting) {
           amount = Number(amountSetting);
         }

@@ -22,7 +22,7 @@ export class ProductsService {
     private prisma: PrismaService,
     @Inject(forwardRef(() => VendorsService))
     private vendorsService: VendorsService,
-  ) { }
+  ) {}
 
   async create(createProductDto: CreateProductDto, user: User) {
     const vendor = await this.vendorsService.findByAuthor(user.id);
@@ -146,16 +146,16 @@ export class ProductsService {
         ...updateData,
         extras: extras
           ? {
-            deleteMany: {},
-            create: extras,
-          }
+              deleteMany: {},
+              create: extras,
+            }
           : undefined,
         itemAttributes:
           itemAttributes !== undefined
             ? {
-              deleteMany: {},
-              create: attributeData || [],
-            }
+                deleteMany: {},
+                create: attributeData || [],
+              }
             : undefined,
       },
       include: { extras: true, itemAttributes: true },

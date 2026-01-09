@@ -3,7 +3,7 @@ import { ConfigService } from '@nestjs/config';
 
 @Injectable()
 export class UploadService {
-  constructor(private configService: ConfigService) { }
+  constructor(private configService: ConfigService) {}
 
   uploadFile(file: Express.Multer.File) {
     if (!file) {

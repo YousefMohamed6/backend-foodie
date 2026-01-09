@@ -10,21 +10,21 @@ import { AnalyticsController } from './analytics.controller';
 import { AnalyticsGateway } from './analytics.gateway';
 
 @Module({
-    imports: [
-        PrismaModule,
-        SharedModule,
-        AuthModule,
-        // JwtModule is already registered globally in AuthModule
-        // EventEmitter and Schedule are registered globally in AppModule
-    ],
-    providers: [
-        AnalyticsTrackingService,
-        AnalyticsEventsService,
-        AnalyticsAggregationService,
-        AnalyticsQueryService,
-        AnalyticsGateway,
-    ],
-    controllers: [AnalyticsController],
-    exports: [AnalyticsTrackingService, AnalyticsQueryService],
+  imports: [
+    PrismaModule,
+    SharedModule,
+    AuthModule,
+    // JwtModule is already registered globally in AuthModule
+    // EventEmitter and Schedule are registered globally in AppModule
+  ],
+  providers: [
+    AnalyticsTrackingService,
+    AnalyticsEventsService,
+    AnalyticsAggregationService,
+    AnalyticsQueryService,
+    AnalyticsGateway,
+  ],
+  controllers: [AnalyticsController],
+  exports: [AnalyticsTrackingService, AnalyticsQueryService],
 })
-export class AnalyticsModule { }
+export class AnalyticsModule {}

@@ -12,11 +12,11 @@ import { ManagerAuditService } from './manager-audit.service';
 @Roles(UserRole.ADMIN)
 @Controller('manager-audit-logs')
 export class ManagerAuditController {
-    constructor(private readonly managerAuditService: ManagerAuditService) { }
+  constructor(private readonly managerAuditService: ManagerAuditService) {}
 
-    @Get()
-    @ApiOperation({ summary: 'Get all manager dispatch audit logs (Admin only)' })
-    findAll() {
-        return this.managerAuditService.findAll();
-    }
+  @Get()
+  @ApiOperation({ summary: 'Get all manager dispatch audit logs (Admin only)' })
+  findAll() {
+    return this.managerAuditService.findAll();
+  }
 }

@@ -8,4 +8,4 @@ import { AdminController } from './admin.controller';
   imports: [DriversModule, UsersModule, OrdersModule],
   controllers: [AdminController],
 })
-export class AdminModule { }
+export class AdminModule {}

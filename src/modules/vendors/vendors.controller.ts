@@ -30,7 +30,7 @@ import { VendorsService } from './vendors.service';
 @ApiBearerAuth()
 @Controller('vendors')
 export class VendorsController {
-  constructor(private readonly vendorsService: VendorsService) { }
+  constructor(private readonly vendorsService: VendorsService) {}
 
   @Post()
   @UseGuards(JwtAuthGuard, RolesGuard)

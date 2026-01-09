@@ -18,11 +18,12 @@ import {
   Prisma,
   TransactionType,
   User,
-  UserRole
+  UserRole,
 } from '@prisma/client';
 
 import { RedisService } from '../../shared/services/redis.service';
 
+import { I18nService } from 'nestjs-i18n';
 import { PrismaService } from '../../prisma/prisma.service';
 import { NotificationService } from '../../shared/services/notification.service';
 import { AnalyticsTrackingService } from '../analytics/analytics-tracking.service';
@@ -30,8 +31,10 @@ import { CashbackService } from '../cashback/cashback.service';
 import { CouponsService } from '../coupons/coupons.service';
 import { ProductsService } from '../products/products.service';
 import { ReviewsService } from '../reviews/reviews.service';
+import { APP_SETTINGS } from '../settings/settings.constants';
 import { SettingsService } from '../settings/settings.service';
 import { WalletProtectionService } from '../wallet/wallet-protection.service';
+import { WalletTransactionDescriptions } from '../wallet/wallet-transaction.constants';
 import { WalletService } from '../wallet/wallet.service';
 import { CommissionService } from './commission.service';
 import { AssignDriverDto } from './dto/assign-driver.dto';
@@ -40,11 +43,18 @@ import { DriverReportProblemDto } from './dto/driver-report-problem.dto';
 import { VendorAcceptOrderDto } from './dto/vendor-accept-order.dto';
 import { OrderManagementService } from './order-management.service';
 import { OrderPricingService } from './order-pricing.service';
+import {
+  AnalyticsEventType,
+  NotificationEventType,
+  OrderConstants,
+  ORDERS_ERRORS,
+  ORDERS_NOTIFICATIONS,
+} from './orders.constants';
 import { OrdersGateway } from './orders.gateway';
 import {
   calculateSubtotal,
   mapOrderResponse,
-  orderInclude
+  orderInclude,
 } from './orders.helper';
 
 export interface OrderItemExtra {
@@ -73,12 +83,18 @@ export class OrdersService {
     private managementService: OrderManagementService,
     private commissionService: CommissionService,
     private analyticsTrackingService: AnalyticsTrackingService,
-  ) { }
+    private i18n: I18nService,
+  ) {}
 
   async create(createOrderDto: CreateOrderDto, user: User) {
-    const { productMap, subtotal } = await this.resolveProductsAndSubtotal(createOrderDto);
+    const { productMap, subtotal } =
+      await this.resolveProductsAndSubtotal(createOrderDto);
 
-    const calculations = await this.initializeOrderCalculations(createOrderDto, subtotal);
+    const calculations = await this.pricingService.calculatePricing(
+      createOrderDto,
+      subtotal,
+      user.id,
+    );
 
     const result = await this.finalizeOrderCreate(
       createOrderDto,
@@ -92,7 +108,7 @@ export class OrdersService {
     if (result) {
       this.analyticsTrackingService.trackOrderLifecycle({
         orderId: result.id,
-        eventType: 'ORDER_CREATED',
+        eventType: AnalyticsEventType.ORDER_CREATED,
         previousStatus: undefined,
         newStatus: OrderStatus.PLACED,
         actorId: user.id,
@@ -158,23 +174,26 @@ export class OrdersService {
     });
 
     if (!order) {
-      throw new NotFoundException('ORDER_NOT_FOUND');
+      throw new NotFoundException(ORDERS_ERRORS.ORDER_NOT_FOUND);
     }
 
     if (user.role === UserRole.CUSTOMER && order.authorId !== user.id) {
-      throw new ForbiddenException('ACCESS_DENIED');
+      throw new ForbiddenException(ORDERS_ERRORS.ACCESS_DENIED);
     }
 
     if (user.role === UserRole.VENDOR && order.vendor?.authorId !== user.id) {
-      throw new ForbiddenException('ACCESS_DENIED');
+      throw new ForbiddenException(ORDERS_ERRORS.ACCESS_DENIED);
     }
 
     if (user.role === UserRole.DRIVER && order.driverId !== user.id) {
-      throw new ForbiddenException('ACCESS_DENIED');
+      throw new ForbiddenException(ORDERS_ERRORS.ACCESS_DENIED);
     }
 
     if (user.role === UserRole.MANAGER) {
-      await this.managementService.validateManagerZoneAccess(user.id, order.vendor.zoneId);
+      await this.managementService.validateManagerZoneAccess(
+        user.id,
+        order.vendor.zoneId,
+      );
     }
 
     return mapOrderResponse(order);
@@ -186,7 +205,7 @@ export class OrdersService {
       include: { vendor: true },
     });
 
-    if (!order) throw new NotFoundException('ORDER_NOT_FOUND');
+    if (!order) throw new NotFoundException(ORDERS_ERRORS.ORDER_NOT_FOUND);
 
     // Reuse findOne's ownership checks indirectly or implement explicitly
     const orderDetails = await this.findOne(id, user);
@@ -199,31 +218,39 @@ export class OrdersService {
     ];
 
     if (invalidStatuses.includes(order.status)) {
-      throw new BadRequestException('ORDER_CANNOT_BE_CANCELLED');
+      throw new BadRequestException(ORDERS_ERRORS.ORDER_CANNOT_BE_CANCELLED);
     }
 
-    const savedOrder = await this.processOrderCancellation(id, user, 'User cancelled the order');
+    const savedOrder = await this.processOrderCancellation(
+      id,
+      user,
+      WalletTransactionDescriptions.orderCancelledByUser().en,
+    );
 
     await this.notificationService.sendOrderNotification(
       savedOrder.authorId,
-      'notification_template_order_cancelled',
+      ORDERS_NOTIFICATIONS.ORDER_CANCELLED,
       { orderId: savedOrder.id, status: savedOrder.status },
     );
 
     return this.emitUpdate(savedOrder);
   }
 
-  async reportDeliveryProblem(id: string, dto: DriverReportProblemDto, user: User) {
+  async reportDeliveryProblem(
+    id: string,
+    dto: DriverReportProblemDto,
+    user: User,
+  ) {
     const order = await this.prisma.order.findUnique({
       where: { id },
       include: { vendor: true },
     });
 
-    if (!order) throw new NotFoundException('ORDER_NOT_FOUND');
+    if (!order) throw new NotFoundException(ORDERS_ERRORS.ORDER_NOT_FOUND);
 
     // Only the assigned driver can report a problem during delivery
     if (order.driverId !== user.id) {
-      throw new ForbiddenException('NOT_ASSIGNED_TO_THIS_ORDER');
+      throw new ForbiddenException(ORDERS_ERRORS.NOT_ASSIGNED_TO_THIS_ORDER);
     }
 
     const validStatuses: OrderStatus[] = [
@@ -233,21 +260,28 @@ export class OrdersService {
     ];
 
     if (!validStatuses.includes(order.status)) {
-      throw new BadRequestException('CANNOT_REPORT_PROBLEM_IN_CURRENT_STATUS');
+      throw new BadRequestException(
+        ORDERS_ERRORS.CANNOT_REPORT_PROBLEM_IN_CURRENT_STATUS,
+      );
     }
 
-    const savedOrder = await this.processOrderCancellation(id, user, `Delivery reported problem: ${dto.reason}`, 'DELIVERY_FAILED');
+    const savedOrder = await this.processOrderCancellation(
+      id,
+      user,
+      `Delivery reported problem: ${dto.reason}`,
+      AnalyticsEventType.DELIVERY_FAILED,
+    );
 
     // Notifications
     await this.notificationService.sendOrderNotification(
       savedOrder.authorId,
-      'notification_template_order_failed_delivery',
+      ORDERS_NOTIFICATIONS.ORDER_FAILED_DELIVERY,
       { orderId: savedOrder.id, reason: dto.reason },
     );
 
     await this.notificationService.sendOrderNotification(
       order.vendor.authorId,
-      'notification_template_order_failed_delivery_vendor',
+      ORDERS_NOTIFICATIONS.ORDER_FAILED_DELIVERY_VENDOR,
       { orderId: savedOrder.id, reason: dto.reason },
     );
 
@@ -257,14 +291,37 @@ export class OrdersService {
       });
 
       for (const manager of managers) {
+        const titleEn = await this.i18n.translate(
+          'messages.DELIVERY_ISSUE_TITLE',
+          { lang: 'en' },
+        );
+        const titleAr = await this.i18n.translate(
+          'messages.DELIVERY_ISSUE_TITLE',
+          { lang: 'ar' },
+        );
+        const bodyEn = await this.i18n.translate(
+          'messages.DELIVERY_ISSUE_BODY',
+          {
+            lang: 'en',
+            args: { orderId: savedOrder.id, reason: dto.reason },
+          },
+        );
+        const bodyAr = await this.i18n.translate(
+          'messages.DELIVERY_ISSUE_BODY',
+          {
+            lang: 'ar',
+            args: { orderId: savedOrder.id, reason: dto.reason },
+          },
+        );
+
         await this.notificationService.sendCustomNotification(
           [manager.id],
-          { en: 'Delivery Issue Reported', ar: 'مشكلة في التوصيل' },
+          { en: titleEn, ar: titleAr },
+          { en: bodyEn, ar: bodyAr },
           {
-            en: `Driver reported a problem for order ${savedOrder.id}: ${dto.reason}`,
-            ar: `ابلغ السائق عن مشكلة في الطلب ${savedOrder.id}: ${dto.reason}`
+            orderId: savedOrder.id,
+            type: NotificationEventType.DELIVERY_ISSUE,
           },
-          { orderId: savedOrder.id, type: 'DELIVERY_ISSUE' },
         );
       }
     }
@@ -278,7 +335,7 @@ export class OrdersService {
       include: { vendor: true },
     });
 
-    if (!order) throw new NotFoundException('ORDER_NOT_FOUND');
+    if (!order) throw new NotFoundException(ORDERS_ERRORS.ORDER_NOT_FOUND);
 
     const invalidStatuses: OrderStatus[] = [
       OrderStatus.COMPLETED,
@@ -286,15 +343,21 @@ export class OrdersService {
     ];
 
     if (invalidStatuses.includes(order.status)) {
-      throw new BadRequestException('CANNOT_ASSIGN_DRIVER_TO_CLOSED_ORDER');
+      throw new BadRequestException(
+        ORDERS_ERRORS.CANNOT_ASSIGN_DRIVER_TO_CLOSED_ORDER,
+      );
     }
 
     if (user.role === UserRole.VENDOR && order.vendor?.authorId !== user.id) {
-      throw new ForbiddenException('ACCESS_DENIED');
+      throw new ForbiddenException(ORDERS_ERRORS.ACCESS_DENIED);
     }
 
     if (user.role === UserRole.MANAGER) {
-      const managerZoneId = await this.managementService.validateManagerZoneAccess(user.id, order.vendor.zoneId);
+      const managerZoneId =
+        await this.managementService.validateManagerZoneAccess(
+          user.id,
+          order.vendor.zoneId,
+        );
 
       const driver = await this.prisma.user.findUnique({
         where: { id: assignDriverDto.driverId },
@@ -302,32 +365,36 @@ export class OrdersService {
           zoneId: true,
           role: true,
           driverProfile: {
-            select: { walletAmount: true }
-          }
+            select: { walletAmount: true },
+          },
         },
       });
 
       if (!driver || driver.role !== UserRole.DRIVER) {
-        throw new NotFoundException('DRIVER_NOT_FOUND');
+        throw new NotFoundException(ORDERS_ERRORS.DRIVER_NOT_FOUND);
       }
 
       if (driver.zoneId !== managerZoneId) {
-        throw new ForbiddenException('ACCESS_DENIED');
+        throw new ForbiddenException(ORDERS_ERRORS.ACCESS_DENIED);
       }
 
       // --- RISK 7.4: PROFILE VALIDATION ---
       if (!driver.driverProfile) {
-        throw new BadRequestException('DRIVER_PROFILE_NOT_INITIALIZED');
+        throw new BadRequestException(
+          ORDERS_ERRORS.DRIVER_PROFILE_NOT_INITIALIZED,
+        );
       }
 
       // --- RISK 7.2: CONCURRENCY LOCK ---
-      const lockKey = `lock:assign_order:${assignDriverDto.driverId}`;
+      const lockKey = `${OrderConstants.REDIS_LOCK_ASSIGN_ORDER_PREFIX}${assignDriverDto.driverId}`;
       const client = this.redisService.getClient();
       // Only lock if redis is connected
       if (client) {
         const lock = await client.set(lockKey, 'true', { NX: true, EX: 10 });
         if (!lock) {
-          throw new ConflictException('DRIVER_IS_BEING_ASSIGNED_ANOTHER_ORDER');
+          throw new ConflictException(
+            ORDERS_ERRORS.DRIVER_IS_BEING_ASSIGNED_ANOTHER_ORDER,
+          );
         }
       }
 
@@ -346,7 +413,7 @@ export class OrdersService {
         }
 
         if (currentDebt + expectedNewDebt > maxDebt) {
-          throw new BadRequestException('DRIVER_MAX_DEBT_EXCEEDED');
+          throw new BadRequestException(ORDERS_ERRORS.DRIVER_MAX_DEBT_EXCEEDED);
         }
       } finally {
         if (client) {
@@ -360,7 +427,7 @@ export class OrdersService {
           managerId: user.id,
           orderId: id,
           driverId: assignDriverDto.driverId,
-          action: 'dispatch',
+          action: OrderConstants.MANAGER_AUDIT_ACTION_DISPATCH,
         },
       });
     }
@@ -377,14 +444,14 @@ export class OrdersService {
     // Track Driver Assignment
     this.analyticsTrackingService.trackOrderLifecycle({
       orderId: savedOrder.id,
-      eventType: 'DRIVER_ASSIGNED',
+      eventType: AnalyticsEventType.DRIVER_ASSIGNED,
       previousStatus: order.status,
       newStatus: OrderStatus.DRIVER_PENDING,
       actorId: user.id,
       actorRole: user.role,
       metadata: {
         driverId: assignDriverDto.driverId,
-      }
+      },
     });
 
     return this.emitUpdate(savedOrder);
@@ -392,10 +459,10 @@ export class OrdersService {
 
   async rejectOrder(id: string, user: User) {
     const order = await this.findOne(id, user);
-    if (!order) throw new NotFoundException('ORDER_NOT_FOUND');
+    if (!order) throw new NotFoundException(ORDERS_ERRORS.ORDER_NOT_FOUND);
 
     if (order.driverId !== user.id) {
-      throw new ForbiddenException('DRIVER_NOT_ASSIGNED');
+      throw new ForbiddenException(ORDERS_ERRORS.DRIVER_NOT_ASSIGNED);
     }
 
     const savedOrder = await this.prisma.order.update({
@@ -410,7 +477,7 @@ export class OrdersService {
     // Track Driver Rejection
     this.analyticsTrackingService.trackOrderLifecycle({
       orderId: savedOrder.id,
-      eventType: 'DRIVER_REJECTED',
+      eventType: AnalyticsEventType.DRIVER_REJECTED,
       previousStatus: order.status,
       newStatus: OrderStatus.DRIVER_REJECTED,
       actorId: user.id,
@@ -433,7 +500,7 @@ export class OrdersService {
       if (managerIds.length > 0) {
         await this.notificationService.sendBulkNotifications(
           managerIds,
-          'notification_template_manager_driver_rejected',
+          ORDERS_NOTIFICATIONS.MANAGER_DRIVER_REJECTED,
           {
             orderId: savedOrder.id,
             vendorName: savedOrder.vendor.title,
@@ -457,14 +524,14 @@ export class OrdersService {
       include: { vendor: true },
     });
 
-    if (!order) throw new NotFoundException('ORDER_NOT_FOUND');
+    if (!order) throw new NotFoundException(ORDERS_ERRORS.ORDER_NOT_FOUND);
 
     if (user.role === UserRole.VENDOR && order.vendor.authorId !== user.id) {
-      throw new ForbiddenException('ACCESS_DENIED');
+      throw new ForbiddenException(ORDERS_ERRORS.ACCESS_DENIED);
     }
 
     if (order.status !== OrderStatus.PLACED) {
-      throw new BadRequestException('ORDER_NOT_PLACED');
+      throw new BadRequestException(ORDERS_ERRORS.ORDER_NOT_PLACED);
     }
 
     const savedOrder = await this.prisma.order.update({
@@ -476,7 +543,7 @@ export class OrdersService {
     // Track Vendor Rejection
     this.analyticsTrackingService.trackOrderLifecycle({
       orderId: savedOrder.id,
-      eventType: 'VENDOR_REJECTED',
+      eventType: AnalyticsEventType.VENDOR_REJECTED,
       previousStatus: OrderStatus.PLACED,
       newStatus: OrderStatus.VENDOR_REJECTED,
       actorId: user.id,
@@ -485,13 +552,12 @@ export class OrdersService {
 
     await this.notificationService.sendOrderNotification(
       order.authorId,
-      'notification_template_order_rejected',
+      ORDERS_NOTIFICATIONS.ORDER_REJECTED,
       { orderId: savedOrder.id, status: savedOrder.status },
     );
 
     return this.emitUpdate(savedOrder);
   }
-
 
   async vendorAcceptOrder(id: string, user: User, dto?: VendorAcceptOrderDto) {
     const order = await this.prisma.order.findUnique({
@@ -499,10 +565,10 @@ export class OrdersService {
       include: { vendor: true },
     });
 
-    if (!order) throw new NotFoundException('ORDER_NOT_FOUND');
+    if (!order) throw new NotFoundException(ORDERS_ERRORS.ORDER_NOT_FOUND);
 
     if (user.role === UserRole.VENDOR && order.vendor.authorId !== user.id) {
-      throw new ForbiddenException('ACCESS_DENIED');
+      throw new ForbiddenException(ORDERS_ERRORS.ACCESS_DENIED);
     }
 
     return await this.prisma.$transaction(async (tx) => {
@@ -512,18 +578,24 @@ export class OrdersService {
         select: { status: true, vendorCommissionApplied: true },
       });
 
-      if (!currentOrder) throw new NotFoundException('ORDER_NOT_FOUND');
-      if (currentOrder.status !== OrderStatus.PLACED) throw new BadRequestException('ORDER_NOT_PLACED');
-      if (currentOrder.vendorCommissionApplied) throw new BadRequestException('COMMISSION_ALREADY_APPLIED');
+      if (!currentOrder)
+        throw new NotFoundException(ORDERS_ERRORS.ORDER_NOT_FOUND);
+      if (currentOrder.status !== OrderStatus.PLACED)
+        throw new BadRequestException(ORDERS_ERRORS.ORDER_NOT_PLACED);
+      if (currentOrder.vendorCommissionApplied)
+        throw new BadRequestException(ORDERS_ERRORS.COMMISSION_ALREADY_APPLIED);
 
-      const isFreePlan = await this.commissionService.isVendorOnFreePlan(order.vendorId);
+      const isFreePlan = await this.commissionService.isVendorOnFreePlan(
+        order.vendorId,
+      );
 
       let vendorCommissionRate = 0;
       let vendorCommissionValue = 0;
       let vendorNet = Number(order.orderTotal);
 
       if (isFreePlan) {
-        vendorCommissionRate = await this.commissionService.getVendorCommissionRate();
+        vendorCommissionRate =
+          await this.commissionService.getVendorCommissionRate();
         const calculation = this.commissionService.calculateVendorCommission(
           Number(order.orderTotal),
           vendorCommissionRate,
@@ -549,7 +621,9 @@ export class OrdersService {
       let estimatedReadyAt: Date | undefined;
       if (dto?.preparationTime) {
         const now = new Date();
-        estimatedReadyAt = new Date(now.getTime() + dto.preparationTime * 60000);
+        estimatedReadyAt = new Date(
+          now.getTime() + dto.preparationTime * 60000,
+        );
       }
 
       const updateData: Prisma.OrderUpdateInput = {
@@ -563,7 +637,8 @@ export class OrdersService {
       };
 
       if (order.driverCommissionApplied) {
-        const platformTotal = vendorCommissionValue + Number(order.driverCommissionValue);
+        const platformTotal =
+          vendorCommissionValue + Number(order.driverCommissionValue);
         updateData.platformTotalCommission = platformTotal;
       }
 
@@ -576,7 +651,7 @@ export class OrdersService {
       // Track Vendor Acceptance
       this.analyticsTrackingService.trackOrderLifecycle({
         orderId: savedOrder.id,
-        eventType: 'VENDOR_ACCEPTED',
+        eventType: AnalyticsEventType.VENDOR_ACCEPTED,
         previousStatus: OrderStatus.PLACED,
         newStatus: OrderStatus.VENDOR_ACCEPTED,
         actorId: user.id,
@@ -584,12 +659,12 @@ export class OrdersService {
         metadata: {
           preparationTime: dto?.preparationTime,
           estimatedReadyAt: estimatedReadyAt,
-        }
+        },
       });
 
       await this.notificationService.sendOrderNotification(
         order.authorId,
-        'notification_template_order_accepted',
+        ORDERS_NOTIFICATIONS.ORDER_ACCEPTED,
         { orderId: savedOrder.id, status: savedOrder.status },
       );
 
@@ -603,20 +678,27 @@ export class OrdersService {
       include: { vendor: true },
     });
 
-    if (!order) throw new NotFoundException('ORDER_NOT_FOUND');
+    if (!order) throw new NotFoundException(ORDERS_ERRORS.ORDER_NOT_FOUND);
 
     if (user.role === UserRole.DRIVER && order.driverId !== user.id) {
-      throw new ForbiddenException('ACCESS_DENIED');
+      throw new ForbiddenException(ORDERS_ERRORS.ACCESS_DENIED);
     }
 
     return await this.prisma.$transaction(async (tx) => {
       // Re-fetch inside transaction for thread safety
       const currentOrder = await tx.order.findUnique({
         where: { id },
-        select: { status: true, driverCommissionApplied: true, totalAmount: true, paymentMethod: true, driverId: true },
+        select: {
+          status: true,
+          driverCommissionApplied: true,
+          totalAmount: true,
+          paymentMethod: true,
+          driverId: true,
+        },
       });
 
-      if (!currentOrder) throw new NotFoundException('ORDER_NOT_FOUND');
+      if (!currentOrder)
+        throw new NotFoundException(ORDERS_ERRORS.ORDER_NOT_FOUND);
 
       const validStatuses: OrderStatus[] = [
         OrderStatus.DRIVER_ACCEPTED,
@@ -624,7 +706,7 @@ export class OrdersService {
         OrderStatus.IN_TRANSIT,
       ];
       if (!validStatuses.includes(currentOrder.status)) {
-        throw new BadRequestException('INVALID_ORDER_STATUS');
+        throw new BadRequestException(ORDERS_ERRORS.INVALID_ORDER_STATUS);
       }
 
       // Update order status to COMPLETED
@@ -665,21 +747,27 @@ export class OrdersService {
         );
 
         // 4. Record Driver Debt (Cash to return: Subtotal + Fee, excluding Tip)
-        const amountToCollect = Number(order.totalAmount) - Number(order.tipAmount);
+        const amountToCollect =
+          Number(order.totalAmount) - Number(order.tipAmount);
         await tx.walletTransaction.create({
           data: {
             userId: currentOrder.driverId!,
             amount: amountToCollect,
             type: TransactionType.PAYMENT, // Record cash collection as a debt
-            description: `Cash collected for order ${savedOrder.id} (excluding Tip)`,
+            descriptionEn: WalletTransactionDescriptions.cashCollectedDebt(
+              savedOrder.id,
+            ).en,
+            descriptionAr: WalletTransactionDescriptions.cashCollectedDebt(
+              savedOrder.id,
+            ).ar,
             orderId: savedOrder.id,
-            transactionUser: 'driver',
+            transactionUser: OrderConstants.DRIVER_TRANSACTION_USER,
           },
         });
         await this.walletService.updateDriverWallet(
           currentOrder.driverId!,
           amountToCollect,
-          'subtract',
+          OrderConstants.WALLET_OPERATION_SUBTRACT,
           tx,
         );
       }
@@ -691,18 +779,18 @@ export class OrdersService {
         // Send notification requesting delivery confirmation
         await this.notificationService.sendOrderNotification(
           order.authorId,
-          'notification_template_confirm_delivery',
+          ORDERS_NOTIFICATIONS.CONFIRM_DELIVERY,
           {
             orderId: savedOrder.id,
             status: savedOrder.status,
-            message: 'Please confirm you received your order to release payment to the vendor and driver.',
+            message: WalletTransactionDescriptions.deliveryConfirmedReason().en,
           },
         );
       } else {
         // COD: Send regular completion notification
         await this.notificationService.sendOrderNotification(
           order.authorId,
-          'notification_template_order_completed',
+          ORDERS_NOTIFICATIONS.ORDER_COMPLETED,
           { orderId: savedOrder.id, status: savedOrder.status },
         );
       }
@@ -710,7 +798,7 @@ export class OrdersService {
       // Track Order Delivered
       this.analyticsTrackingService.trackOrderLifecycle({
         orderId: savedOrder.id,
-        eventType: 'ORDER_DELIVERED',
+        eventType: AnalyticsEventType.ORDER_DELIVERED,
         previousStatus: order.status,
         newStatus: OrderStatus.COMPLETED,
         actorId: user.id,
@@ -718,7 +806,7 @@ export class OrdersService {
         metadata: {
           driverCommission: savedOrder.driverCommissionValue,
           deliveryTime: new Date().getTime() - order.createdAt.getTime(),
-        }
+        },
       });
 
       // Also track delivery event
@@ -736,20 +824,19 @@ export class OrdersService {
     });
   }
 
-
   async acceptOrder(id: string, user: User) {
     const order = await this.prisma.order.findUnique({
       where: { id },
     });
 
-    if (!order) throw new NotFoundException('ORDER_NOT_FOUND');
+    if (!order) throw new NotFoundException(ORDERS_ERRORS.ORDER_NOT_FOUND);
 
     if (order.driverId !== user.id) {
-      throw new ForbiddenException('DRIVER_NOT_ASSIGNED');
+      throw new ForbiddenException(ORDERS_ERRORS.DRIVER_NOT_ASSIGNED);
     }
 
     if (order.status !== OrderStatus.DRIVER_PENDING) {
-      throw new BadRequestException('ORDER_NOT_PENDING');
+      throw new BadRequestException(ORDERS_ERRORS.ORDER_NOT_PENDING);
     }
 
     const savedOrder = await this.prisma.order.update({
@@ -774,7 +861,7 @@ export class OrdersService {
       if (managerIds.length > 0) {
         await this.notificationService.sendBulkNotifications(
           managerIds,
-          'notification_template_manager_driver_accepted',
+          ORDERS_NOTIFICATIONS.MANAGER_DRIVER_ACCEPTED,
           {
             orderId: savedOrder.id,
             vendorName: savedOrder.vendor.title,
@@ -794,35 +881,40 @@ export class OrdersService {
       include: { vendor: true },
     });
 
-    if (!order) throw new NotFoundException('ORDER_NOT_FOUND');
+    if (!order) throw new NotFoundException(ORDERS_ERRORS.ORDER_NOT_FOUND);
 
     if (order.driverId !== user.id) {
-      throw new ForbiddenException('DRIVER_NOT_ASSIGNED');
+      throw new ForbiddenException(ORDERS_ERRORS.DRIVER_NOT_ASSIGNED);
     }
 
     // Order must be marked as accepted by driver before it can be picked up
     if (order.status !== OrderStatus.DRIVER_ACCEPTED) {
-      throw new BadRequestException('ORDER_NOT_ACCEPTED_BY_DRIVER');
+      throw new BadRequestException(ORDERS_ERRORS.ORDER_NOT_ACCEPTED_BY_DRIVER);
     }
 
     // --- READINESS CHECK ---
     if (order.estimatedReadyAt && new Date() < order.estimatedReadyAt) {
-      throw new BadRequestException('ORDER_NOT_READY_YET');
+      throw new BadRequestException(ORDERS_ERRORS.ORDER_NOT_READY_YET);
     }
 
     return await this.prisma.$transaction(async (tx) => {
       // 1. Calculate Driver Pay & Admin Cut from Delivery Fee
-      const driverCommRate = await this.commissionService.getDriverCommissionRate();
+      const driverCommRate =
+        await this.commissionService.getDriverCommissionRate();
       const minPay = await this.commissionService.getMinDeliveryPay();
 
       const deliveryCharge = Number(order.deliveryCharge);
       // Admin Cut = % of delivery charge
-      const adminDeliveryCut = Math.round(deliveryCharge * (driverCommRate / 100) * 100) / 100;
+      const adminDeliveryCut =
+        Math.round(deliveryCharge * (driverCommRate / 100) * 100) / 100;
 
       // Driver Pay = Fee - Admin Cut, but subject to floor (min_delivery_pay)
       // If floor is applied, Admin takes less.
       // --- RISK 7.1: SUBSIDY PROTECTION ---
-      const driverNet = Math.max(Math.min(deliveryCharge, deliveryCharge - adminDeliveryCut), minPay);
+      const driverNet = Math.max(
+        Math.min(deliveryCharge, deliveryCharge - adminDeliveryCut),
+        minPay,
+      );
 
       // Admin cut is the remainder. It should never be negative unless deliberate subsidy.
       const driverCommissionValue = Math.max(0, deliveryCharge - driverNet);
@@ -839,7 +931,8 @@ export class OrdersService {
         tx,
       );
 
-      const platformTotal = Number(order.vendorCommissionValue) + driverCommissionValue;
+      const platformTotal =
+        Number(order.vendorCommissionValue) + driverCommissionValue;
 
       // 2. Update Order Status and metrics
       const savedOrder = await tx.order.update({
@@ -861,7 +954,8 @@ export class OrdersService {
         // Funds remain HELD until customer confirms delivery or timeout
 
         // Update HeldBalance with calculated amounts and driver info
-        const driverTotal = Number(savedOrder.driverNet) + Number(savedOrder.tipAmount);
+        const driverTotal =
+          Number(savedOrder.driverNet) + Number(savedOrder.tipAmount);
         await tx.heldBalance.update({
           where: { orderId: order.id },
           data: {
@@ -882,7 +976,7 @@ export class OrdersService {
       // Track in Analytics
       this.analyticsTrackingService.trackOrderLifecycle({
         orderId: savedOrder.id,
-        eventType: 'ORDER_PICKED_UP',
+        eventType: AnalyticsEventType.ORDER_PICKED_UP,
         previousStatus: OrderStatus.DRIVER_ACCEPTED,
         newStatus: OrderStatus.SHIPPED,
         actorId: user.id,
@@ -891,16 +985,16 @@ export class OrdersService {
           driverId: user.id,
           vendorId: order.vendorId,
           pickupTime: new Date(),
-        }
+        },
       });
 
       await this.notificationService.sendOrderNotification(
         order.authorId,
-        'notification_template_order_shipped',
+        ORDERS_NOTIFICATIONS.ORDER_SHIPPED,
         {
           orderId: savedOrder.id,
           vendorName: order.vendor.title,
-          status: savedOrder.status
+          status: savedOrder.status,
         },
       );
 
@@ -913,14 +1007,14 @@ export class OrdersService {
       where: { id },
     });
 
-    if (!order) throw new NotFoundException('ORDER_NOT_FOUND');
+    if (!order) throw new NotFoundException(ORDERS_ERRORS.ORDER_NOT_FOUND);
 
     if (order.driverId !== user.id) {
-      throw new ForbiddenException('DRIVER_NOT_ASSIGNED');
+      throw new ForbiddenException(ORDERS_ERRORS.DRIVER_NOT_ASSIGNED);
     }
 
     if (order.paymentMethod !== PaymentMethod.cash) {
-      throw new BadRequestException('NOT_COD_ORDER');
+      throw new BadRequestException(ORDERS_ERRORS.NOT_COD_ORDER);
     }
 
     // Optional status check omitted for identical behavior as original
@@ -940,20 +1034,23 @@ export class OrdersService {
       include: { vendor: true },
     });
 
-    if (!order) throw new NotFoundException('ORDER_NOT_FOUND');
+    if (!order) throw new NotFoundException(ORDERS_ERRORS.ORDER_NOT_FOUND);
 
     if (user.role !== UserRole.MANAGER) {
-      throw new ForbiddenException('ACCESS_DENIED');
+      throw new ForbiddenException(ORDERS_ERRORS.ACCESS_DENIED);
     }
 
-    await this.managementService.validateManagerZoneAccess(user.id, order.vendor.zoneId);
+    await this.managementService.validateManagerZoneAccess(
+      user.id,
+      order.vendor.zoneId,
+    );
 
     if (!order.cashReportedAt) {
-      throw new BadRequestException('CASH_NOT_REPORTED');
+      throw new BadRequestException(ORDERS_ERRORS.CASH_NOT_REPORTED);
     }
 
     if (order.paymentStatus === PaymentStatus.PAID) {
-      throw new BadRequestException('ORDER_ALREADY_PAID');
+      throw new BadRequestException(ORDERS_ERRORS.ORDER_ALREADY_PAID);
     }
 
     return await this.prisma.$transaction(async (tx) => {
@@ -973,20 +1070,23 @@ export class OrdersService {
       });
 
       // When manager confirms receipt, we "clear" the driver's cash debt
+      const cashHandoverDescriptions =
+        WalletTransactionDescriptions.cashHandover(id);
       await this.prisma.walletTransaction.create({
         data: {
           userId: order.driverId!,
           amount: Number(order.totalAmount),
           type: TransactionType.DEPOSIT, // Cash handover is treated as a deposit from the driver
-          description: `Cash handover confirmed for order ${id}`,
+          descriptionEn: cashHandoverDescriptions.en,
+          descriptionAr: cashHandoverDescriptions.ar,
           orderId: id,
-          transactionUser: 'driver',
+          transactionUser: OrderConstants.DRIVER_TRANSACTION_USER,
         },
       });
       await this.walletService.updateDriverWallet(
         order.driverId!,
         Number(order.totalAmount),
-        'add',
+        OrderConstants.WALLET_OPERATION_ADD,
         tx,
       );
 
@@ -1008,7 +1108,7 @@ export class OrdersService {
 
   async confirmManagerPayout(managerId: string, date: string, adminUser: User) {
     if (adminUser.role !== UserRole.ADMIN) {
-      throw new ForbiddenException('ACCESS_DENIED');
+      throw new ForbiddenException(ORDERS_ERRORS.ACCESS_DENIED);
     }
 
     const startOfDay = new Date(date);
@@ -1024,10 +1124,13 @@ export class OrdersService {
     });
 
     if (confirmations.length === 0) {
-      throw new BadRequestException('NO_CASH_CONFIRMATIONS');
+      throw new BadRequestException(ORDERS_ERRORS.NO_CASH_CONFIRMATIONS);
     }
 
-    const totalAmount = confirmations.reduce((sum, conf) => sum + Number(conf.amount), 0);
+    const totalAmount = confirmations.reduce(
+      (sum, conf) => sum + Number(conf.amount),
+      0,
+    );
 
     return this.prisma.managerPayoutConfirmation.create({
       data: {
@@ -1051,7 +1154,10 @@ export class OrdersService {
     return { productMap, subtotal };
   }
 
-  private async initializeOrderCalculations(createOrderDto: CreateOrderDto, subtotal: number) {
+  private async initializeOrderCalculations(
+    createOrderDto: CreateOrderDto,
+    subtotal: number,
+  ) {
     return this.pricingService.calculatePricing(createOrderDto, subtotal);
   }
 
@@ -1074,14 +1180,20 @@ export class OrdersService {
           items: {
             create: createOrderDto.products.map((item) => {
               const product = productMap.get(item.productId);
-              if (!product) throw new NotFoundException('PRODUCT_NOT_FOUND');
-              const price = product.discountPrice ? Number(product.discountPrice) : Number(product.price);
+              if (!product)
+                throw new NotFoundException(ORDERS_ERRORS.PRODUCT_NOT_FOUND);
+              const price = product.discountPrice
+                ? Number(product.discountPrice)
+                : Number(product.price);
               return {
                 productId: item.productId,
                 quantity: item.quantity,
                 price,
                 extras: {
-                  create: item.extras?.map((extra) => ({ name: extra.name, price: extra.price })),
+                  create: item.extras?.map((extra) => ({
+                    name: extra.name,
+                    price: extra.price,
+                  })),
                 },
               };
             }),
@@ -1095,7 +1207,9 @@ export class OrdersService {
           deliveryCharge: calcs.deliveryCharge,
           tipAmount: createOrderDto.tipAmount,
           takeAway: createOrderDto.takeAway || false,
-          scheduleTime: createOrderDto.scheduleTime ? new Date(createOrderDto.scheduleTime) : null,
+          scheduleTime: createOrderDto.scheduleTime
+            ? new Date(createOrderDto.scheduleTime)
+            : null,
           orderSubtotal: subtotal,
           orderTotal: calcs.totalAmount,
           discountAmount: calcs.discountAmount,
@@ -1115,20 +1229,34 @@ export class OrdersService {
             userId: user.id,
             amount: calcs.totalAmount,
             type: TransactionType.PAYMENT,
-            description: `Payment for order ${savedOrder.id} - HELD pending delivery confirmation`,
+            descriptionEn: WalletTransactionDescriptions.orderPaymentHeld(
+              savedOrder.id,
+            ).en,
+            descriptionAr: WalletTransactionDescriptions.orderPaymentHeld(
+              savedOrder.id,
+            ).ar,
             orderId: savedOrder.id,
-            transactionUser: 'customer',
+            transactionUser: OrderConstants.CUSTOMER_TRANSACTION_USER,
             balanceType: BalanceType.HELD,
           },
         });
 
         // Deduct from customer available balance
-        await this.walletService.updateUserWallet(user.id, calcs.totalAmount, 'subtract', tx);
+        await this.walletService.updateUserWallet(
+          user.id,
+          calcs.totalAmount,
+          OrderConstants.WALLET_OPERATION_SUBTRACT,
+          tx,
+        );
 
         // Step 2: Create HeldBalance record
-        const autoReleaseDays = await this.settingsService.findOne('wallet_auto_release_days').catch(() => '7');
+        const autoReleaseDays = await this.settingsService
+          .findOne(APP_SETTINGS.WALLET_AUTO_RELEASE_DAYS)
+          .catch(() => '7');
         const autoReleaseDate = new Date();
-        autoReleaseDate.setDate(autoReleaseDate.getDate() + parseInt(autoReleaseDays || '7'));
+        autoReleaseDate.setDate(
+          autoReleaseDate.getDate() + parseInt(autoReleaseDays || '7'),
+        );
 
         await tx.heldBalance.create({
           data: {
@@ -1141,7 +1269,8 @@ export class OrdersService {
             driverAmount: 0, // Calculated at SHIPPED
             adminAmount: calcs.adminCommissionAmount || 0, // Initial estimate
             status: HeldBalanceStatus.HELD,
-            holdReason: 'awaiting_delivery_confirmation',
+            holdReason:
+              OrderConstants.HELD_BALANCE_REASON_AWAITING_CONFIRMATION,
             autoReleaseDate,
           },
         });
@@ -1170,7 +1299,7 @@ export class OrdersService {
       if (vendor?.authorId) {
         await this.notificationService.sendOrderNotification(
           vendor.authorId,
-          'notification_template_order_placed',
+          ORDERS_NOTIFICATIONS.ORDER_PLACED,
           { orderId: savedOrder.id, status: savedOrder.status },
         );
       }
@@ -1193,7 +1322,9 @@ export class OrdersService {
     } else if (user.role === UserRole.DRIVER) {
       where.driverId = user.id;
     } else if (user.role === UserRole.MANAGER) {
-      const zoneId = await this.managementService.getManagerZoneId(user.id).catch(() => null);
+      const zoneId = await this.managementService
+        .getManagerZoneId(user.id)
+        .catch(() => null);
       if (!zoneId) return null;
       where.vendor = { zoneId };
     }
@@ -1205,15 +1336,34 @@ export class OrdersService {
   }
 
   async getCommissionReport(startDate?: Date, endDate?: Date) {
-    return this.commissionService.getPlatformCommissionTotal(startDate, endDate);
+    return this.commissionService.getPlatformCommissionTotal(
+      startDate,
+      endDate,
+    );
   }
 
-  async getVendorCommissionReport(vendorId: string, startDate?: Date, endDate?: Date) {
-    return this.commissionService.getVendorNetReceivables(vendorId, startDate, endDate);
+  async getVendorCommissionReport(
+    vendorId: string,
+    startDate?: Date,
+    endDate?: Date,
+  ) {
+    return this.commissionService.getVendorNetReceivables(
+      vendorId,
+      startDate,
+      endDate,
+    );
   }
 
-  async getDriverCommissionReport(driverId: string, startDate?: Date, endDate?: Date) {
-    return this.commissionService.getDriverEarnings(driverId, startDate, endDate);
+  async getDriverCommissionReport(
+    driverId: string,
+    startDate?: Date,
+    endDate?: Date,
+  ) {
+    return this.commissionService.getDriverEarnings(
+      driverId,
+      startDate,
+      endDate,
+    );
   }
 
   async getMonthlyCommissionReport(year: number, month: number) {
@@ -1223,8 +1373,6 @@ export class OrdersService {
   async getOrderCommissionSnapshots(orderId: string) {
     return this.commissionService.getOrderCommissionSnapshots(orderId);
   }
-
-
 
   private emitUpdate(order: any) {
     const mappedOrder = mapOrderResponse(order);
@@ -1238,7 +1386,9 @@ export class OrdersService {
     orderId: string,
     actor: User,
     reason: string,
-    eventType: 'ORDER_CANCELLED' | 'DELIVERY_FAILED' = 'ORDER_CANCELLED'
+    eventType:
+      | AnalyticsEventType.ORDER_CANCELLED
+      | AnalyticsEventType.DELIVERY_FAILED = AnalyticsEventType.ORDER_CANCELLED,
   ) {
     return await this.prisma.$transaction(async (tx) => {
       // Re-fetch with vendor
@@ -1247,7 +1397,7 @@ export class OrdersService {
         include: { vendor: true },
       });
 
-      if (!order) throw new NotFoundException('ORDER_NOT_FOUND');
+      if (!order) throw new NotFoundException(ORDERS_ERRORS.ORDER_NOT_FOUND);
 
       const previousStatus = order.status;
 
@@ -1276,7 +1426,8 @@ export class OrdersService {
           await this.walletService.refund(
             order.authorId,
             Number(order.orderTotal),
-            `Refund for order ${order.id}: ${reason}`,
+            WalletTransactionDescriptions.orderRefund(order.id, reason).en,
+            WalletTransactionDescriptions.orderRefund(order.id, reason).ar,
             order.id,
             tx,
           );
@@ -1291,7 +1442,8 @@ export class OrdersService {
         // --- REVERSALS ---
         // Reversals happen only if the order reached the credit stage (SHIPPED).
 
-        const wasShipped = order.status === OrderStatus.SHIPPED ||
+        const wasShipped =
+          order.status === OrderStatus.SHIPPED ||
           order.status === OrderStatus.IN_TRANSIT ||
           order.status === OrderStatus.DRIVER_ACCEPTED;
 
@@ -1301,19 +1453,20 @@ export class OrdersService {
             await this.walletService.updateVendorWallet(
               order.vendorId,
               Number(order.vendorNet),
-              'subtract',
+              OrderConstants.WALLET_OPERATION_SUBTRACT,
               tx,
             );
           }
 
           // Reverse Driver credit (Pay + Tip)
           if (order.driverId && order.driverCommissionApplied) {
-            const driverTotal = Number(order.driverNet) + Number(order.tipAmount);
+            const driverTotal =
+              Number(order.driverNet) + Number(order.tipAmount);
             if (driverTotal > 0) {
               await this.walletService.updateDriverWallet(
                 order.driverId,
                 driverTotal,
-                'subtract',
+                OrderConstants.WALLET_OPERATION_SUBTRACT,
                 tx,
               );
             }
@@ -1323,7 +1476,7 @@ export class OrdersService {
           if (Number(order.platformTotalCommission) > 0) {
             await this.walletService.updateAdminWallet(
               Number(order.platformTotalCommission),
-              'subtract',
+              OrderConstants.WALLET_OPERATION_SUBTRACT,
               tx,
             );
           }
@@ -1358,23 +1511,29 @@ export class OrdersService {
       include: { heldBalance: true },
     });
 
-    if (!order) throw new NotFoundException('ORDER_NOT_FOUND');
-    if (order.authorId !== user.id) throw new ForbiddenException('NOT_YOUR_ORDER');
+    if (!order) throw new NotFoundException(ORDERS_ERRORS.ORDER_NOT_FOUND);
+    if (order.authorId !== user.id)
+      throw new ForbiddenException(ORDERS_ERRORS.NOT_YOUR_ORDER);
     if (order.status !== OrderStatus.COMPLETED) {
-      throw new BadRequestException('ORDER_NOT_DELIVERED_YET');
+      throw new BadRequestException(ORDERS_ERRORS.ORDER_NOT_DELIVERED_YET);
     }
     if (order.paymentMethod !== PaymentMethod.wallet) {
-      throw new BadRequestException('NOT_A_WALLET_ORDER');
+      throw new BadRequestException(ORDERS_ERRORS.NOT_A_WALLET_ORDER);
     }
-    if (!order.heldBalance || order.heldBalance.status !== HeldBalanceStatus.HELD) {
-      throw new BadRequestException('NO_HELD_BALANCE_OR_ALREADY_PROCESSED');
+    if (
+      !order.heldBalance ||
+      order.heldBalance.status !== HeldBalanceStatus.HELD
+    ) {
+      throw new BadRequestException(
+        ORDERS_ERRORS.NO_HELD_BALANCE_OR_ALREADY_PROCESSED,
+      );
     }
 
     // Release held funds to vendor, driver, admin
     await this.walletProtectionService.releaseHeldBalance(
       orderId,
       confirmationType,
-      'Customer confirmed delivery receipt',
+      WalletTransactionDescriptions.deliveryConfirmedReason().ar,
     );
 
     return {
@@ -1398,19 +1557,25 @@ export class OrdersService {
       include: { heldBalance: true, disputes: true },
     });
 
-    if (!order) throw new NotFoundException('ORDER_NOT_FOUND');
-    if (order.authorId !== user.id) throw new ForbiddenException('NOT_YOUR_ORDER');
+    if (!order) throw new NotFoundException(ORDERS_ERRORS.ORDER_NOT_FOUND);
+    if (order.authorId !== user.id)
+      throw new ForbiddenException(ORDERS_ERRORS.NOT_YOUR_ORDER);
     if (order.status !== OrderStatus.COMPLETED) {
-      throw new BadRequestException('ORDER_NOT_DELIVERED_YET');
+      throw new BadRequestException(ORDERS_ERRORS.ORDER_NOT_DELIVERED_YET);
     }
     if (order.paymentMethod !== PaymentMethod.wallet) {
-      throw new BadRequestException('NOT_A_WALLET_ORDER');
+      throw new BadRequestException(ORDERS_ERRORS.NOT_A_WALLET_ORDER);
     }
-    if (!order.heldBalance || order.heldBalance.status !== HeldBalanceStatus.HELD) {
-      throw new BadRequestException('NO_HELD_BALANCE_OR_ALREADY_PROCESSED');
+    if (
+      !order.heldBalance ||
+      order.heldBalance.status !== HeldBalanceStatus.HELD
+    ) {
+      throw new BadRequestException(
+        ORDERS_ERRORS.NO_HELD_BALANCE_OR_ALREADY_PROCESSED,
+      );
     }
     if (order.disputes && order.disputes.length > 0) {
-      throw new BadRequestException('DISPUTE_ALREADY_EXISTS');
+      throw new BadRequestException(ORDERS_ERRORS.DISPUTE_ALREADY_EXISTS);
     }
 
     // Create dispute - this will also mark HeldBalance as DISPUTED
@@ -1422,15 +1587,37 @@ export class OrdersService {
     );
 
     // Notify driver
+    // Notify driver
     if (order.driverId) {
+      const titleEn = await this.i18n.translate(
+        'messages.DELIVERY_DISPUTED_TITLE',
+        { lang: 'en' },
+      );
+      const titleAr = await this.i18n.translate(
+        'messages.DELIVERY_DISPUTED_TITLE',
+        { lang: 'ar' },
+      );
+      const bodyEn = await this.i18n.translate(
+        'messages.DELIVERY_DISPUTED_BODY',
+        { lang: 'en', args: { orderId } },
+      );
+      const bodyAr = await this.i18n.translate(
+        'messages.DELIVERY_DISPUTED_BODY',
+        { lang: 'ar', args: { orderId } },
+      );
+
       await this.notificationService.sendCustomNotification(
         [order.driverId],
-        { en: 'Delivery Disputed', ar: 'نزاع على التوصيل' },
+        { en: titleEn, ar: titleAr },
         {
-          en: `Customer has disputed delivery for order ${orderId}. Please respond.`,
-          ar: `اعترض العميل على توصيل الطلب ${orderId}. يرجى الرد.`,
+          en: bodyEn,
+          ar: bodyAr,
         },
-        { orderId, disputeId: dispute.id, type: 'DISPUTE_CREATED' },
+        {
+          orderId,
+          disputeId: dispute.id,
+          type: NotificationEventType.DISPUTE_CREATED,
+        },
       );
     }
 
@@ -1456,31 +1643,41 @@ export class OrdersService {
       },
     });
 
-    if (!order) throw new NotFoundException('ORDER_NOT_FOUND');
-    if (order.authorId !== user.id && user.role !== UserRole.ADMIN && user.role !== UserRole.MANAGER) {
-      throw new ForbiddenException('ACCESS_DENIED');
+    if (!order) throw new NotFoundException(ORDERS_ERRORS.ORDER_NOT_FOUND);
+    if (
+      order.authorId !== user.id &&
+      user.role !== UserRole.ADMIN &&
+      user.role !== UserRole.MANAGER
+    ) {
+      throw new ForbiddenException(ORDERS_ERRORS.ACCESS_DENIED);
     }
 
     return {
       orderId: order.id,
       paymentMethod: order.paymentMethod,
       status: order.status,
-      heldBalance: order.heldBalance ? {
-        status: order.heldBalance.status,
-        totalAmount: Number(order.heldBalance.totalAmount),
-        autoReleaseDate: order.heldBalance.autoReleaseDate,
-        releasedAt: order.heldBalance.releasedAt,
-        releaseType: order.heldBalance.releaseType,
-      } : null,
-      dispute: order.disputes[0] ? {
-        id: order.disputes[0].id,
-        status: order.disputes[0].status,
-        reason: order.disputes[0].reason,
-        createdAt: order.disputes[0].createdAt,
-        resolvedAt: order.disputes[0].resolvedAt,
-      } : null,
+      heldBalance: order.heldBalance
+        ? {
+            status: order.heldBalance.status,
+            totalAmount: Number(order.heldBalance.totalAmount),
+            autoReleaseDate: order.heldBalance.autoReleaseDate,
+            releasedAt: order.heldBalance.releasedAt,
+            releaseType: order.heldBalance.releaseType,
+          }
+        : null,
+      dispute: order.disputes[0]
+        ? {
+            id: order.disputes[0].id,
+            status: order.disputes[0].status,
+            reason: order.disputes[0].reason,
+            createdAt: order.disputes[0].createdAt,
+            resolvedAt: order.disputes[0].resolvedAt,
+          }
+        : null,
       canConfirmDelivery: order.heldBalance?.status === HeldBalanceStatus.HELD,
-      canDispute: order.heldBalance?.status === HeldBalanceStatus.HELD && order.disputes.length === 0,
+      canDispute:
+        order.heldBalance?.status === HeldBalanceStatus.HELD &&
+        order.disputes.length === 0,
     };
   }
 }

@@ -4,7 +4,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 
 @Injectable()
 export class NotificationsService {
-  constructor(private prisma: PrismaService) { }
+  constructor(private prisma: PrismaService) {}
 
   async findAll(userId: string, type?: string) {
     const where: Prisma.NotificationWhereInput = { userId };

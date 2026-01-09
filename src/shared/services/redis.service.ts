@@ -14,7 +14,7 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
   private pubClient: RedisClientType;
   private subClient: RedisClientType;
 
-  constructor(private configService: ConfigService) { }
+  constructor(private configService: ConfigService) {}
 
   async onModuleInit() {
     const redisConfig = this.configService.get('redis');

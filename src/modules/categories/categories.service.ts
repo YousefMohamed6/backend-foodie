@@ -16,7 +16,7 @@ export class CategoriesService {
     private prisma: PrismaService,
     private vendorsService: VendorsService,
     private redis: RedisService,
-  ) { }
+  ) {}
 
   private readonly CACHE_KEY_HOME = 'categories:home';
 
@@ -51,8 +51,8 @@ export class CategoriesService {
         reviewAttributes:
           attributeIds.length > 0
             ? {
-              connect: attributeIds.map((id) => ({ id })),
-            }
+                connect: attributeIds.map((id) => ({ id })),
+              }
             : undefined,
       },
       include: {
@@ -90,7 +90,11 @@ export class CategoriesService {
     const cacheKey = `categories:all:${query.vendorId || 'global'}:${query.home}:${query.showInHomepage}`;
 
     // Only cache home categories for now as they are most hit
-    const isHomeQuery = query.home === 'true' || query.home === true || query.showInHomepage === 'true' || query.showInHomepage === true;
+    const isHomeQuery =
+      query.home === 'true' ||
+      query.home === true ||
+      query.showInHomepage === 'true' ||
+      query.showInHomepage === true;
 
     if (isHomeQuery && !query.page && !query.limit) {
       const cached = await this.redis.get<any[]>(this.CACHE_KEY_HOME);
@@ -153,8 +157,8 @@ export class CategoriesService {
         ...rest,
         reviewAttributes: reviewAttributes
           ? {
-            set: attributeIds.map((id) => ({ id })),
-          }
+              set: attributeIds.map((id) => ({ id })),
+            }
           : undefined,
       },
       include: {

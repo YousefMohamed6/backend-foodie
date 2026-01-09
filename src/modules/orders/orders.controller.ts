@@ -6,7 +6,7 @@ import {
   Post,
   Query,
   Request,
-  UseGuards
+  UseGuards,
 } from '@nestjs/common';
 import {
   ApiBearerAuth,
@@ -30,7 +30,7 @@ import { OrdersService } from './orders.service';
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('orders')
 export class OrdersController {
-  constructor(private readonly ordersService: OrdersService) { }
+  constructor(private readonly ordersService: OrdersService) {}
 
   @Post()
   @Roles(UserRole.CUSTOMER)
@@ -41,7 +41,13 @@ export class OrdersController {
   }
 
   @Get()
-  @Roles(UserRole.ADMIN, UserRole.CUSTOMER, UserRole.VENDOR, UserRole.DRIVER, UserRole.MANAGER)
+  @Roles(
+    UserRole.ADMIN,
+    UserRole.CUSTOMER,
+    UserRole.VENDOR,
+    UserRole.DRIVER,
+    UserRole.MANAGER,
+  )
   @ApiOperation({ summary: 'Get all orders' })
   @ApiQuery({ name: 'status', required: false })
   @ApiQuery({ name: 'vendorId', required: false })
@@ -52,7 +58,13 @@ export class OrdersController {
   }
 
   @Get(':id')
-  @Roles(UserRole.ADMIN, UserRole.CUSTOMER, UserRole.VENDOR, UserRole.DRIVER, UserRole.MANAGER)
+  @Roles(
+    UserRole.ADMIN,
+    UserRole.CUSTOMER,
+    UserRole.VENDOR,
+    UserRole.DRIVER,
+    UserRole.MANAGER,
+  )
   @ApiOperation({ summary: 'Get an order by ID' })
   async findOne(@Param('id') id: string, @Request() req) {
     const data = await this.ordersService.findOne(id, req.user);
@@ -62,10 +74,7 @@ export class OrdersController {
   @Post(':id/cancel')
   @Roles(UserRole.ADMIN, UserRole.CUSTOMER, UserRole.VENDOR, UserRole.MANAGER)
   @ApiOperation({ summary: 'Cancel an order' })
-  async cancelOrder(
-    @Param('id') id: string,
-    @Request() req,
-  ) {
+  async cancelOrder(@Param('id') id: string, @Request() req) {
     const data = await this.ordersService.cancelOrder(id, req.user);
     return { success: true, message: 'ORDER_CANCELLED', data };
   }
@@ -114,13 +123,19 @@ export class OrdersController {
 
   @Post(':id/report-problem')
   @Roles(UserRole.DRIVER)
-  @ApiOperation({ summary: 'Driver reports a problem with the order (Emergency cancel)' })
+  @ApiOperation({
+    summary: 'Driver reports a problem with the order (Emergency cancel)',
+  })
   async reportProblem(
     @Param('id') id: string,
     @Body() dto: DriverReportProblemDto,
     @Request() req,
   ) {
-    const data = await this.ordersService.reportDeliveryProblem(id, dto, req.user);
+    const data = await this.ordersService.reportDeliveryProblem(
+      id,
+      dto,
+      req.user,
+    );
     return { success: true, message: 'PROBLEM_REPORTED', data };
   }
 
@@ -150,8 +165,13 @@ export class OrdersController {
 
   @Get('drivers/:driverId/pending-cash-orders')
   @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.DRIVER)
-  @ApiOperation({ summary: 'Get all cash orders still with a driver (Not yet handed over)' })
-  async getDriverPendingCash(@Param('driverId') driverId: string, @Request() req) {
+  @ApiOperation({
+    summary: 'Get all cash orders still with a driver (Not yet handed over)',
+  })
+  async getDriverPendingCash(
+    @Param('driverId') driverId: string,
+    @Request() req,
+  ) {
     const data = await this.ordersService.getDriverPendingCashOrders(
       driverId,
       req.user,
@@ -159,17 +179,22 @@ export class OrdersController {
     return { success: true, message: 'ORDER_SUCCESS', data };
   }
 
-
-
   @Post(':id/vendor-accept')
   @Roles(UserRole.ADMIN, UserRole.VENDOR)
-  @ApiOperation({ summary: 'Vendor accepts order (triggers vendor commission if on free plan)' })
+  @ApiOperation({
+    summary:
+      'Vendor accepts order (triggers vendor commission if on free plan)',
+  })
   async vendorAcceptOrder(
     @Param('id') id: string,
     @Body() vendorAcceptOrderDto: VendorAcceptOrderDto,
     @Request() req,
   ) {
-    const data = await this.ordersService.vendorAcceptOrder(id, req.user, vendorAcceptOrderDto);
+    const data = await this.ordersService.vendorAcceptOrder(
+      id,
+      req.user,
+      vendorAcceptOrderDto,
+    );
     return { success: true, message: 'ORDER_ACCEPTED', data };
   }
 
@@ -183,7 +208,9 @@ export class OrdersController {
 
   @Post(':id/complete')
   @Roles(UserRole.ADMIN, UserRole.DRIVER)
-  @ApiOperation({ summary: 'Mark order as completed (triggers driver commission)' })
+  @ApiOperation({
+    summary: 'Mark order as completed (triggers driver commission)',
+  })
   async markOrderCompleted(@Param('id') id: string, @Request() req) {
     const data = await this.ordersService.markOrderDelivered(id, req.user);
     return { success: true, message: 'ORDER_COMPLETED', data };
@@ -223,7 +250,11 @@ export class OrdersController {
       parseInt(year),
       parseInt(month),
     );
-    return { success: true, message: 'MONTHLY_COMMISSION_REPORT_RETRIEVED', data };
+    return {
+      success: true,
+      message: 'MONTHLY_COMMISSION_REPORT_RETRIEVED',
+      data,
+    };
   }
 
   @Get('reports/vendor/:vendorId/commission')
@@ -238,8 +269,16 @@ export class OrdersController {
   ) {
     const start = startDate ? new Date(startDate) : undefined;
     const end = endDate ? new Date(endDate) : undefined;
-    const data = await this.ordersService.getVendorCommissionReport(vendorId, start, end);
-    return { success: true, message: 'VENDOR_COMMISSION_REPORT_RETRIEVED', data };
+    const data = await this.ordersService.getVendorCommissionReport(
+      vendorId,
+      start,
+      end,
+    );
+    return {
+      success: true,
+      message: 'VENDOR_COMMISSION_REPORT_RETRIEVED',
+      data,
+    };
   }
 
   @Get('reports/driver/:driverId/commission')
@@ -254,15 +293,25 @@ export class OrdersController {
   ) {
     const start = startDate ? new Date(startDate) : undefined;
     const end = endDate ? new Date(endDate) : undefined;
-    const data = await this.ordersService.getDriverCommissionReport(driverId, start, end);
-    return { success: true, message: 'DRIVER_COMMISSION_REPORT_RETRIEVED', data };
+    const data = await this.ordersService.getDriverCommissionReport(
+      driverId,
+      start,
+      end,
+    );
+    return {
+      success: true,
+      message: 'DRIVER_COMMISSION_REPORT_RETRIEVED',
+      data,
+    };
   }
 
   // === WALLET PROTECTION ENDPOINTS ===
 
   @Post(':id/confirm-delivery')
   @Roles(UserRole.CUSTOMER)
-  @ApiOperation({ summary: 'Customer confirms delivery receipt - releases wallet funds' })
+  @ApiOperation({
+    summary: 'Customer confirms delivery receipt - releases wallet funds',
+  })
   async confirmDelivery(@Param('id') id: string, @Request() req) {
     const data = await this.ordersService.confirmDeliveryReceipt(id, req.user);
     return { success: true, message: 'DELIVERY_CONFIRMED', data };
@@ -273,10 +322,16 @@ export class OrdersController {
   @ApiOperation({ summary: 'Customer disputes non-receipt of order' })
   async createDispute(
     @Param('id') id: string,
-    @Body() dto: { reason: string; evidence?: { photos?: string[]; notes?: string } },
+    @Body()
+    dto: { reason: string; evidence?: { photos?: string[]; notes?: string } },
     @Request() req,
   ) {
-    const data = await this.ordersService.createOrderDispute(id, req.user, dto.reason, dto.evidence);
+    const data = await this.ordersService.createOrderDispute(
+      id,
+      req.user,
+      dto.reason,
+      dto.evidence,
+    );
     return { success: true, message: 'DISPUTE_CREATED', data };
   }
 
@@ -284,7 +339,10 @@ export class OrdersController {
   @Roles(UserRole.ADMIN, UserRole.CUSTOMER, UserRole.MANAGER)
   @ApiOperation({ summary: 'Get wallet protection status for order' })
   async getProtectionStatus(@Param('id') id: string, @Request() req) {
-    const data = await this.ordersService.getOrderProtectionStatus(id, req.user);
+    const data = await this.ordersService.getOrderProtectionStatus(
+      id,
+      req.user,
+    );
     return { success: true, message: 'PROTECTION_STATUS_RETRIEVED', data };
   }
 }

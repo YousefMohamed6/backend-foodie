@@ -3,7 +3,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 
 @Injectable()
 export class CurrenciesSeederService implements OnModuleInit {
-  constructor(private prisma: PrismaService) { }
+  constructor(private prisma: PrismaService) {}
 
   async onModuleInit() {
     await this.seed();

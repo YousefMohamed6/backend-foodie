@@ -11,4 +11,4 @@ import { ReferralsService } from './referrals.service';
   providers: [ReferralsService],
   exports: [ReferralsService],
 })
-export class ReferralsModule { }
+export class ReferralsModule {}

@@ -10,7 +10,7 @@ type ReviewWithRelations = Prisma.ReviewGetPayload<{
 
 @Injectable()
 export class ReviewsService {
-  constructor(private prisma: PrismaService) { }
+  constructor(private prisma: PrismaService) {}
 
   async create(createReviewDto: CreateReviewDto, user: User) {
     const { images, reviewAttributes, ...rest } = createReviewDto;
@@ -37,14 +37,14 @@ export class ReviewsService {
         customerId: user.id,
         images: images
           ? {
-            create: images.map((url) => ({ url })),
-          }
+              create: images.map((url) => ({ url })),
+            }
           : undefined,
         ratings:
           ratingsData.length > 0
             ? {
-              create: ratingsData,
-            }
+                create: ratingsData,
+              }
             : undefined,
       },
       include: { images: true, ratings: true, customer: true },
@@ -127,15 +127,15 @@ export class ReviewsService {
         ...rest,
         images: images
           ? {
-            deleteMany: {},
-            create: images.map((url) => ({ url })),
-          }
+              deleteMany: {},
+              create: images.map((url) => ({ url })),
+            }
           : undefined,
         ratings: reviewAttributes
           ? {
-            deleteMany: {},
-            create: ratingsData,
-          }
+              deleteMany: {},
+              create: ratingsData,
+            }
           : undefined,
       },
       include: { images: true, ratings: true, customer: true },
@@ -170,9 +170,7 @@ export class ReviewsService {
       include: { images: true, ratings: true, customer: true },
     });
     if (!review) {
-      throw new NotFoundException(
-        'REVIEW_NOT_FOUND_FOR_PRODUCT_IN_ORDER',
-      );
+      throw new NotFoundException('REVIEW_NOT_FOUND_FOR_PRODUCT_IN_ORDER');
     }
     return this.mapReviewResponse(review);
   }

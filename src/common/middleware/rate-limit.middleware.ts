@@ -4,7 +4,7 @@ import { RedisService } from '../../shared/services/redis.service';
 
 @Injectable()
 export class RateLimitMiddleware implements NestMiddleware {
-  constructor(private redisService: RedisService) { }
+  constructor(private redisService: RedisService) {}
 
   async use(req: Request, res: Response, next: NextFunction) {
     const ip = req.ip || req.connection.remoteAddress || 'unknown';

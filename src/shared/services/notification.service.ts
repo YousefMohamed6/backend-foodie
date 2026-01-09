@@ -19,7 +19,7 @@ export class NotificationService {
   constructor(
     private prisma: PrismaService,
     private fcmService: FcmService,
-  ) { }
+  ) {}
 
   /**
    * Get user's preferred language or default to Arabic
@@ -64,13 +64,19 @@ export class NotificationService {
 
       // Return the message in user's preferred language
       // Fallback to Arabic if the language doesn't exist in template
-      let content = template[language] || template.ar || template.en;
+      const content = template[language] || template.ar || template.en;
 
       if (data) {
-        Object.keys(data).forEach(key => {
+        Object.keys(data).forEach((key) => {
           const placeholder = `{${key}}`;
-          content.message = content.message.replace(new RegExp(placeholder, 'g'), data[key]);
-          content.subject = content.subject.replace(new RegExp(placeholder, 'g'), data[key]);
+          content.message = content.message.replace(
+            new RegExp(placeholder, 'g'),
+            data[key],
+          );
+          content.subject = content.subject.replace(
+            new RegExp(placeholder, 'g'),
+            data[key],
+          );
         });
       }
 
@@ -103,7 +109,11 @@ export class NotificationService {
     }
 
     // Get localized notification
-    const notification = await this.getLocalizedNotification(userId, templateKey, orderData);
+    const notification = await this.getLocalizedNotification(
+      userId,
+      templateKey,
+      orderData,
+    );
 
     // Send notification
     await this.fcmService.sendNotification(
@@ -169,7 +179,8 @@ export class NotificationService {
 
     for (const user of users) {
       try {
-        const language = (user.preferredLanguage?.toLowerCase() === 'en' ? 'en' : 'ar') as 'ar' | 'en';
+        const language =
+          user.preferredLanguage?.toLowerCase() === 'en' ? 'en' : 'ar';
 
         // Send notification in user's preferred language
         await this.fcmService.sendNotification(
@@ -225,7 +236,8 @@ export class NotificationService {
 
     for (const user of users) {
       try {
-        const language = (user.preferredLanguage?.toLowerCase() === 'en' ? 'en' : 'ar') as 'ar' | 'en';
+        const language =
+          user.preferredLanguage?.toLowerCase() === 'en' ? 'en' : 'ar';
 
         await this.fcmService.sendNotification(
           user.fcmToken!,

@@ -5,7 +5,7 @@ import { SubscribeDto } from './dto/subscribe.dto';
 
 @Injectable()
 export class SubscriptionsService {
-  constructor(private prisma: PrismaService) { }
+  constructor(private prisma: PrismaService) {}
 
   async getPlans() {
     return this.prisma.subscriptionPlan.findMany({ where: { isActive: true } });

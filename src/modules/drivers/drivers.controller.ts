@@ -8,7 +8,7 @@ import {
   Patch,
   Post,
   Query,
-  UseGuards
+  UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { type User, UserRole } from '@prisma/client';
@@ -26,7 +26,7 @@ import { UploadDriverDocumentDto } from './dto/upload-driver-document.dto';
 @ApiBearerAuth()
 @Controller('drivers')
 export class DriversController {
-  constructor(private readonly driversService: DriversService) { }
+  constructor(private readonly driversService: DriversService) {}
 
   @Post()
   @UseGuards(JwtAuthGuard, RolesGuard)

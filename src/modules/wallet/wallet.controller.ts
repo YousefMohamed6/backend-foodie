@@ -16,7 +16,10 @@ import {
 } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
-import { GetTransactionsQueryDto, GetWithdrawalsQueryDto } from './dto/get-transactions-query.dto';
+import {
+  GetTransactionsQueryDto,
+  GetWithdrawalsQueryDto,
+} from './dto/get-transactions-query.dto';
 import {
   SetWithdrawMethodDto,
   TopUpWalletDto,
@@ -29,7 +32,7 @@ import { WalletService } from './wallet.service';
 @UseGuards(JwtAuthGuard)
 @Controller('wallet')
 export class WalletController {
-  constructor(private readonly walletService: WalletService) { }
+  constructor(private readonly walletService: WalletService) {}
 
   @Get('balance')
   @ApiOperation({ summary: 'Get wallet balance' })

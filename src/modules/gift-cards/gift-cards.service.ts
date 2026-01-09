@@ -12,7 +12,7 @@ export class GiftCardsService {
   constructor(
     private prisma: PrismaService,
     private readonly walletService: WalletService,
-  ) { }
+  ) {}
 
   async findAll() {
     return this.prisma.giftCardTemplate.findMany({

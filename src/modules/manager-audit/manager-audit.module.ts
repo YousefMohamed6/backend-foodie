@@ -3,8 +3,8 @@ import { ManagerAuditController } from './manager-audit.controller';
 import { ManagerAuditService } from './manager-audit.service';
 
 @Module({
-    controllers: [ManagerAuditController],
-    providers: [ManagerAuditService],
-    exports: [ManagerAuditService],
+  controllers: [ManagerAuditController],
+  providers: [ManagerAuditService],
+  exports: [ManagerAuditService],
 })
-export class ManagerAuditModule { }
+export class ManagerAuditModule {}

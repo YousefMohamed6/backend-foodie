@@ -7,7 +7,7 @@ export class SendPushNotificationProcessor {
   constructor(
     private readonly fcmService: FcmService,
     private readonly prisma: PrismaService,
-  ) { }
+  ) {}
 
   @Process()
   async handlePushNotificationJob(job: any) {
@@ -27,11 +27,6 @@ export class SendPushNotificationProcessor {
     }
 
     // Send notification
-    await this.fcmService.sendNotification(
-      user.fcmToken,
-      title,
-      body,
-      data,
-    );
+    await this.fcmService.sendNotification(user.fcmToken, title, body, data);
   }
 }

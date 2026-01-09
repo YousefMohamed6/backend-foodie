@@ -30,7 +30,7 @@ import { ValidateCouponDto } from './dto/validate-coupon.dto';
 @ApiBearerAuth()
 @Controller('coupons')
 export class CouponsController {
-  constructor(private readonly couponsService: CouponsService) { }
+  constructor(private readonly couponsService: CouponsService) {}
 
   @Post()
   @UseGuards(JwtAuthGuard, RolesGuard)
@@ -79,6 +79,10 @@ export class CouponsController {
   @Post('validate')
   @ApiOperation({ summary: 'Validate coupon for order' })
   validate(@Body() dto: ValidateCouponDto) {
-    return this.couponsService.validate(dto.code, dto.vendorId || null, dto.orderAmount);
+    return this.couponsService.validate(
+      dto.code,
+      dto.vendorId || null,
+      dto.orderAmount,
+    );
   }
 }

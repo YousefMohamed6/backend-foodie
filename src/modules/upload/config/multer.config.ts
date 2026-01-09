@@ -26,10 +26,7 @@ export const multerOptions = {
     } else {
       // Reject file
       cb(
-        new HttpException(
-          'UNSUPPORTED_FILE_TYPE',
-          HttpStatus.BAD_REQUEST,
-        ),
+        new HttpException('UNSUPPORTED_FILE_TYPE', HttpStatus.BAD_REQUEST),
         false,
       );
     }
@@ -73,10 +70,7 @@ export const multerImageOptions = {
       cb(null, true);
     } else {
       cb(
-        new HttpException(
-          'INVALID_IMAGE_TYPE',
-          HttpStatus.BAD_REQUEST,
-        ),
+        new HttpException('INVALID_IMAGE_TYPE', HttpStatus.BAD_REQUEST),
         false,
       );
     }

@@ -9,10 +9,8 @@ import { SecureLoggingInterceptor } from './common/interceptors/secure-logging.i
 import { securityHeadersConfig } from './config/security-headers.config';
 const cookieParser = require('cookie-parser');
 
-
 process.on('unhandledRejection', (reason, promise) => {
   console.error('Unhandled Rejection at:', promise, 'reason:', reason);
-
 });
 
 process.on('uncaughtException', (error) => {
@@ -34,19 +32,15 @@ async function bootstrap() {
   const configService = app.get(ConfigService);
   const port = configService.get<number>('app.port') || 3000;
 
-
-
   app.use(helmet(securityHeadersConfig));
   app.use(cookieParser());
   app.setGlobalPrefix('api/v1', {
     exclude: ['/api', '/api/(.*)'],
   });
 
-
-
   const allowedOrigins = configService.get<string>('ALLOWED_ORIGINS');
   const corsOrigins = allowedOrigins
-    ? allowedOrigins.split(',').map(origin => origin.trim())
+    ? allowedOrigins.split(',').map((origin) => origin.trim())
     : ['http://localhost:3000', 'http://localhost:4200'];
 
   app.enableCors({
@@ -56,9 +50,12 @@ async function bootstrap() {
     maxAge: 86400,
   });
 
-  const sessionSecret = configService.get<string>('SESSION_SECRET') ||
+  const sessionSecret =
+    configService.get<string>('SESSION_SECRET') ||
     (isProduction
-      ? (() => { throw new Error('SESSION_SECRET is required in production'); })()
+      ? (() => {
+          throw new Error('SESSION_SECRET is required in production');
+        })()
       : 'foodie-admin-secret-key-dev');
 
   app.use(

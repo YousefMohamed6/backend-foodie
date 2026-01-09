@@ -19,7 +19,7 @@ import { CreateChannelDto, SendMessageDto } from './dto/chat.dto';
 @UseGuards(JwtAuthGuard)
 @Controller('chat')
 export class ChatController {
-  constructor(private readonly chatService: ChatService) { }
+  constructor(private readonly chatService: ChatService) {}
 
   @Get('threads')
   @ApiOperation({ summary: 'Get user chat threads' })

@@ -3,7 +3,10 @@ import { DriverStatus, TransactionType, UserRole } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../../prisma/prisma.service';
 import { RedisService } from '../../shared/services/redis.service';
+import { APP_SETTINGS } from '../settings/settings.constants';
 import { SettingsService } from '../settings/settings.service';
+import { WalletTransactionDescriptions } from '../wallet/wallet-transaction.constants';
+import { WalletConstants } from '../wallet/wallet.constants';
 import { WalletService } from '../wallet/wallet.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
@@ -15,11 +18,14 @@ export class UsersService {
     private redisService: RedisService,
     private walletService: WalletService,
     private settingsService: SettingsService,
-  ) { }
+  ) {}
 
   async create(createUserDto: CreateUserDto) {
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { referralCode: inputReferralCode, deviceId, ...userData } = createUserDto as any;
+    const {
+      referralCode: inputReferralCode,
+      deviceId,
+      ...userData
+    } = createUserDto as any;
 
     // Check if phone number already exists
     if (userData.phoneNumber) {
@@ -80,9 +86,13 @@ export class UsersService {
       // Get referral settings
       let rewardAmount = 0;
       try {
-        const isEnabled = await this.settingsService.findOne('referral_enabled');
+        const isEnabled = await this.settingsService.findOne(
+          APP_SETTINGS.REFERRAL_ENABLED,
+        );
         if (isEnabled === 'true') {
-          const amountSetting = await this.settingsService.findOne('referral_amount');
+          const amountSetting = await this.settingsService.findOne(
+            APP_SETTINGS.REFERRAL_AMOUNT,
+          );
           if (amountSetting) {
             rewardAmount = Number(amountSetting);
             // Cap referral amount at 100
@@ -106,13 +116,17 @@ export class UsersService {
 
       // Credit referrer's wallet if reward amount is greater than 0
       if (rewardAmount > 0) {
+        const descriptions = WalletTransactionDescriptions.referralBonus(
+          inputReferralCode || 'UNKNOWN',
+        );
         await this.prisma.walletTransaction.create({
           data: {
             userId: referrerId,
             amount: rewardAmount,
             type: TransactionType.DEPOSIT,
-            description: `Referral reward for inviting new user`,
-            paymentStatus: 'PAID',
+            descriptionEn: descriptions.en,
+            descriptionAr: descriptions.ar,
+            paymentStatus: WalletConstants.PAYMENT_STATUS_PAID,
           },
         });
 
@@ -120,7 +134,7 @@ export class UsersService {
         await this.walletService.updateUserWallet(
           referrerId,
           rewardAmount,
-          'add',
+          WalletConstants.OPERATION_ADD,
         );
       }
     }

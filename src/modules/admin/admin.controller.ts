@@ -9,7 +9,12 @@ import {
   Request,
   UseGuards,
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiOperation,
+  ApiQuery,
+  ApiTags,
+} from '@nestjs/swagger';
 import { UserRole } from '@prisma/client';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
@@ -32,7 +37,7 @@ export class AdminController {
     private readonly usersService: UsersService,
     private readonly prisma: PrismaService,
     private readonly ordersService: OrdersService,
-  ) { }
+  ) {}
 
   @Get('drivers')
   @ApiOperation({ summary: 'Get all drivers for admin' })
@@ -62,7 +67,9 @@ export class AdminController {
   }
 
   @Get('cash-confirmations')
-  @ApiOperation({ summary: 'Get all manager cash receipt confirmations (Admin only)' })
+  @ApiOperation({
+    summary: 'Get all manager cash receipt confirmations (Admin only)',
+  })
   getCashConfirmations() {
     return this.prisma.managerCashConfirmation.findMany({
       include: {
@@ -81,8 +88,14 @@ export class AdminController {
   }
 
   @Post('managers/:managerId/confirm-payout')
-  @ApiOperation({ summary: 'Admin confirms receiving cash from a manager for a specific day' })
-  @ApiQuery({ name: 'date', description: 'Date in YYYY-MM-DD format', required: true })
+  @ApiOperation({
+    summary: 'Admin confirms receiving cash from a manager for a specific day',
+  })
+  @ApiQuery({
+    name: 'date',
+    description: 'Date in YYYY-MM-DD format',
+    required: true,
+  })
   confirmManagerPayout(
     @Param('managerId') managerId: string,
     @Query('date') date: string,

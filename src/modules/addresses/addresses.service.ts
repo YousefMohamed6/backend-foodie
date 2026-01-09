@@ -10,7 +10,7 @@ import { UpdateAddressDto } from './dto/update-address.dto';
 
 @Injectable()
 export class AddressesService {
-  constructor(private prisma: PrismaService) { }
+  constructor(private prisma: PrismaService) {}
 
   async create(createAddressDto: CreateAddressDto, user: User) {
     const profile = await this.prisma.customerProfile.findUnique({

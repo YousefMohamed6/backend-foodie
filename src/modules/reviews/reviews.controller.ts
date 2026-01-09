@@ -29,7 +29,7 @@ import { ReviewsService } from './reviews.service';
 @ApiBearerAuth()
 @Controller('reviews')
 export class ReviewsController {
-  constructor(private readonly reviewsService: ReviewsService) { }
+  constructor(private readonly reviewsService: ReviewsService) {}
 
   @Post()
   @UseGuards(JwtAuthGuard, RolesGuard)

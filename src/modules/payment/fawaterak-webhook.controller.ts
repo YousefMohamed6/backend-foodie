@@ -11,7 +11,7 @@ export class FawaterakWebhookController {
     private readonly prisma: PrismaService,
     private readonly fawaterakService: FawaterakService,
     private readonly walletService: WalletService,
-  ) { }
+  ) {}
 
   @Post('webhook')
   @ApiOperation({ summary: 'Fawaterak webhook' })
@@ -71,14 +71,20 @@ export class FawaterakWebhookController {
           },
           ...(payloadReferenceId
             ? [
-              {
-                referenceId: String(payloadReferenceId),
-              },
-            ]
+                {
+                  referenceId: String(payloadReferenceId),
+                },
+              ]
             : []),
         ],
       },
-      select: { id: true, userId: true, amount: true, paymentStatus: true, metadata: true },
+      select: {
+        id: true,
+        userId: true,
+        amount: true,
+        paymentStatus: true,
+        metadata: true,
+      },
     });
 
     if (!tx) {

@@ -18,14 +18,15 @@ import { DriversService } from './drivers.service';
   namespace: 'drivers',
 })
 export class DriversGateway
-  implements OnGatewayConnection, OnGatewayDisconnect {
+  implements OnGatewayConnection, OnGatewayDisconnect
+{
   @WebSocketServer()
   server: Server;
 
   constructor(
     private driversService: DriversService,
     private usersService: UsersService,
-  ) { }
+  ) {}
 
   handleConnection(client: Socket) {
     const driverId = client.handshake.query.driverId as string;

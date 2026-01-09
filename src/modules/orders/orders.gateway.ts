@@ -23,7 +23,7 @@ import { WsJwtGuard } from '../../common/guards/ws-jwt.guard';
 export class OrdersGateway implements OnGatewayConnection, OnGatewayDisconnect {
   private readonly logger = new Logger(OrdersGateway.name);
 
-  constructor(private readonly jwtService: JwtService) { }
+  constructor(private readonly jwtService: JwtService) {}
 
   @WebSocketServer()
   server: Server;
@@ -56,7 +56,8 @@ export class OrdersGateway implements OnGatewayConnection, OnGatewayDisconnect {
   }
 
   private extractToken(client: Socket): string | null {
-    const authHeader = client.handshake.auth?.token || client.handshake.headers?.authorization;
+    const authHeader =
+      client.handshake.auth?.token || client.handshake.headers?.authorization;
     if (authHeader) {
       return authHeader.split(' ')[1] || authHeader;
     }

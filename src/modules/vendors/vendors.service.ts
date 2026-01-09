@@ -32,7 +32,7 @@ export class VendorsService {
     private ordersService: OrdersService,
     @Inject(forwardRef(() => CouponsService))
     private couponsService: CouponsService,
-  ) { }
+  ) {}
 
   async create(createVendorDto: CreateVendorDto, user: User) {
     const { photos, restaurantMenuPhotos, ...rest } = createVendorDto;
@@ -55,7 +55,9 @@ export class VendorsService {
     return this.mapVendorResponse(vendor);
   }
 
-  async findAll(query: { page?: number | string; limit?: number | string } = {}) {
+  async findAll(
+    query: { page?: number | string; limit?: number | string } = {},
+  ) {
     const page = Number(query.page) || 1;
     const limit = Math.min(Number(query.limit) || 20, 100); // Max 100 per page
     const skip = (page - 1) * limit;
@@ -94,15 +96,15 @@ export class VendorsService {
         ...rest,
         photos: photos
           ? {
-            deleteMany: {},
-            create: photos.map((url) => ({ url })),
-          }
+              deleteMany: {},
+              create: photos.map((url) => ({ url })),
+            }
           : undefined,
         restaurantMenuPhotos: restaurantMenuPhotos
           ? {
-            deleteMany: {},
-            create: restaurantMenuPhotos.map((url) => ({ url })),
-          }
+              deleteMany: {},
+              create: restaurantMenuPhotos.map((url) => ({ url })),
+            }
           : undefined,
       },
       include: {
@@ -166,12 +168,12 @@ export class VendorsService {
         ],
         ...(categoryId
           ? {
-            categories: {
-              some: {
-                id: categoryId,
+              categories: {
+                some: {
+                  id: categoryId,
+                },
               },
-            },
-          }
+            }
           : {}),
       },
       include: {
@@ -228,7 +230,9 @@ export class VendorsService {
 
     return {
       totalOrders: orderStats._count.id,
-      totalRevenue: orderStats._sum.totalAmount ? orderStats._sum.totalAmount.toNumber() : 0,
+      totalRevenue: orderStats._sum.totalAmount
+        ? orderStats._sum.totalAmount.toNumber()
+        : 0,
       totalProducts: productsCount,
       totalReviews: reviewStats._count.id,
       averageRating: reviewStats._avg.rating || 0,

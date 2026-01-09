@@ -4,14 +4,14 @@ import crypto from 'crypto';
 
 type CreateInvoiceLinkResponse =
   | {
-    status: 'success';
-    data: { url: string; invoiceKey: string; invoiceId: number };
-  }
+      status: 'success';
+      data: { url: string; invoiceKey: string; invoiceId: number };
+    }
   | { status: string; message?: string; data?: any };
 
 @Injectable()
 export class FawaterakService {
-  constructor(private readonly configService: ConfigService) { }
+  constructor(private readonly configService: ConfigService) {}
 
   private get baseUrl() {
     const v = this.configService.get<string>('FAWATERAK_BASE_URL');
@@ -47,7 +47,11 @@ export class FawaterakService {
       phone: string;
       address?: string;
     };
-    redirectionUrls: { successUrl: string; failUrl: string; pendingUrl: string };
+    redirectionUrls: {
+      successUrl: string;
+      failUrl: string;
+      pendingUrl: string;
+    };
     payLoad: Record<string, any>;
   }) {
     const res = await fetch(`${this.baseUrl}/api/v2/createInvoiceLink`, {

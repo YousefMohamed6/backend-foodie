@@ -1,4 +1,8 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { Prisma, TransactionType } from '@prisma/client';
 import crypto from 'crypto';
 import { PrismaService } from '../../prisma/prisma.service';
@@ -8,21 +12,26 @@ import {
   TopUpWalletDto,
   WithdrawWalletDto,
 } from './dto/wallet.dto';
+import { WalletTransactionDescriptions } from './wallet-transaction.constants';
+import { WalletConstants, WalletOperation } from './wallet.constants';
 
 @Injectable()
 export class WalletService {
   constructor(
     private prisma: PrismaService,
     private readonly fawaterakService: FawaterakService,
-  ) { }
+  ) {}
 
   async getBalance(userId: string) {
     const getSum = async (type: TransactionType) => {
       const depositFilter =
         type === TransactionType.DEPOSIT
           ? {
-            OR: [{ paymentStatus: 'PAID' }, { paymentStatus: null }],
-          }
+              OR: [
+                { paymentStatus: WalletConstants.PAYMENT_STATUS_PAID },
+                { paymentStatus: null },
+              ],
+            }
           : {};
       const aggregations = await this.prisma.walletTransaction.aggregate({
         _sum: {
@@ -72,7 +81,10 @@ export class WalletService {
   }
 
   async topUp(userId: string, topUpDto: TopUpWalletDto) {
-    if (topUpDto.paymentGateway.toLowerCase() !== 'fawaterak') {
+    if (
+      topUpDto.paymentGateway.toLowerCase() !==
+      WalletConstants.GATEWAY_FAWATERAK
+    ) {
       throw new BadRequestException('UNSUPPORTED_PAYMENT_GATEWAY');
     }
     if (!topUpDto.successUrl || !topUpDto.failUrl || !topUpDto.pendingUrl) {
@@ -81,25 +93,34 @@ export class WalletService {
 
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
-      select: { firstName: true, lastName: true, email: true, phoneNumber: true },
+      select: {
+        firstName: true,
+        lastName: true,
+        email: true,
+        phoneNumber: true,
+      },
     });
     if (!user?.email || !user?.phoneNumber) {
       throw new BadRequestException('MISSING_PAYMENT_DATA');
     }
 
     const transactionId = crypto.randomUUID();
+    const topUpDescriptions = WalletTransactionDescriptions.topUp(
+      topUpDto.paymentMethod,
+    );
     const transaction = await this.prisma.walletTransaction.create({
       data: {
         id: transactionId,
         userId,
         amount: topUpDto.amount,
         type: TransactionType.DEPOSIT,
-        description: `Top up via ${topUpDto.paymentMethod}`,
+        descriptionEn: topUpDescriptions.en,
+        descriptionAr: topUpDescriptions.ar,
         isTopup: true,
-        paymentStatus: 'PENDING',
+        paymentStatus: WalletConstants.PAYMENT_STATUS_PENDING,
         referenceId: transactionId,
         metadata: {
-          gateway: 'fawaterak',
+          gateway: WalletConstants.GATEWAY_FAWATERAK,
           paymentGateway: topUpDto.paymentGateway,
           paymentMethod: topUpDto.paymentMethod,
         },
@@ -108,13 +129,13 @@ export class WalletService {
 
     const invoice = await this.fawaterakService.createInvoiceLink({
       amount: topUpDto.amount,
-      currency: 'EGP',
+      currency: WalletConstants.CURRENCY_EGP,
       customer: {
         first_name: user.firstName,
         last_name: user.lastName,
         email: user.email,
         phone: user.phoneNumber,
-        address: 'N/A',
+        address: WalletConstants.ADDRESS_NA,
       },
       redirectionUrls: {
         successUrl: topUpDto.successUrl,
@@ -150,12 +171,14 @@ export class WalletService {
       throw new BadRequestException('INSUFFICIENT_FUNDS');
     }
 
+    const withdrawalDescriptions = WalletTransactionDescriptions.withdrawal();
     const transaction = await this.prisma.walletTransaction.create({
       data: {
         userId,
         amount: withdrawDto.amount,
         type: TransactionType.WITHDRAWAL,
-        description: 'Withdrawal request',
+        descriptionEn: withdrawalDescriptions.en,
+        descriptionAr: withdrawalDescriptions.ar,
         metadata: {
           withdrawMethodId: withdrawDto.withdrawMethodId,
           accountDetails: withdrawDto.accountDetails,
@@ -171,7 +194,7 @@ export class WalletService {
     await this.updateUserWallet(
       userId,
       withdrawDto.amount,
-      'subtract',
+      WalletConstants.OPERATION_SUBTRACT,
       this.prisma,
     );
 
@@ -193,7 +216,8 @@ export class WalletService {
   async pay(
     userId: string,
     amount: number,
-    description: string,
+    descriptionEn: string,
+    descriptionAr: string,
     orderId?: string,
     tx?: Prisma.TransactionClient,
   ) {
@@ -208,13 +232,19 @@ export class WalletService {
         userId,
         amount,
         type: TransactionType.PAYMENT,
-        description,
+        descriptionEn,
+        descriptionAr,
         orderId,
       },
     });
 
     // Sync with User entity walletAmount
-    await this.updateUserWallet(userId, amount, 'subtract', prisma);
+    await this.updateUserWallet(
+      userId,
+      amount,
+      WalletConstants.OPERATION_SUBTRACT,
+      prisma,
+    );
 
     return transaction;
   }
@@ -222,7 +252,8 @@ export class WalletService {
   async refund(
     userId: string,
     amount: number,
-    description: string,
+    descriptionEn: string,
+    descriptionAr: string,
     orderId?: string,
     tx?: Prisma.TransactionClient,
   ) {
@@ -232,13 +263,19 @@ export class WalletService {
         userId,
         amount,
         type: TransactionType.DEPOSIT,
-        description,
+        descriptionEn,
+        descriptionAr,
         orderId,
       },
     });
 
     // Sync with User entity walletAmount
-    await this.updateUserWallet(userId, amount, 'add', prisma);
+    await this.updateUserWallet(
+      userId,
+      amount,
+      WalletConstants.OPERATION_ADD,
+      prisma,
+    );
 
     return transaction;
   }
@@ -269,7 +306,7 @@ export class WalletService {
   async updateUserWallet(
     userId: string,
     amount: number,
-    type: 'add' | 'subtract',
+    type: WalletOperation,
     tx?: Prisma.TransactionClient,
   ) {
     const prisma = tx || this.prisma;
@@ -278,7 +315,10 @@ export class WalletService {
     });
     if (profile) {
       const current = profile.walletAmount.toNumber();
-      const newBalance = type === 'add' ? current + amount : current - amount;
+      const newBalance =
+        type === WalletConstants.OPERATION_ADD
+          ? current + amount
+          : current - amount;
       await prisma.customerProfile.update({
         where: { userId },
         data: { walletAmount: newBalance },
@@ -289,7 +329,7 @@ export class WalletService {
   async updateVendorWallet(
     vendorId: string,
     amount: number,
-    type: 'add' | 'subtract',
+    type: WalletOperation,
     tx?: Prisma.TransactionClient,
   ) {
     const prisma = tx || this.prisma;
@@ -298,7 +338,10 @@ export class WalletService {
     });
     if (vendor) {
       const current = vendor.walletAmount.toNumber();
-      const newBalance = type === 'add' ? current + amount : current - amount;
+      const newBalance =
+        type === WalletConstants.OPERATION_ADD
+          ? current + amount
+          : current - amount;
       await prisma.vendor.update({
         where: { id: vendorId },
         data: { walletAmount: newBalance },
@@ -314,17 +357,24 @@ export class WalletService {
     tx?: Prisma.TransactionClient,
   ) {
     const prisma = tx || this.prisma;
+    const descriptions = WalletTransactionDescriptions.vendorEarnings(orderId);
     await prisma.walletTransaction.create({
       data: {
         userId,
         amount,
         type: TransactionType.DEPOSIT,
-        description: `Earnings for order ${orderId}`,
+        descriptionEn: descriptions.en,
+        descriptionAr: descriptions.ar,
         orderId,
-        transactionUser: 'vendor',
+        transactionUser: WalletConstants.TRANSACTION_USER_VENDOR,
       },
     });
-    await this.updateVendorWallet(vendorId, amount, 'add', prisma);
+    await this.updateVendorWallet(
+      vendorId,
+      amount,
+      WalletConstants.OPERATION_ADD,
+      prisma,
+    );
   }
 
   async addDriverEarnings(
@@ -334,17 +384,24 @@ export class WalletService {
     tx?: Prisma.TransactionClient,
   ) {
     const prisma = tx || this.prisma;
+    const descriptions = WalletTransactionDescriptions.driverEarnings(orderId);
     await prisma.walletTransaction.create({
       data: {
         userId: driverId,
         amount,
         type: TransactionType.DEPOSIT,
-        description: `Earnings for order ${orderId}`,
+        descriptionEn: descriptions.en,
+        descriptionAr: descriptions.ar,
         orderId,
-        transactionUser: 'driver',
+        transactionUser: WalletConstants.TRANSACTION_USER_DRIVER,
       },
     });
-    await this.updateDriverWallet(driverId, amount, 'add', prisma);
+    await this.updateDriverWallet(
+      driverId,
+      amount,
+      WalletConstants.OPERATION_ADD,
+      prisma,
+    );
   }
 
   async addAdminCommission(
@@ -362,19 +419,19 @@ export class WalletService {
       data: {
         walletId: wallet.id,
         amount,
-        type: 'CREDIT',
+        type: WalletConstants.PLATFORM_TRANSACTION_TYPE_CREDIT,
         reason: `Commission from order ${orderId}`,
         orderId,
       },
     });
 
-    await this.updateAdminWallet(amount, 'add', prisma);
+    await this.updateAdminWallet(amount, WalletConstants.OPERATION_ADD, prisma);
   }
 
   async updateDriverWallet(
     driverId: string,
     amount: number,
-    type: 'add' | 'subtract',
+    type: WalletOperation,
     tx?: Prisma.TransactionClient,
   ) {
     const prisma = tx || this.prisma;
@@ -383,7 +440,10 @@ export class WalletService {
     });
     if (profile) {
       const current = profile.walletAmount.toNumber();
-      const newBalance = type === 'add' ? current + amount : current - amount;
+      const newBalance =
+        type === WalletConstants.OPERATION_ADD
+          ? current + amount
+          : current - amount;
       await prisma.driverProfile.update({
         where: { userId: driverId },
         data: { walletAmount: newBalance },
@@ -393,14 +453,17 @@ export class WalletService {
 
   async updateAdminWallet(
     amount: number,
-    type: 'add' | 'subtract',
+    type: WalletOperation,
     tx?: Prisma.TransactionClient,
   ) {
     const prisma = tx || this.prisma;
     const wallet = await prisma.adminWallet.findFirst();
     if (wallet) {
       const current = wallet.walletAmount.toNumber();
-      const newBalance = type === 'add' ? current + amount : current - amount;
+      const newBalance =
+        type === WalletConstants.OPERATION_ADD
+          ? current + amount
+          : current - amount;
       await prisma.adminWallet.update({
         where: { id: wallet.id },
         data: { walletAmount: newBalance },
@@ -410,12 +473,17 @@ export class WalletService {
 
   async getTopUpStatus(userId: string, transactionId: string) {
     const tx = await this.prisma.walletTransaction.findFirst({
-      where: { id: transactionId, userId, isTopup: true, type: TransactionType.DEPOSIT },
+      where: {
+        id: transactionId,
+        userId,
+        isTopup: true,
+        type: TransactionType.DEPOSIT,
+      },
       select: { paymentStatus: true },
     });
     if (!tx) {
       throw new NotFoundException('TRANSACTION_NOT_FOUND');
     }
-    return { status: tx.paymentStatus || 'PAID' };
+    return { status: tx.paymentStatus || WalletConstants.PAYMENT_STATUS_PAID };
   }
 }

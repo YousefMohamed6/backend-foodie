@@ -14,7 +14,7 @@ export class PaymentController {
   constructor(
     private readonly paymentService: PaymentService,
     private readonly prisma: PrismaService,
-  ) { }
+  ) {}
 
   @Get('settings')
   @ApiOperation({ summary: 'Get payment settings' })

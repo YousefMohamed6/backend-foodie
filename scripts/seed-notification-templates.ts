@@ -1,4 +1,5 @@
 import { PrismaClient } from '@prisma/client';
+import { ORDERS_NOTIFICATIONS } from '../src/modules/orders/orders.constants';
 
 const prisma = new PrismaClient();
 
@@ -17,7 +18,7 @@ async function seedNotificationTemplates() {
     console.log('Seeding notification templates...');
 
     const templates: Record<string, NotificationTemplate> = {
-        notification_template_order_placed: {
+        [ORDERS_NOTIFICATIONS.ORDER_PLACED]: {
             en: {
                 subject: 'New Order Received',
                 message: 'You have received a new order. Please review and accept it.',
@@ -27,7 +28,7 @@ async function seedNotificationTemplates() {
                 message: 'لقد تلقيت طلبًا جديدًا. يرجى المراجعة والقبول.',
             },
         },
-        notification_template_order_accepted: {
+        [ORDERS_NOTIFICATIONS.ORDER_ACCEPTED]: {
             en: {
                 subject: 'Order Accepted',
                 message: 'Your order has been accepted and is being prepared.',
@@ -37,7 +38,7 @@ async function seedNotificationTemplates() {
                 message: 'تم قبول طلبك وجاري تحضيره.',
             },
         },
-        notification_template_order_rejected: {
+        [ORDERS_NOTIFICATIONS.ORDER_REJECTED]: {
             en: {
                 subject: 'Order Rejected',
                 message: 'Unfortunately, your order could not be accepted at this time.',
@@ -47,7 +48,7 @@ async function seedNotificationTemplates() {
                 message: 'للأسف، لا يمكن قبول طلبك في هذا الوقت.',
             },
         },
-        notification_template_order_cancelled: {
+        [ORDERS_NOTIFICATIONS.ORDER_CANCELLED]: {
             en: {
                 subject: 'Order Cancelled',
                 message: 'Your order has been cancelled.',
@@ -57,7 +58,7 @@ async function seedNotificationTemplates() {
                 message: 'تم إلغاء طلبك.',
             },
         },
-        notification_template_order_driver_pending: {
+        [ORDERS_NOTIFICATIONS.ORDER_DRIVER_PENDING]: {
             en: {
                 subject: 'Finding Driver',
                 message: 'We are finding a driver for your order.',
@@ -67,7 +68,7 @@ async function seedNotificationTemplates() {
                 message: 'نحن نبحث عن سائق لطلبك.',
             },
         },
-        notification_template_order_driver_accepted: {
+        [ORDERS_NOTIFICATIONS.ORDER_DRIVER_ACCEPTED]: {
             en: {
                 subject: 'Driver Assigned',
                 message: 'A driver has been assigned and is on the way to pick up your order.',
@@ -77,7 +78,7 @@ async function seedNotificationTemplates() {
                 message: 'تم تعيين سائق وهو في الطريق لاستلام طلبك.',
             },
         },
-        notification_template_order_shipped: {
+        [ORDERS_NOTIFICATIONS.ORDER_SHIPPED]: {
             en: {
                 subject: 'Order Picked Up',
                 message: 'Your order has been picked up and is on the way to you.',
@@ -87,7 +88,7 @@ async function seedNotificationTemplates() {
                 message: 'تم استلام طلبك وهو في الطريق إليك.',
             },
         },
-        notification_template_order_in_transit: {
+        [ORDERS_NOTIFICATIONS.ORDER_IN_TRANSIT]: {
             en: {
                 subject: 'Order In Transit',
                 message: 'Your order is currently being delivered.',
@@ -97,7 +98,7 @@ async function seedNotificationTemplates() {
                 message: 'طلبك قيد التوصيل حاليًا.',
             },
         },
-        notification_template_order_completed: {
+        [ORDERS_NOTIFICATIONS.ORDER_COMPLETED]: {
             en: {
                 subject: 'Order Delivered',
                 message: 'Your order has been delivered. Enjoy your meal!',
@@ -107,7 +108,7 @@ async function seedNotificationTemplates() {
                 message: 'تم توصيل طلبك. استمتع بوجبتك!',
             },
         },
-        notification_template_order_ready: {
+        [ORDERS_NOTIFICATIONS.ORDER_READY]: {
             en: {
                 subject: 'Order Ready!',
                 message: 'Your order from {vendorName} is ready.',
@@ -117,7 +118,7 @@ async function seedNotificationTemplates() {
                 message: 'طلبك من {vendorName} جاهز.',
             },
         },
-        notification_template_manager_order_ready: {
+        [ORDERS_NOTIFICATIONS.MANAGER_ORDER_READY]: {
             en: {
                 subject: 'Order Ready',
                 message: 'Order #{orderId} from {vendorName} is prepared and ready for delivery.',
@@ -127,7 +128,7 @@ async function seedNotificationTemplates() {
                 message: 'الطلب #{orderId} من {vendorName} تم تحضيره وجاهز للتوصيل.',
             },
         },
-        notification_template_manager_driver_accepted: {
+        [ORDERS_NOTIFICATIONS.MANAGER_DRIVER_ACCEPTED]: {
             en: {
                 subject: 'Driver Accepted Order',
                 message: 'Driver {driverName} has accepted order #{orderId} from {vendorName}.',
@@ -137,7 +138,7 @@ async function seedNotificationTemplates() {
                 message: 'السائق {driverName} قبل الطلب #{orderId} من {vendorName}.',
             },
         },
-        notification_template_manager_driver_rejected: {
+        [ORDERS_NOTIFICATIONS.MANAGER_DRIVER_REJECTED]: {
             en: {
                 subject: 'Driver Rejected Order',
                 message: 'Driver {driverName} has rejected order #{orderId} from {vendorName}. Please reassign.',

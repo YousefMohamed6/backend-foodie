@@ -15,7 +15,7 @@ import {
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('admin/notifications')
 export class NotificationsController {
-  constructor(private readonly notificationService: NotificationService) { }
+  constructor(private readonly notificationService: NotificationService) {}
 
   @Post('send-to-customers')
   @Roles(UserRole.ADMIN)

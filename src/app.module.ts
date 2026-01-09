@@ -20,7 +20,7 @@ import { BannersModule } from './modules/banners/banners.module';
 import { CashbackModule } from './modules/cashback/cashback.module';
 import { CategoriesModule } from './modules/categories/categories.module';
 import { ChatModule } from './modules/chat/chat.module';
-import { ConfigModule as CustomConfigModule } from './modules/config/config.module';
+
 import { CouponsModule } from './modules/coupons/coupons.module';
 import { CurrenciesModule } from './modules/currencies/currencies.module';
 import { DineInModule } from './modules/dine-in/dine-in.module';
@@ -45,7 +45,6 @@ import { VendorsModule } from './modules/vendors/vendors.module';
 import { WalletModule } from './modules/wallet/wallet.module';
 import { ZonesModule } from './modules/zones/zones.module';
 
-
 import { EmailTemplatesModule } from './modules/email-templates/email-templates.module';
 import { OnBoardingModule } from './modules/onboarding/onboarding.module';
 
@@ -67,8 +66,11 @@ import { PrismaModule } from './prisma/prisma.module';
 import { SharedModule } from './shared/shared.module';
 
 import * as Joi from 'joi';
-import { AcceptLanguageResolver, HeaderResolver, I18nModule } from 'nestjs-i18n';
-
+import {
+  AcceptLanguageResolver,
+  HeaderResolver,
+  I18nModule,
+} from 'nestjs-i18n';
 
 @Module({
   imports: [
@@ -115,12 +117,8 @@ import { AcceptLanguageResolver, HeaderResolver, I18nModule } from 'nestjs-i18n'
         path: join(__dirname, '..', 'i18n/'),
         watch: true,
       },
-      resolvers: [
-        new HeaderResolver(['x-lang']),
-        AcceptLanguageResolver,
-      ],
+      resolvers: [new HeaderResolver(['x-lang']), AcceptLanguageResolver],
     }),
-
 
     UsersModule,
     AuthModule,
@@ -136,7 +134,7 @@ import { AcceptLanguageResolver, HeaderResolver, I18nModule } from 'nestjs-i18n'
     // DriversModule,
     ZonesModule,
     SettingsModule,
-    CustomConfigModule,
+
     SubscriptionsModule,
     GiftCardsModule,
     ReferralsModule,
@@ -180,14 +178,17 @@ import { AcceptLanguageResolver, HeaderResolver, I18nModule } from 'nestjs-i18n'
       provide: APP_FILTER,
       useClass: GlobalExceptionFilter,
     },
-
   ],
 })
 export class AppModule {
   configure(consumer: import('@nestjs/common').MiddlewareConsumer) {
     const hpp = require('hpp');
-    const { TimeoutMiddleware } = require('./common/middleware/timeout.middleware');
-    const { XssSanitizationMiddleware } = require('./common/middleware/xss-sanitization.middleware');
+    const {
+      TimeoutMiddleware,
+    } = require('./common/middleware/timeout.middleware');
+    const {
+      XssSanitizationMiddleware,
+    } = require('./common/middleware/xss-sanitization.middleware');
 
     consumer
       .apply(hpp(), XssSanitizationMiddleware, TimeoutMiddleware)

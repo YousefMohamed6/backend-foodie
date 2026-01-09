@@ -16,6 +16,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { RedisService } from '../../shared/services/redis.service';
 import { SmsService } from '../../shared/services/sms.service';
 import { UsersService } from '../users/users.service';
+import { AUTH_ERRORS } from './auth.constants';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
@@ -40,7 +41,7 @@ export class AuthService {
     private appleAuthService: AppleAuthService,
     private smsService: SmsService,
     private redisService: RedisService,
-  ) { }
+  ) {}
 
   async register(
     registerDto: RegisterDto,
@@ -48,7 +49,7 @@ export class AuthService {
   ) {
     const existingUser = await this.usersService.findByEmail(registerDto.email);
     if (existingUser) {
-      throw new ConflictException('EMAIL_ALREADY_EXISTS');
+      throw new ConflictException(AUTH_ERRORS.EMAIL_ALREADY_EXISTS);
     }
 
     // Security: Restrict public registration to specific roles
@@ -59,7 +60,7 @@ export class AuthService {
       )
     ) {
       // Force to CUSTOMER or throw error. Throwing error is safer.
-      throw new ForbiddenException('ROLE_NOT_ALLOWED');
+      throw new ForbiddenException(AUTH_ERRORS.ROLE_NOT_ALLOWED);
     }
 
     // Password hashing is handled in UsersService.create
@@ -74,11 +75,11 @@ export class AuthService {
     });
 
     if (!user) {
-      throw new UnauthorizedException('USER_NOT_FOUND');
+      throw new UnauthorizedException(AUTH_ERRORS.USER_NOT_FOUND);
     }
 
     if (!user.isActive) {
-      throw new UnauthorizedException('USER_INACTIVE');
+      throw new UnauthorizedException(AUTH_ERRORS.USER_INACTIVE);
     }
 
     return user;
@@ -94,12 +95,12 @@ export class AuthService {
       !validUser ||
       !(await bcrypt.compare(loginDto.password, validUser.password))
     ) {
-      throw new UnauthorizedException('INVALID_CREDENTIALS');
+      throw new UnauthorizedException(AUTH_ERRORS.INVALID_CREDENTIALS);
     }
 
     // Ensure active
     if (!validUser.isActive) {
-      throw new UnauthorizedException('USER_INACTIVE');
+      throw new UnauthorizedException(AUTH_ERRORS.USER_INACTIVE);
     }
 
     return this.generateTokens(validUser, context);
@@ -135,7 +136,7 @@ export class AuthService {
       lastName = socialLoginDto.lastName;
       providerId = applePayload.sub;
     } else {
-      throw new UnauthorizedException('UNSUPPORTED_PROVIDER');
+      throw new UnauthorizedException(AUTH_ERRORS.UNSUPPORTED_PROVIDER);
     }
 
     // Step 2: Find or create user with VERIFIED email
@@ -166,7 +167,8 @@ export class AuthService {
       }
     }
 
-    if (!user) throw new UnauthorizedException('USER_CREATION_FAILED');
+    if (!user)
+      throw new UnauthorizedException(AUTH_ERRORS.USER_CREATION_FAILED);
 
     return this.generateTokens(user, context);
   }
@@ -191,7 +193,7 @@ export class AuthService {
       if (process.env.NODE_ENV !== 'production') {
         return { verificationId: otpKey, devOtp: otp };
       }
-      throw new BadRequestException('OTP_SEND_FAILED');
+      throw new BadRequestException(AUTH_ERRORS.OTP_SEND_FAILED);
     }
 
     return { verificationId: otpKey };
@@ -208,7 +210,7 @@ export class AuthService {
     const storedOtp = await this.redisService.get(otpKey);
 
     if (!storedOtp || storedOtp !== code) {
-      throw new UnauthorizedException('INVALID_OTP');
+      throw new UnauthorizedException(AUTH_ERRORS.INVALID_OTP);
     }
 
     // 2. Clear OTP after successful verification
@@ -217,7 +219,7 @@ export class AuthService {
     // 3. Find user and login
     const user = await this.usersService.findByPhone(phoneNumber);
     if (!user) {
-      throw new UnauthorizedException('PHONE_NOT_REGISTERED');
+      throw new UnauthorizedException(AUTH_ERRORS.PHONE_NOT_REGISTERED);
     }
 
     return this.generateTokens(user, context);
@@ -226,7 +228,7 @@ export class AuthService {
   async forgotPassword(forgotPasswordDto: ForgotPasswordDto) {
     const user = await this.usersService.findByEmail(forgotPasswordDto.email);
     if (!user) {
-      throw new UnauthorizedException('USER_NOT_FOUND');
+      throw new UnauthorizedException(AUTH_ERRORS.USER_NOT_FOUND);
     }
     // Generate reset token and send email
     return { message: 'Password reset link sent to email' };
@@ -236,7 +238,7 @@ export class AuthService {
     // Verify token and reset password
     const user = await this.usersService.findByEmail(resetPasswordDto.email);
     if (!user) {
-      throw new UnauthorizedException('USER_NOT_FOUND');
+      throw new UnauthorizedException(AUTH_ERRORS.USER_NOT_FOUND);
     }
 
     await this.usersService.updatePassword(user.id, resetPasswordDto.password);
@@ -256,7 +258,7 @@ export class AuthService {
     });
 
     if (!user) {
-      throw new NotFoundException('USER_NOT_FOUND');
+      throw new NotFoundException(AUTH_ERRORS.USER_NOT_FOUND);
     }
 
     return this.mapUserResponse(user);
@@ -277,7 +279,7 @@ export class AuthService {
       });
 
       const user = await this.usersService.findOne(payload.sub);
-      if (!user) throw new UnauthorizedException('USER_NOT_FOUND');
+      if (!user) throw new UnauthorizedException(AUTH_ERRORS.USER_NOT_FOUND);
 
       const tokenHash = crypto
         .createHash('sha256')
@@ -288,19 +290,20 @@ export class AuthService {
         where: { token: tokenHash },
       });
 
-      if (!storedToken) throw new ForbiddenException('INVALID_REFRESH_TOKEN');
+      if (!storedToken)
+        throw new ForbiddenException(AUTH_ERRORS.INVALID_REFRESH_TOKEN);
       if (storedToken.revoked) {
         // Reuse detection: revoke all tokens for this user
         await this.revokeAllRefreshTokens(user.id);
-        throw new ForbiddenException('REFRESH_TOKEN_REUSE_DETECTED');
+        throw new ForbiddenException(AUTH_ERRORS.REFRESH_TOKEN_REUSE_DETECTED);
       }
       if (storedToken.expiresAt < new Date()) {
-        throw new ForbiddenException('REFRESH_TOKEN_EXPIRED');
+        throw new ForbiddenException(AUTH_ERRORS.REFRESH_TOKEN_EXPIRED);
       }
 
       // Validate binding
       if (storedToken.deviceId && storedToken.deviceId !== context.deviceId) {
-        throw new ForbiddenException('DEVICE_MISMATCH');
+        throw new ForbiddenException(AUTH_ERRORS.DEVICE_MISMATCH);
       }
 
       // Rotate token
@@ -312,7 +315,7 @@ export class AuthService {
       return this.generateTokens(user, context);
     } catch (e) {
       if (e instanceof ForbiddenException) throw e;
-      throw new ForbiddenException('INVALID_REFRESH_TOKEN');
+      throw new ForbiddenException(AUTH_ERRORS.INVALID_REFRESH_TOKEN);
     }
   }
 

@@ -22,7 +22,7 @@ import { GetDiningReservationsQueryDto } from './dto/get-dining-reservations-que
 @ApiTags('Dine-In Bookings')
 @Controller('dine-in-bookings')
 export class DineInController {
-  constructor(private readonly dineInService: DineInService) { }
+  constructor(private readonly dineInService: DineInService) {}
 
   @Post()
   @ApiBearerAuth()

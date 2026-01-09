@@ -17,7 +17,7 @@ import { ReferralsService } from './referrals.service';
 @UseGuards(JwtAuthGuard)
 @Controller('referrals')
 export class ReferralsController {
-  constructor(private readonly referralsService: ReferralsService) { }
+  constructor(private readonly referralsService: ReferralsService) {}
 
   @Get('my-code')
   @ApiOperation({ summary: 'Get user referral code' })

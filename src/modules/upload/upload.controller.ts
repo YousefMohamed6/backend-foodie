@@ -4,7 +4,7 @@ import {
   Post,
   UploadedFile,
   UseGuards,
-  UseInterceptors
+  UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import {
@@ -21,7 +21,7 @@ import { UploadService } from './upload.service';
 @ApiTags('Upload')
 @Controller('upload')
 export class UploadController {
-  constructor(private readonly uploadService: UploadService) { }
+  constructor(private readonly uploadService: UploadService) {}
 
   @Post()
   @UseGuards(JwtAuthGuard)

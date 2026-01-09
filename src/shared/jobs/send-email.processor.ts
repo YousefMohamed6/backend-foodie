@@ -3,7 +3,7 @@ import { EmailService } from '../services/email.service';
 
 @Processor('email')
 export class SendEmailProcessor {
-  constructor(private readonly emailService: EmailService) { }
+  constructor(private readonly emailService: EmailService) {}
 
   @Process()
   async handleEmailJob(job: any) {

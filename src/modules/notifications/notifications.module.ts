@@ -6,4 +6,4 @@ import { NotificationsController } from './notifications.controller';
   imports: [SharedModule],
   controllers: [NotificationsController],
 })
-export class NotificationsModule { }
+export class NotificationsModule {}

@@ -48,5 +48,4 @@ import { OrdersService } from './orders.service';
     CommissionService,
   ],
 })
-export class OrdersModule { }
-
+export class OrdersModule {}

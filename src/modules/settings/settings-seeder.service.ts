@@ -1,9 +1,10 @@
 import { Injectable, OnModuleInit } from '@nestjs/common';
+import { APP_SETTINGS } from './settings.constants';
 import { SettingsService } from './settings.service';
 
 @Injectable()
 export class SettingsSeederService implements OnModuleInit {
-  constructor(private readonly settingsService: SettingsService) { }
+  constructor(private readonly settingsService: SettingsService) {}
 
   async onModuleInit() {
     await this.seed();
@@ -12,8 +13,8 @@ export class SettingsSeederService implements OnModuleInit {
   async seed() {
     const defaultSettings = {
       googleMapKey: 'YOUR_GOOGLE_MAP_KEY',
-      referral_enabled: 'true',
-      referral_amount: '10',
+      [APP_SETTINGS.REFERRAL_ENABLED]: 'true',
+      [APP_SETTINGS.REFERRAL_AMOUNT]: '10',
       RestaurantNearBy: JSON.stringify({
         radius: '10',
         distanceType: 'km',
@@ -23,7 +24,7 @@ export class SettingsSeederService implements OnModuleInit {
       }),
       globalSettings: JSON.stringify({
         isEnableAdsFeature: 'true',
-        isSelfDeliveryFeature: 'true',
+        isSelfDeliveryFeature: 'false',
         placeholderImage: 'https://via.placeholder.com/150',
       }),
       adminCommission: '15',

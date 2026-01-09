@@ -8,8 +8,11 @@ import { WalletService } from './wallet.service';
 @Module({
   imports: [forwardRef(() => SettingsModule)],
   controllers: [WalletController],
-  providers: [WalletService, WalletProtectionService, WalletProtectionScheduler],
+  providers: [
+    WalletService,
+    WalletProtectionService,
+    WalletProtectionScheduler,
+  ],
   exports: [WalletService, WalletProtectionService],
 })
-export class WalletModule { }
-
+export class WalletModule {}

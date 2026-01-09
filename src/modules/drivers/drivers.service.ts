@@ -18,7 +18,7 @@ export class DriversService {
     private prisma: PrismaService,
     @Inject(forwardRef(() => OrdersService))
     private ordersService: OrdersService,
-  ) { }
+  ) {}
 
   async create(createDriverDto: CreateDriverDto, userId: string) {
     const existingDriver = await this.prisma.driverProfile.findUnique({

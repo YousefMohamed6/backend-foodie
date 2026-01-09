@@ -687,7 +687,8 @@ model WalletTransaction {
   subscription    Subscription? @relation(fields: [subscriptionId], references: [id])
   paymentStatus   String?       @map("payment_status")
   transactionUser String        @default("customer")
-  description     String?       @map("note")
+  descriptionEn   String?       @map("description_en")
+  descriptionAr   String?       @map("description_ar")
   referenceId     String?
   metadata        Json?
 

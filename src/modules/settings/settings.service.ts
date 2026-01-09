@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { RedisService } from '../../shared/services/redis.service';
+import { APP_SETTINGS } from './settings.constants';
 import { SettingsGateway } from './settings.gateway';
 
 @Injectable()
@@ -9,7 +10,7 @@ export class SettingsService {
     private prisma: PrismaService,
     private settingsGateway: SettingsGateway,
     private redis: RedisService,
-  ) { }
+  ) {}
 
   private readonly CACHE_KEY = 'global:settings';
 
@@ -70,7 +71,10 @@ export class SettingsService {
   }
 
   async getCommissionRate(type: 'vendor' | 'driver'): Promise<number> {
-    const key = type === 'vendor' ? 'vendor_commission_rate' : 'driver_commission_rate';
+    const key =
+      type === 'vendor'
+        ? APP_SETTINGS.VENDOR_COMMISSION_RATE
+        : APP_SETTINGS.DRIVER_COMMISSION_RATE;
     try {
       const value = await this.findOne(key);
       const rate = parseFloat(value);
@@ -82,17 +86,17 @@ export class SettingsService {
 
   async getPublicSettings() {
     const publicKeys = [
-      'wallet_enabled',
-      'cash_on_delivery_enabled',
-      'app_name',
-      'app_version',
-      'about_us',
-      'terms_and_conditions',
-      'privacy_policy',
-      'story_enabled',
-      'google_play_link',
-      'app_store_link',
-      'website_url',
+      APP_SETTINGS.WALLET_ENABLED,
+      APP_SETTINGS.CASH_ON_DELIVERY_ENABLED,
+      APP_SETTINGS.APP_NAME,
+      APP_SETTINGS.APP_VERSION,
+      APP_SETTINGS.ABOUT_US,
+      APP_SETTINGS.TERMS_AND_CONDITIONS,
+      APP_SETTINGS.PRIVACY_POLICY,
+      APP_SETTINGS.STORY_ENABLED,
+      APP_SETTINGS.GOOGLE_PLAY_LINK,
+      APP_SETTINGS.APP_STORE_LINK,
+      APP_SETTINGS.WEBSITE_URL,
     ];
 
     const settings = await this.prisma.setting.findMany({

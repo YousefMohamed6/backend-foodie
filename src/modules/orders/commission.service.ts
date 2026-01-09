@@ -1,260 +1,281 @@
 import { Injectable } from '@nestjs/common';
 import { CommissionSource, Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
+import { APP_SETTINGS } from '../settings/settings.constants';
 import { SettingsService } from '../settings/settings.service';
 
 export interface CommissionCalculation {
-    rate: number;
-    value: number; // in standard currency units, but rounded correctly
-    baseAmount: number;
+  rate: number;
+  value: number; // in standard currency units, but rounded correctly
+  baseAmount: number;
 }
 
 export interface CommissionSnapshotData {
-    orderId: string;
-    vendorId?: string;
-    driverId?: string;
-    source: CommissionSource;
-    commissionRate: number;
-    commissionValue: number;
-    baseAmount: number;
+  orderId: string;
+  vendorId?: string;
+  driverId?: string;
+  source: CommissionSource;
+  commissionRate: number;
+  commissionValue: number;
+  baseAmount: number;
 }
 
 @Injectable()
 export class CommissionService {
-    constructor(
-        private prisma: PrismaService,
-        private settingsService: SettingsService,
-    ) { }
+  constructor(
+    private prisma: PrismaService,
+    private settingsService: SettingsService,
+  ) {}
 
-    private round(amount: number): number {
-        return Math.round(amount * 100) / 100;
+  private round(amount: number): number {
+    return Math.round(amount * 100) / 100;
+  }
+
+  calculateVendorCommission(
+    orderTotal: number,
+    rate: number,
+  ): CommissionCalculation {
+    const value = (orderTotal * rate) / 100;
+    return {
+      rate,
+      value: this.round(value),
+      baseAmount: orderTotal,
+    };
+  }
+
+  calculateDriverCommission(
+    distance: number,
+    ratePerKm: number,
+  ): CommissionCalculation {
+    const value = distance * ratePerKm;
+    return {
+      rate: ratePerKm,
+      value: this.round(value),
+      baseAmount: distance,
+    };
+  }
+
+  async getVendorCommissionRate(): Promise<number> {
+    return this.settingsService.getCommissionRate('vendor');
+  }
+
+  async getDriverCommissionRate(): Promise<number> {
+    return this.settingsService.getCommissionRate('driver');
+  }
+
+  async getDeliveryFeePerKm(): Promise<number> {
+    try {
+      const value = await this.settingsService.findOne(
+        APP_SETTINGS.DELIVERY_FEE_PER_KM,
+      );
+      const rate = parseFloat(value);
+      return isNaN(rate) ? 1 : rate; // Default to 1 if not set
+    } catch {
+      return 1;
+    }
+  }
+
+  async getMinDeliveryPay(): Promise<number> {
+    try {
+      const value = await this.settingsService.findOne(
+        APP_SETTINGS.MIN_DELIVERY_PAY,
+      );
+      const pay = parseFloat(value);
+      return isNaN(pay) ? 5 : pay; // Default to 5 if not set
+    } catch {
+      return 5;
+    }
+  }
+
+  async getMaxDriverDebt(): Promise<number> {
+    try {
+      const value = await this.settingsService.findOne(
+        APP_SETTINGS.MAX_DRIVER_DEBT,
+      );
+      const limit = parseFloat(value);
+      return isNaN(limit) ? 500 : limit; // Default to 500 if not set
+    } catch {
+      return 500;
+    }
+  }
+
+  async createCommissionSnapshot(
+    data: CommissionSnapshotData,
+    tx?: Prisma.TransactionClient,
+  ) {
+    const client = tx || this.prisma;
+    return client.orderCommissionSnapshot.create({
+      data: {
+        orderId: data.orderId,
+        vendorId: data.vendorId,
+        driverId: data.driverId,
+        source: data.source,
+        commissionRate: data.commissionRate,
+        commissionValue: data.commissionValue,
+        baseAmount: data.baseAmount,
+      },
+    });
+  }
+
+  async isVendorOnFreePlan(vendorId: string): Promise<boolean> {
+    const vendor = await this.prisma.vendor.findUnique({
+      where: { id: vendorId },
+      include: {
+        subscriptionPlan: true,
+        subscription: {
+          include: {
+            plan: true,
+          },
+        },
+      },
+    });
+
+    if (!vendor) return false;
+
+    const plan = vendor.subscription?.plan || vendor.subscriptionPlan;
+    if (!plan) return true;
+
+    return Number(plan.price) === 0;
+  }
+
+  async getOrderCommissionSnapshots(orderId: string) {
+    return this.prisma.orderCommissionSnapshot.findMany({
+      where: { orderId },
+      orderBy: { createdAt: 'asc' },
+    });
+  }
+
+  async getPlatformCommissionTotal(startDate?: Date, endDate?: Date) {
+    const dateFilter: Prisma.OrderWhereInput = {};
+    if (startDate && endDate) {
+      dateFilter.createdAt = {
+        gte: startDate,
+        lte: endDate,
+      };
     }
 
-    calculateVendorCommission(orderTotal: number, rate: number): CommissionCalculation {
-        const value = (orderTotal * rate) / 100;
-        return {
-            rate,
-            value: this.round(value),
-            baseAmount: orderTotal,
-        };
+    const result = await this.prisma.order.aggregate({
+      where: {
+        ...dateFilter,
+        vendorCommissionApplied: true,
+        driverCommissionApplied: true,
+      },
+      _sum: {
+        platformTotalCommission: true,
+        vendorCommissionValue: true,
+        driverCommissionValue: true,
+      },
+    });
+
+    return {
+      platformTotalCommission: Number(result._sum.platformTotalCommission) || 0,
+      vendorCommissionTotal: Number(result._sum.vendorCommissionValue) || 0,
+      driverCommissionTotal: Number(result._sum.driverCommissionValue) || 0,
+    };
+  }
+
+  async getVendorNetReceivables(
+    vendorId: string,
+    startDate?: Date,
+    endDate?: Date,
+  ) {
+    const dateFilter: Prisma.OrderWhereInput = {};
+    if (startDate && endDate) {
+      dateFilter.createdAt = {
+        gte: startDate,
+        lte: endDate,
+      };
     }
 
-    calculateDriverCommission(distance: number, ratePerKm: number): CommissionCalculation {
-        const value = distance * ratePerKm;
-        return {
-            rate: ratePerKm,
-            value: this.round(value),
-            baseAmount: distance,
-        };
+    const result = await this.prisma.order.aggregate({
+      where: {
+        vendorId,
+        vendorCommissionApplied: true,
+        ...dateFilter,
+      },
+      _sum: {
+        vendorNet: true,
+        orderTotal: true,
+        vendorCommissionValue: true,
+      },
+      _count: true,
+    });
+
+    return {
+      totalOrders: result._count,
+      totalOrderValue: Number(result._sum.orderTotal) || 0,
+      totalCommissionPaid: Number(result._sum.vendorCommissionValue) || 0,
+      netReceivables: Number(result._sum.vendorNet) || 0,
+    };
+  }
+
+  async getDriverEarnings(driverId: string, startDate?: Date, endDate?: Date) {
+    const dateFilter: Prisma.OrderWhereInput = {};
+    if (startDate && endDate) {
+      dateFilter.createdAt = {
+        gte: startDate,
+        lte: endDate,
+      };
     }
 
-    async getVendorCommissionRate(): Promise<number> {
-        return this.settingsService.getCommissionRate('vendor');
+    const result = await this.prisma.order.aggregate({
+      where: {
+        driverId,
+        driverCommissionApplied: true,
+        ...dateFilter,
+      },
+      _sum: {
+        driverNet: true,
+        deliveryCharge: true,
+        driverCommissionValue: true,
+      },
+      _count: true,
+    });
+
+    return {
+      totalDeliveries: result._count,
+      totalDeliveryFees: Number(result._sum.deliveryCharge) || 0,
+      totalCommissionPaid: Number(result._sum.driverCommissionValue) || 0,
+      netEarnings: Number(result._sum.driverNet) || 0,
+    };
+  }
+
+  async getMonthlyCommissionReport(year: number, month: number) {
+    const startDate = new Date(year, month - 1, 1);
+    const endDate = new Date(year, month, 0, 23, 59, 59, 999);
+
+    return this.getPlatformCommissionTotal(startDate, endDate);
+  }
+
+  async getCommissionSnapshotsBySource(
+    source: CommissionSource,
+    startDate?: Date,
+    endDate?: Date,
+  ) {
+    const dateFilter: Prisma.OrderCommissionSnapshotWhereInput = {};
+    if (startDate && endDate) {
+      dateFilter.createdAt = {
+        gte: startDate,
+        lte: endDate,
+      };
     }
 
-    async getDriverCommissionRate(): Promise<number> {
-        return this.settingsService.getCommissionRate('driver');
-    }
+    const result = await this.prisma.orderCommissionSnapshot.aggregate({
+      where: {
+        source,
+        ...dateFilter,
+      },
+      _sum: {
+        commissionValue: true,
+        baseAmount: true,
+      },
+      _count: true,
+    });
 
-    async getDeliveryFeePerKm(): Promise<number> {
-        try {
-            const value = await this.settingsService.findOne('delivery_fee_per_km');
-            const rate = parseFloat(value);
-            return isNaN(rate) ? 1 : rate; // Default to 1 if not set
-        } catch {
-            return 1;
-        }
-    }
-
-    async getMinDeliveryPay(): Promise<number> {
-        try {
-            const value = await this.settingsService.findOne('min_delivery_pay');
-            const pay = parseFloat(value);
-            return isNaN(pay) ? 5 : pay; // Default to 5 if not set
-        } catch {
-            return 5;
-        }
-    }
-
-    async getMaxDriverDebt(): Promise<number> {
-        try {
-            const value = await this.settingsService.findOne('max_driver_debt');
-            const limit = parseFloat(value);
-            return isNaN(limit) ? 500 : limit; // Default to 500 if not set
-        } catch {
-            return 500;
-        }
-    }
-
-    async createCommissionSnapshot(
-        data: CommissionSnapshotData,
-        tx?: Prisma.TransactionClient,
-    ) {
-        const client = tx || this.prisma;
-        return client.orderCommissionSnapshot.create({
-            data: {
-                orderId: data.orderId,
-                vendorId: data.vendorId,
-                driverId: data.driverId,
-                source: data.source,
-                commissionRate: data.commissionRate,
-                commissionValue: data.commissionValue,
-                baseAmount: data.baseAmount,
-            },
-        });
-    }
-
-    async isVendorOnFreePlan(vendorId: string): Promise<boolean> {
-        const vendor = await this.prisma.vendor.findUnique({
-            where: { id: vendorId },
-            include: {
-                subscriptionPlan: true,
-                subscription: {
-                    include: {
-                        plan: true,
-                    },
-                },
-            },
-        });
-
-        if (!vendor) return false;
-
-        const plan = vendor.subscription?.plan || vendor.subscriptionPlan;
-        if (!plan) return true;
-
-        return Number(plan.price) === 0;
-    }
-
-    async getOrderCommissionSnapshots(orderId: string) {
-        return this.prisma.orderCommissionSnapshot.findMany({
-            where: { orderId },
-            orderBy: { createdAt: 'asc' },
-        });
-    }
-
-    async getPlatformCommissionTotal(startDate?: Date, endDate?: Date) {
-        const dateFilter: Prisma.OrderWhereInput = {};
-        if (startDate && endDate) {
-            dateFilter.createdAt = {
-                gte: startDate,
-                lte: endDate,
-            };
-        }
-
-        const result = await this.prisma.order.aggregate({
-            where: {
-                ...dateFilter,
-                vendorCommissionApplied: true,
-                driverCommissionApplied: true,
-            },
-            _sum: {
-                platformTotalCommission: true,
-                vendorCommissionValue: true,
-                driverCommissionValue: true,
-            },
-        });
-
-        return {
-            platformTotalCommission: Number(result._sum.platformTotalCommission) || 0,
-            vendorCommissionTotal: Number(result._sum.vendorCommissionValue) || 0,
-            driverCommissionTotal: Number(result._sum.driverCommissionValue) || 0,
-        };
-    }
-
-    async getVendorNetReceivables(vendorId: string, startDate?: Date, endDate?: Date) {
-        const dateFilter: Prisma.OrderWhereInput = {};
-        if (startDate && endDate) {
-            dateFilter.createdAt = {
-                gte: startDate,
-                lte: endDate,
-            };
-        }
-
-        const result = await this.prisma.order.aggregate({
-            where: {
-                vendorId,
-                vendorCommissionApplied: true,
-                ...dateFilter,
-            },
-            _sum: {
-                vendorNet: true,
-                orderTotal: true,
-                vendorCommissionValue: true,
-            },
-            _count: true,
-        });
-
-        return {
-            totalOrders: result._count,
-            totalOrderValue: Number(result._sum.orderTotal) || 0,
-            totalCommissionPaid: Number(result._sum.vendorCommissionValue) || 0,
-            netReceivables: Number(result._sum.vendorNet) || 0,
-        };
-    }
-
-    async getDriverEarnings(driverId: string, startDate?: Date, endDate?: Date) {
-        const dateFilter: Prisma.OrderWhereInput = {};
-        if (startDate && endDate) {
-            dateFilter.createdAt = {
-                gte: startDate,
-                lte: endDate,
-            };
-        }
-
-        const result = await this.prisma.order.aggregate({
-            where: {
-                driverId,
-                driverCommissionApplied: true,
-                ...dateFilter,
-            },
-            _sum: {
-                driverNet: true,
-                deliveryCharge: true,
-                driverCommissionValue: true,
-            },
-            _count: true,
-        });
-
-        return {
-            totalDeliveries: result._count,
-            totalDeliveryFees: Number(result._sum.deliveryCharge) || 0,
-            totalCommissionPaid: Number(result._sum.driverCommissionValue) || 0,
-            netEarnings: Number(result._sum.driverNet) || 0,
-        };
-    }
-
-    async getMonthlyCommissionReport(year: number, month: number) {
-        const startDate = new Date(year, month - 1, 1);
-        const endDate = new Date(year, month, 0, 23, 59, 59, 999);
-
-        return this.getPlatformCommissionTotal(startDate, endDate);
-    }
-
-    async getCommissionSnapshotsBySource(source: CommissionSource, startDate?: Date, endDate?: Date) {
-        const dateFilter: Prisma.OrderCommissionSnapshotWhereInput = {};
-        if (startDate && endDate) {
-            dateFilter.createdAt = {
-                gte: startDate,
-                lte: endDate,
-            };
-        }
-
-        const result = await this.prisma.orderCommissionSnapshot.aggregate({
-            where: {
-                source,
-                ...dateFilter,
-            },
-            _sum: {
-                commissionValue: true,
-                baseAmount: true,
-            },
-            _count: true,
-        });
-
-        return {
-            totalSnapshots: result._count,
-            totalBaseAmount: Number(result._sum.baseAmount) || 0,
-            totalCommissionValue: Number(result._sum.commissionValue) || 0,
-        };
-    }
+    return {
+      totalSnapshots: result._count,
+      totalBaseAmount: Number(result._sum.baseAmount) || 0,
+      totalCommissionValue: Number(result._sum.commissionValue) || 0,
+    };
+  }
 }
