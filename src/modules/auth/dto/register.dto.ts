@@ -1,5 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { DevicePlatform, UserRole } from '@prisma/client';
+import { Transform } from 'class-transformer';
 import {
   IsEmail,
   IsEnum,
@@ -8,6 +9,7 @@ import {
   IsString,
   MinLength,
 } from 'class-validator';
+import { normalizePhoneNumber } from '../../../common/utils/phone.utils';
 
 export class RegisterDto {
   @ApiProperty()
@@ -38,6 +40,7 @@ export class RegisterDto {
   @ApiPropertyOptional()
   @IsString()
   @IsOptional()
+  @Transform(({ value }) => normalizePhoneNumber(value))
   phoneNumber?: string;
 
   @ApiPropertyOptional()
@@ -79,4 +82,9 @@ export class RegisterDto {
   @IsString()
   @IsOptional()
   referralCode?: string;
+
+  @ApiPropertyOptional()
+  @IsString()
+  @IsOptional()
+  zoneId?: string;
 }

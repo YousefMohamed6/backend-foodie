@@ -84,7 +84,7 @@ export class OrdersService {
     private commissionService: CommissionService,
     private analyticsTrackingService: AnalyticsTrackingService,
     private i18n: I18nService,
-  ) {}
+  ) { }
 
   async create(createOrderDto: CreateOrderDto, user: User) {
     const { productMap, subtotal } =
@@ -716,6 +716,14 @@ export class OrdersService {
           status: OrderStatus.COMPLETED,
         },
         include: orderInclude,
+      });
+
+      // Update Vendor metrics
+      await tx.vendor.update({
+        where: { id: order.vendorId },
+        data: {
+          subscriptionTotalOrders: { increment: 1 },
+        },
       });
 
       // --- WALLET UPDATES FOR CASH ON DELIVERY ---
@@ -1658,21 +1666,21 @@ export class OrdersService {
       status: order.status,
       heldBalance: order.heldBalance
         ? {
-            status: order.heldBalance.status,
-            totalAmount: Number(order.heldBalance.totalAmount),
-            autoReleaseDate: order.heldBalance.autoReleaseDate,
-            releasedAt: order.heldBalance.releasedAt,
-            releaseType: order.heldBalance.releaseType,
-          }
+          status: order.heldBalance.status,
+          totalAmount: Number(order.heldBalance.totalAmount),
+          autoReleaseDate: order.heldBalance.autoReleaseDate,
+          releasedAt: order.heldBalance.releasedAt,
+          releaseType: order.heldBalance.releaseType,
+        }
         : null,
       dispute: order.disputes[0]
         ? {
-            id: order.disputes[0].id,
-            status: order.disputes[0].status,
-            reason: order.disputes[0].reason,
-            createdAt: order.disputes[0].createdAt,
-            resolvedAt: order.disputes[0].resolvedAt,
-          }
+          id: order.disputes[0].id,
+          status: order.disputes[0].status,
+          reason: order.disputes[0].reason,
+          createdAt: order.disputes[0].createdAt,
+          resolvedAt: order.disputes[0].resolvedAt,
+        }
         : null,
       canConfirmDelivery: order.heldBalance?.status === HeldBalanceStatus.HELD,
       canDispute:

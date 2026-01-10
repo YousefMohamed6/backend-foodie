@@ -196,7 +196,54 @@ When customer reports non-receipt:
 | Vendor Timeout Auto-Cancel | ✅ Implemented |
 | OTP Verification | ⏳ Future Enhancement |
 | Photo Proof Validation | ⏳ Future Enhancement |
+| Vendor Working Hours | ✅ Implemented |
+| Address-Zone Sync | ✅ Implemented |
+| Zone-Filtered Products| ✅ Implemented |
 
 ---
 
-**Last Updated**: 2026-01-09
+## 8. Vendor Working Hours
+
+### 8.1 Core Principle
+Vendors have configurable working hours for each day of the week. The application dynamically determines if a vendor is "Open" or "Closed" based on these hours.
+
+### 8.2 Initialization
+- **Default**: New vendors are initialized with 24/7 working hours (00:00 to 23:59) for all 7 days of the week.
+- **Table**: `WeekDay` stores the 7 days (0=Sunday, 6=Saturday) with localized names (Arabic/English).
+
+### 8.3 Working Hours Logic
+- **Multiple Timeslots**: A vendor can have multiple active timeslots within the same day (e.g., 08:00-14:00 and 18:00-23:00).
+- **IsOpen Calculation**:
+  - Checks the current day of the week.
+  - Checks all active timeslots for that day.
+  - `isOpen = true` if current time falls within ANY active timeslots.
+- **Closing a Day**: A day is considered closed if it has no active timeslots or if `isActive` is false for all slots.
+
+### 8.4 Management
+- **Vendor Role**: Can edit their own working hours. Denied access to other vendors' hours.
+- **Admin Role**: Full access to view and edit any vendor's working hours.
+- **Replacement Logic**: Updating a day's schedule replaces all existing timeslots for that day to ensure consistency.
+
+### 8.5 Order Placement Restriction
+- **Constraint**: Orders cannot be placed if the vendor is currently "Closed".
+- **Validation**: The system checks working hours during the order pricing and creation phase.
+- **Error Handling**: Throws a `VENDOR_CLOSED` error with localized messages (English: "The vendor is currently closed", Arabic: "المتجر مغلق حالياً").
+
+---
+
+## 9. Geospatial Logic & Zone-Based Filtering
+
+### 9.1 Address-Zone Synchronization
+- **Trigger**: When a customer user creates a new address or updates an existing address and sets it as `isDefault`.
+- **Action**: The system automatically identifies the specific delivery `Zone` that contains the address's coordinates (latitude/longitude).
+- **Update**: If a matching zone is found, the user's profile is updated with the corresponding `zoneId`.
+- **Matching Algorithm**: Uses points-in-polygon logic against the coordinates stored in each zone's `area` field.
+
+### 9.2 Zone-Filtered Product Discovery
+- **Requirement**: Customers can browse products within a specific category filtered specifically for their current delivery zone.
+- **Filtering Rule**: Only products from vendors located within the user's active zone (matching their default address) are displayed.
+- **Endpoint**: `GET /products/category/:categoryId/zone-filtered`.
+
+---
+
+**Last Updated**: 2026-01-10

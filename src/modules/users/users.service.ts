@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { DriverStatus, TransactionType, UserRole } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
+import { normalizePhoneNumber } from '../../common/utils/phone.utils';
 import { PrismaService } from '../../prisma/prisma.service';
 import { RedisService } from '../../shared/services/redis.service';
 import { APP_SETTINGS } from '../settings/settings.constants';
@@ -18,7 +19,7 @@ export class UsersService {
     private redisService: RedisService,
     private walletService: WalletService,
     private settingsService: SettingsService,
-  ) {}
+  ) { }
 
   async create(createUserDto: CreateUserDto) {
     const {
@@ -26,6 +27,11 @@ export class UsersService {
       deviceId,
       ...userData
     } = createUserDto as any;
+
+    // Normalize phone number
+    if (userData.phoneNumber) {
+      userData.phoneNumber = normalizePhoneNumber(userData.phoneNumber);
+    }
 
     // Check if phone number already exists
     if (userData.phoneNumber) {
@@ -35,6 +41,13 @@ export class UsersService {
       if (existingUser) {
         throw new BadRequestException('PHONE_NUMBER_ALREADY_EXISTS');
       }
+    }
+
+    // Ensure zoneId is required for certain roles
+    const mandatoryRoles: UserRole[] = [UserRole.DRIVER, UserRole.VENDOR, UserRole.MANAGER];
+    const role = userData.role || UserRole.CUSTOMER;
+    if (mandatoryRoles.includes(role) && !userData.zoneId) {
+      throw new BadRequestException('ZONE_ID_REQUIRED_FOR_THIS_ROLE');
     }
 
     const hashedPassword = await bcrypt.hash(userData.password, 10);
@@ -175,6 +188,26 @@ export class UsersService {
     if (updateUserDto.password) {
       updateUserDto.password = await bcrypt.hash(updateUserDto.password, 10);
     }
+    if (updateUserDto.phoneNumber) {
+      updateUserDto.phoneNumber = normalizePhoneNumber(updateUserDto.phoneNumber);
+    }
+
+    // Ensure zoneId is not removed for mandatory roles
+    const userToUpdate = await this.prisma.user.findUnique({ where: { id } });
+    if (!userToUpdate) {
+      throw new BadRequestException('USER_NOT_FOUND');
+    }
+
+    const mandatoryRoles: UserRole[] = [UserRole.DRIVER, UserRole.VENDOR, UserRole.MANAGER];
+    if (mandatoryRoles.includes(userToUpdate.role)) {
+      if (
+        updateUserDto.zoneId === null ||
+        (updateUserDto.hasOwnProperty('zoneId') && !updateUserDto.zoneId)
+      ) {
+        throw new BadRequestException('ZONE_ID_REQUIRED_FOR_THIS_ROLE');
+      }
+    }
+
     const user = await this.prisma.user.update({
       where: { id },
       data: updateUserDto,
@@ -213,7 +246,8 @@ export class UsersService {
   }
 
   findByPhone(phoneNumber: string) {
-    return this.prisma.user.findFirst({ where: { phoneNumber } });
+    const normalized = normalizePhoneNumber(phoneNumber);
+    return this.prisma.user.findFirst({ where: { phoneNumber: normalized } });
   }
 
   async updatePassword(id: string, password: string) {
@@ -243,9 +277,12 @@ export class UsersService {
   }
 
   async remove(id: string) {
-    // Invalidate cached user data before deletion
+    // Invalidate cached user data before update
     await this.redisService.del(`user:${id}`);
 
-    return this.prisma.user.delete({ where: { id } });
+    return this.prisma.user.update({
+      where: { id },
+      data: { isActive: false },
+    });
   }
 }

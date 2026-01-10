@@ -9,7 +9,8 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
-import { UserRole } from '@prisma/client';
+import * as Prisma from '@prisma/client';
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
@@ -20,12 +21,12 @@ import { UpdateAdvertisementDto } from './dto/update-advertisement.dto';
 @ApiTags('Advertisements')
 @Controller('advertisements')
 export class AdvertisementsController {
-  constructor(private readonly adsService: AdvertisementsService) {}
+  constructor(private readonly adsService: AdvertisementsService) { }
 
   @Get()
   @ApiOperation({ summary: 'Get all active advertisements' })
-  findAll() {
-    return this.adsService.findAll();
+  findAll(@CurrentUser() user?: Prisma.User) {
+    return this.adsService.findAll(user);
   }
 
   @Get(':id')
@@ -37,7 +38,7 @@ export class AdvertisementsController {
   @Post()
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.ADMIN, UserRole.VENDOR)
+  @Roles(Prisma.UserRole.ADMIN, Prisma.UserRole.VENDOR)
   @ApiOperation({ summary: 'Create advertisement' })
   create(@Body() createAdvertisementDto: CreateAdvertisementDto) {
     return this.adsService.create(createAdvertisementDto);
@@ -46,7 +47,7 @@ export class AdvertisementsController {
   @Patch(':id')
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.ADMIN, UserRole.VENDOR)
+  @Roles(Prisma.UserRole.ADMIN, Prisma.UserRole.VENDOR)
   @ApiOperation({ summary: 'Update advertisement' })
   update(
     @Param('id') id: string,
@@ -58,7 +59,7 @@ export class AdvertisementsController {
   @Patch(':id/toggle')
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.ADMIN)
+  @Roles(Prisma.UserRole.ADMIN)
   @ApiOperation({ summary: 'Toggle advertisement status' })
   toggle(@Param('id') id: string) {
     return this.adsService.toggle(id);
@@ -67,7 +68,7 @@ export class AdvertisementsController {
   @Delete(':id')
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.ADMIN)
+  @Roles(Prisma.UserRole.ADMIN)
   @ApiOperation({ summary: 'Delete advertisement' })
   remove(@Param('id') id: string) {
     return this.adsService.remove(id);

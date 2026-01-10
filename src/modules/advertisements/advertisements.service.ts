@@ -1,14 +1,27 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
+import { User } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateAdvertisementDto } from './dto/create-advertisement.dto';
 import { UpdateAdvertisementDto } from './dto/update-advertisement.dto';
 
 @Injectable()
 export class AdvertisementsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(private prisma: PrismaService) { }
 
-  async findAll() {
-    return this.prisma.advertisement.findMany({ where: { isActive: true } });
+  async findAll(user?: User) {
+    const where: any = { isActive: true };
+
+    if (user?.role === 'CUSTOMER' && user.zoneId) {
+      where.OR = [
+        { vendorId: null },
+        { vendor: { zoneId: user.zoneId } }
+      ];
+    }
+
+    return this.prisma.advertisement.findMany({
+      where,
+      include: { vendor: true },
+    });
   }
 
   async findOne(id: string) {
@@ -41,6 +54,9 @@ export class AdvertisementsService {
 
   async remove(id: string) {
     await this.findOne(id);
-    return this.prisma.advertisement.delete({ where: { id } });
+    return this.prisma.advertisement.update({
+      where: { id },
+      data: { isActive: false },
+    });
   }
 }

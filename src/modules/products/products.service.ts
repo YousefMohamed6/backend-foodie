@@ -6,7 +6,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { Prisma, User } from '@prisma/client';
+import { Prisma, User, UserRole } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { VendorsService } from '../vendors/vendors.service';
 import { CreateProductDto } from './dto/create-product.dto';
@@ -22,7 +22,7 @@ export class ProductsService {
     private prisma: PrismaService,
     @Inject(forwardRef(() => VendorsService))
     private vendorsService: VendorsService,
-  ) {}
+  ) { }
 
   async create(createProductDto: CreateProductDto, user: User) {
     const vendor = await this.vendorsService.findByAuthor(user.id);
@@ -53,23 +53,38 @@ export class ProductsService {
     return this.mapProductResponse(product);
   }
 
-  async findAll(query: {
-    vendorId?: string;
-    categoryId?: string;
-    publish?: string | boolean;
-    foodType?: string;
-    page?: number | string;
-    limit?: number | string;
-  }) {
+  async findAll(
+    query: {
+      vendorId?: string;
+      categoryId?: string;
+      publish?: string | boolean;
+      foodType?: string;
+      page?: number | string;
+      limit?: number | string;
+    },
+    user?: User,
+  ) {
     const page = Number(query.page) || 1;
     const limit = Math.min(Number(query.limit) || 20, 100); // Max 100 per page
     const skip = (page - 1) * limit;
 
-    const where: Prisma.ProductWhereInput = {};
+    const where: Prisma.ProductWhereInput = {
+      isActive:
+        query.publish !== undefined
+          ? query.publish === 'true' || query.publish === true
+          : true,
+      vendor: { isActive: true },
+    };
     if (query.vendorId) where.vendorId = query.vendorId;
     if (query.categoryId) where.categoryId = query.categoryId;
-    if (query.publish !== undefined)
-      where.isActive = query.publish === 'true' || query.publish === true;
+
+    if (user?.role === UserRole.CUSTOMER && user.zoneId) {
+      where.vendor = {
+        isActive: true,
+        zoneId: user.zoneId,
+      };
+    }
+
 
     // Filter by food type (TakeAway or DineIn)
     if (query.foodType) {
@@ -88,6 +103,30 @@ export class ProductsService {
     return products.map((p) => this.mapProductResponse(p));
   }
 
+  async findByCategoryAndZone(categoryId: string, user: User) {
+    if (!user.zoneId) {
+      return [];
+    }
+
+    const products = await this.prisma.product.findMany({
+      where: {
+        categoryId,
+        isActive: true,
+        vendor: {
+          zoneId: user.zoneId,
+          isActive: true,
+        },
+      },
+      include: {
+        extras: true,
+        itemAttributes: true,
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    return products.map((p) => this.mapProductResponse(p));
+  }
+
   async count(query: { vendorId?: string }) {
     const where: Prisma.ProductWhereInput = {};
     if (query.vendorId) where.vendorId = query.vendorId;
@@ -99,7 +138,7 @@ export class ProductsService {
       where: { id },
       include: { vendor: true, extras: true, itemAttributes: true },
     });
-    if (!product) {
+    if (!product || !product.vendor?.isActive) {
       throw new NotFoundException('PRODUCT_NOT_FOUND');
     }
     return this.mapProductResponse(product);
@@ -146,16 +185,16 @@ export class ProductsService {
         ...updateData,
         extras: extras
           ? {
-              deleteMany: {},
-              create: extras,
-            }
+            deleteMany: {},
+            create: extras,
+          }
           : undefined,
         itemAttributes:
           itemAttributes !== undefined
             ? {
-                deleteMany: {},
-                create: attributeData || [],
-              }
+              deleteMany: {},
+              create: attributeData || [],
+            }
             : undefined,
       },
       include: { extras: true, itemAttributes: true },
@@ -175,21 +214,40 @@ export class ProductsService {
       throw new ForbiddenException('FORBIDDEN');
     }
 
-    return this.prisma.product.delete({ where: { id } });
+    return this.prisma.product.update({
+      where: { id },
+      data: { isActive: false },
+    });
   }
 
-  async search(query: string, page?: string | number, limit?: string | number) {
+  async search(
+    query: string,
+    page?: string | number,
+    limit?: string | number,
+    user?: User,
+  ) {
     const p = Number(page) || 1;
     const l = Math.min(Number(limit) || 20, 100);
     const skip = (p - 1) * l;
 
-    const products = await this.prisma.product.findMany({
-      where: {
-        name: {
-          contains: query,
-          mode: 'insensitive',
-        },
+    const where: Prisma.ProductWhereInput = {
+      isActive: true,
+      name: {
+        contains: query,
+        mode: 'insensitive',
       },
+      vendor: { isActive: true },
+    };
+
+    if (user?.role === UserRole.CUSTOMER && user.zoneId) {
+      where.vendor = {
+        isActive: true,
+        zoneId: user.zoneId,
+      };
+    }
+
+    const products = await this.prisma.product.findMany({
+      where,
       include: { extras: true, itemAttributes: true },
       skip,
       take: l,

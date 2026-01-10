@@ -5,7 +5,7 @@ import { CreateBannerDto } from './dto/create-banner.dto';
 
 @Injectable()
 export class BannersService {
-  constructor(private prisma: PrismaService) {}
+  constructor(private prisma: PrismaService) { }
 
   async findAll(position?: string) {
     const where: Prisma.BannerWhereInput = { isActive: true };
@@ -27,6 +27,9 @@ export class BannersService {
 
   async remove(id: string) {
     await this.findOne(id);
-    return this.prisma.banner.delete({ where: { id } });
+    return this.prisma.banner.update({
+      where: { id },
+      data: { isActive: false },
+    });
   }
 }

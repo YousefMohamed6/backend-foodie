@@ -17,7 +17,7 @@ export class AnalyticsQueryService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly redis: RedisService,
-  ) {}
+  ) { }
 
   /**
    * Get vendor performance metrics
@@ -77,24 +77,24 @@ export class AnalyticsQueryService {
       },
       performance: snapshot
         ? {
-            acceptanceRating: getPerformanceRating(
-              Number(snapshot.acceptanceRate || 0),
-              {
-                excellent:
-                  AnalyticsConfig.PERFORMANCE_THRESHOLDS
-                    .VENDOR_ACCEPTANCE_RATE_EXCELLENT,
-                good: AnalyticsConfig.PERFORMANCE_THRESHOLDS
-                  .VENDOR_ACCEPTANCE_RATE_GOOD,
-              },
-              true,
-            ),
-            revenueRating:
-              Number(snapshot.totalRevenue) > 10000
-                ? 'EXCELLENT'
-                : Number(snapshot.totalRevenue) > 5000
-                  ? 'GOOD'
-                  : 'AVERAGE',
-          }
+          acceptanceRating: getPerformanceRating(
+            Number(snapshot.acceptanceRate || 0),
+            {
+              excellent:
+                AnalyticsConfig.PERFORMANCE_THRESHOLDS
+                  .VENDOR_ACCEPTANCE_RATE_EXCELLENT,
+              good: AnalyticsConfig.PERFORMANCE_THRESHOLDS
+                .VENDOR_ACCEPTANCE_RATE_GOOD,
+            },
+            true,
+          ),
+          revenueRating:
+            Number(snapshot.totalRevenue) > 10000
+              ? 'EXCELLENT'
+              : Number(snapshot.totalRevenue) > 5000
+                ? 'GOOD'
+                : 'AVERAGE',
+        }
         : null,
     };
 
@@ -155,19 +155,19 @@ export class AnalyticsQueryService {
       },
       performance: snapshot
         ? {
-            deliveryTimeRating: getPerformanceRating(
-              snapshot.averageDeliveryTime || 0,
-              {
-                excellent:
-                  AnalyticsConfig.PERFORMANCE_THRESHOLDS
-                    .DRIVER_DELIVERY_TIME_EXCELLENT,
-                good: AnalyticsConfig.PERFORMANCE_THRESHOLDS
-                  .DRIVER_DELIVERY_TIME_GOOD,
-              },
-              false, // lower is better
-            ),
-            ratingScore: Number(snapshot.averageRating || 0),
-          }
+          deliveryTimeRating: getPerformanceRating(
+            snapshot.averageDeliveryTime || 0,
+            {
+              excellent:
+                AnalyticsConfig.PERFORMANCE_THRESHOLDS
+                  .DRIVER_DELIVERY_TIME_EXCELLENT,
+              good: AnalyticsConfig.PERFORMANCE_THRESHOLDS
+                .DRIVER_DELIVERY_TIME_GOOD,
+            },
+            false, // lower is better
+          ),
+          ratingScore: Number(snapshot.averageRating || 0),
+        }
         : null,
     };
 
@@ -584,7 +584,7 @@ export class AnalyticsQueryService {
         zone: {
           select: {
             id: true,
-            name: true,
+            englishName: true,
           },
         },
       },
@@ -596,7 +596,7 @@ export class AnalyticsQueryService {
 
     const result = {
       zoneId,
-      zoneName: latestMetrics.zone.name,
+      zoneName: (latestMetrics as any).zone.englishName,
       totalOrders: latestMetrics.totalOrders,
       completedOrders: latestMetrics.completedOrders,
       totalRevenue: Number(latestMetrics.totalRevenue),

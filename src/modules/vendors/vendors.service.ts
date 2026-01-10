@@ -1,24 +1,23 @@
 import {
+  ForbiddenException,
   forwardRef,
   Inject,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
 import { Prisma, User, UserRole } from '@prisma/client';
+import { VendorStatusMessages } from '../../common/constants/vendor.constants';
+import { normalizePhoneNumber } from '../../common/utils/phone.utils';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CouponsService } from '../coupons/coupons.service';
 import { OrdersService } from '../orders/orders.service';
 import { ProductsService } from '../products/products.service';
 import { ReviewsService } from '../reviews/reviews.service';
+import { WalletService } from '../wallet/wallet.service';
 import { CreateVendorDto } from './dto/create-vendor.dto';
+import { UpdateVendorScheduleDto } from './dto/update-vendor-schedule.dto';
 import { UpdateVendorDto } from './dto/update-vendor.dto';
-
-type VendorWithRelations = Prisma.VendorGetPayload<{
-  include: {
-    photos: true;
-    restaurantMenuPhotos: true;
-  };
-}>;
+import { VendorDefaults, VendorScheduleDefaults } from './vendor.constants';
 
 @Injectable()
 export class VendorsService {
@@ -32,92 +31,191 @@ export class VendorsService {
     private ordersService: OrdersService,
     @Inject(forwardRef(() => CouponsService))
     private couponsService: CouponsService,
-  ) {}
+    private walletService: WalletService,
+  ) { }
 
   async create(createVendorDto: CreateVendorDto, user: User) {
     const { photos, restaurantMenuPhotos, ...rest } = createVendorDto;
 
-    const vendor = await this.prisma.vendor.create({
-      data: {
-        ...rest,
-        authorId: user.id,
-        photos: photos ? { create: photos.map((url) => ({ url })) } : undefined,
-        restaurantMenuPhotos: restaurantMenuPhotos
-          ? { create: restaurantMenuPhotos.map((url) => ({ url })) }
-          : undefined,
-      },
-      include: {
-        photos: true,
-        restaurantMenuPhotos: true,
-      },
+    const {
+      subscriptionPlanId,
+      subscriptionExpiryDate,
+      subscriptionTotalOrders,
+      walletAmount,
+      reviewsSum,
+      reviewsCount,
+      isActive,
+      isDineInActive,
+      restaurantCost,
+      subscriptionId,
+      ...cleanRest
+    } = rest as any;
+
+    if (cleanRest.phoneNumber) {
+      cleanRest.phoneNumber = normalizePhoneNumber(cleanRest.phoneNumber);
+    }
+
+    const vendor = await this.prisma.$transaction(async (tx) => {
+      // Find Free Plan
+      const freePlan = await tx.subscriptionPlan.findFirst({
+        where: { price: 0, isActive: true },
+        orderBy: { createdAt: 'asc' }
+      });
+
+      let expiryDate: Date | null = null;
+      if (freePlan) {
+        expiryDate = new Date();
+        expiryDate.setDate(expiryDate.getDate() + (freePlan as any).durationDays);
+      }
+
+      const newVendor = await tx.vendor.create({
+        data: {
+          ...cleanRest,
+          authorId: user.id,
+          subscriptionPlanId: freePlan?.id,
+          subscriptionExpiryDate: expiryDate,
+          subscriptionTotalOrders: VendorDefaults.INITIAL_TOTAL_ORDERS,
+          reviewsSum: VendorDefaults.INITIAL_REVIEWS_SUM,
+          reviewsCount: VendorDefaults.INITIAL_REVIEWS_COUNT,
+          isActive: VendorDefaults.DEFAULT_STATUS,
+          photos: photos
+            ? { create: photos.map((url) => ({ url })) }
+            : undefined,
+          restaurantMenuPhotos: restaurantMenuPhotos
+            ? { create: restaurantMenuPhotos.map((url) => ({ url })) }
+            : undefined,
+        },
+      });
+
+      // Create default schedules for 7 days (IDs 0 to 6)
+      await (tx as any).vendorSchedule.createMany({
+        data: Array.from({ length: 7 }, (_, i) => ({
+          vendorId: newVendor.id,
+          dayId: i,
+          openTime: VendorScheduleDefaults.DEFAULT_OPEN_TIME,
+          closeTime: VendorScheduleDefaults.DEFAULT_CLOSE_TIME,
+          isActive: VendorScheduleDefaults.DEFAULT_IS_ACTIVE,
+        })),
+      });
+
+      return tx.vendor.findUnique({
+        where: { id: newVendor.id },
+        include: {
+          photos: true,
+          restaurantMenuPhotos: true,
+          schedules: true,
+          subscriptionPlan: true,
+        },
+      });
     });
 
-    return this.mapVendorResponse(vendor);
+    return await this.mapVendorResponse(vendor as any);
   }
 
   async findAll(
-    query: { page?: number | string; limit?: number | string } = {},
+    query: {
+      page?: number | string;
+      limit?: number | string;
+      zoneId?: string;
+    } = {},
+    user?: User,
   ) {
     const page = Number(query.page) || 1;
-    const limit = Math.min(Number(query.limit) || 20, 100); // Max 100 per page
+    const limit = Math.min(Number(query.limit) || 20, 100);
     const skip = (page - 1) * limit;
+
+    const where: Prisma.VendorWhereInput = {
+      isActive: true,
+    };
+
+    if (user?.role === UserRole.CUSTOMER && user.zoneId) {
+      where.zoneId = user.zoneId;
+    } else if (query.zoneId) {
+      where.zoneId = query.zoneId;
+    }
 
     const vendors = await this.prisma.vendor.findMany({
       skip,
       take: limit,
+      where,
       include: {
         photos: true,
         restaurantMenuPhotos: true,
+        schedules: true,
       },
+      orderBy: { createdAt: 'desc' },
     });
-    return vendors.map((v) => this.mapVendorResponse(v));
+    return Promise.all(vendors.map((v) => this.mapVendorResponse(v as any)));
   }
 
   async findOne(id: string) {
-    const vendor = await this.prisma.vendor.findUnique({
-      where: { id },
+    const vendor = await this.prisma.vendor.findFirst({
+      where: { id, isActive: true },
       include: {
         photos: true,
         restaurantMenuPhotos: true,
+        schedules: true,
       },
     });
     if (!vendor) {
-      throw new NotFoundException('VENDOR_NOT_FOUND');
+      throw new NotFoundException(VendorStatusMessages.VENDOR_NOT_FOUND);
     }
-    return this.mapVendorResponse(vendor);
+    return await this.mapVendorResponse(vendor as any);
   }
 
   async update(id: string, updateVendorDto: UpdateVendorDto) {
     const { photos, restaurantMenuPhotos, ...rest } = updateVendorDto;
 
+    const {
+      subscriptionPlanId,
+      subscriptionExpiryDate,
+      subscriptionTotalOrders,
+      walletAmount,
+      reviewsSum,
+      reviewsCount,
+      isActive,
+      isDineInActive,
+      restaurantCost,
+      subscriptionId,
+      ...cleanRest
+    } = rest as any;
+
+    if (cleanRest.phoneNumber) {
+      cleanRest.phoneNumber = normalizePhoneNumber(cleanRest.phoneNumber);
+    }
+
     const vendor = await this.prisma.vendor.update({
       where: { id },
       data: {
-        ...rest,
+        ...cleanRest,
         photos: photos
           ? {
-              deleteMany: {},
-              create: photos.map((url) => ({ url })),
-            }
+            deleteMany: {},
+            create: photos.map((url) => ({ url })),
+          }
           : undefined,
         restaurantMenuPhotos: restaurantMenuPhotos
           ? {
-              deleteMany: {},
-              create: restaurantMenuPhotos.map((url) => ({ url })),
-            }
+            deleteMany: {},
+            create: restaurantMenuPhotos.map((url) => ({ url })),
+          }
           : undefined,
       },
       include: {
         photos: true,
         restaurantMenuPhotos: true,
+        schedules: true,
       },
     });
 
-    return this.mapVendorResponse(vendor);
+    return await this.mapVendorResponse(vendor as any);
   }
 
   async remove(id: string) {
-    return this.prisma.vendor.delete({ where: { id } });
+    return this.prisma.vendor.update({
+      where: { id },
+      data: { isActive: false },
+    });
   }
 
   async findByAuthor(authorId: string) {
@@ -126,9 +224,10 @@ export class VendorsService {
       include: {
         photos: true,
         restaurantMenuPhotos: true,
+        schedules: true,
       },
     });
-    return this.mapVendorResponse(vendor);
+    return await this.mapVendorResponse(vendor as any);
   }
 
   async findNearest(
@@ -137,10 +236,8 @@ export class VendorsService {
     radius: number = 10,
     isDining?: boolean,
     categoryId?: string,
+    user?: User,
   ) {
-    // 1. Get vendors within radius using raw SQL (Haversine formula)
-    // Note: Prisma returns dates as Date objects and decimals as logic objects, but usually fine for strict comparison if cast query appropriately.
-    // For simplicity, we just fetch IDs effectively.
     const nearbyVendorsRaw = await this.prisma.$queryRaw<{ id: string }[]>`
       SELECT id, 
       (6371 * acos(cos(radians(${latitude})) * cos(radians(latitude)) * cos(radians(longitude) - radians(${longitude})) + sin(radians(${latitude})) * sin(radians(latitude)))) AS distance
@@ -154,43 +251,51 @@ export class VendorsService {
       return [];
     }
 
-    // 2. Filter by status, subscription, dining, and category using Prisma
     const now = new Date();
 
+    const where: Prisma.VendorWhereInput = {
+      id: { in: nearbyIds },
+      isActive: true,
+      ...(isDining !== undefined ? { isDineInActive: isDining } : {}),
+      OR: [
+        { subscriptionExpiryDate: null },
+        { subscriptionExpiryDate: { gt: now } },
+      ],
+      ...(categoryId
+        ? {
+          categories: {
+            some: {
+              id: categoryId,
+            },
+          },
+        }
+        : {}),
+    };
+
+    if (user?.role === UserRole.CUSTOMER && user.zoneId) {
+      where.zoneId = user.zoneId;
+    }
+
     const vendors = await this.prisma.vendor.findMany({
-      where: {
-        id: { in: nearbyIds },
-        isActive: true,
-        ...(isDining !== undefined ? { isDineInActive: isDining } : {}),
-        OR: [
-          { subscriptionExpiryDate: null },
-          { subscriptionExpiryDate: { gt: now } },
-        ],
-        ...(categoryId
-          ? {
-              categories: {
-                some: {
-                  id: categoryId,
-                },
-              },
-            }
-          : {}),
-      },
+      where,
       include: {
         categories: true,
         photos: true,
         restaurantMenuPhotos: true,
+        schedules: true,
       },
     });
 
-    return vendors.map((v) => this.mapVendorResponse(v));
+    return Promise.all(vendors.map((v) => this.mapVendorResponse(v as any)));
   }
 
   async getProducts(vendorId: string) {
+    await this.findOne(vendorId);
     return this.productsService.findAll({ vendorId });
   }
 
   async getReviews(vendorId: string) {
+    await this.findOne(vendorId);
     return this.reviewsService.findAll({ vendorId });
   }
 
@@ -205,10 +310,12 @@ export class VendorsService {
   }
 
   async getCoupons(vendorId: string) {
+    await this.findOne(vendorId);
     return this.couponsService.findAll({ vendorId });
   }
 
   async getReviewAttributes(vendorId: string) {
+    await this.findOne(vendorId);
     return this.reviewsService.getVendorReviewAttributes(vendorId);
   }
 
@@ -239,34 +346,107 @@ export class VendorsService {
     };
   }
 
-  async search(query: string, page?: string | number, limit?: string | number) {
+  async search(
+    query: string,
+    page?: string | number,
+    limit?: string | number,
+    user?: User,
+  ) {
     const p = Number(page) || 1;
     const l = Math.min(Number(limit) || 20, 100);
     const skip = (p - 1) * l;
 
-    const vendors = await this.prisma.vendor.findMany({
-      where: {
-        title: {
-          contains: query,
-          mode: 'insensitive',
-        },
+    const where: Prisma.VendorWhereInput = {
+      isActive: true,
+      title: {
+        contains: query,
+        mode: 'insensitive',
       },
+    };
+
+    if (user?.role === UserRole.CUSTOMER && user.zoneId) {
+      where.zoneId = user.zoneId;
+    }
+
+    const vendors = await this.prisma.vendor.findMany({
+      where,
       include: {
         photos: true,
         restaurantMenuPhotos: true,
+        schedules: true,
       },
       skip,
       take: l,
     });
-    return vendors.map((v) => this.mapVendorResponse(v));
+    return Promise.all(vendors.map((v) => this.mapVendorResponse(v as any)));
   }
-  private mapVendorResponse(vendor: VendorWithRelations | null) {
+
+  async getSchedules(vendorId: string) {
+    const vendor = await this.prisma.vendor.findFirst({ where: { id: vendorId, isActive: true } });
+    if (!vendor) throw new NotFoundException(VendorStatusMessages.VENDOR_NOT_FOUND);
+
+    return (this.prisma as any).vendorSchedule.findMany({
+      where: { vendorId },
+      include: { day: true },
+      orderBy: { dayId: 'asc' },
+    });
+  }
+
+  async updateSchedule(vendorId: string, updateScheduleDto: UpdateVendorScheduleDto, user: User) {
+    const vendor = await this.prisma.vendor.findUnique({ where: { id: vendorId } });
+    if (!vendor) throw new NotFoundException(VendorStatusMessages.VENDOR_NOT_FOUND);
+
+    if (user.role !== UserRole.ADMIN && vendor.authorId !== user.id) {
+      throw new ForbiddenException(VendorStatusMessages.FORBIDDEN);
+    }
+
+    const { dayId, timeslots } = updateScheduleDto;
+
+    return this.prisma.$transaction(async (tx) => {
+      await (tx as any).vendorSchedule.deleteMany({
+        where: { vendorId, dayId },
+      });
+
+      if (timeslots.length > 0) {
+        await (tx as any).vendorSchedule.createMany({
+          data: timeslots.map((slot) => ({
+            vendorId,
+            dayId,
+            ...slot,
+          })),
+        });
+      }
+
+      return (tx as any).vendorSchedule.findMany({
+        where: { vendorId, dayId },
+        include: { day: true },
+      });
+    });
+  }
+
+  private async mapVendorResponse(vendor: any | null) {
     if (!vendor) return null;
-    const { photos, restaurantMenuPhotos, ...rest } = vendor;
+    const { photos, restaurantMenuPhotos, schedules, ...rest } = vendor;
+
+    const walletAmount = await this.walletService.getBalance(vendor.authorId);
+
+    const now = new Date();
+    const currentDayId = now.getDay();
+    const daySchedules = schedules?.filter((s: any) => s.dayId === currentDayId);
+
+    let isOpen = false;
+    if (daySchedules && daySchedules.length > 0) {
+      const currentTime = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+      isOpen = daySchedules.some((s: any) =>
+        s.isActive && s.openTime && s.closeTime && currentTime >= s.openTime && currentTime <= s.closeTime
+      );
+    }
+
     return {
       ...rest,
-      photos: photos?.map((p) => p.url) || [],
-      restaurantMenuPhotos: restaurantMenuPhotos?.map((p) => p.url) || [],
+      isOpen,
+      photos: photos?.map((p: any) => p.url) || [],
+      restaurantMenuPhotos: restaurantMenuPhotos?.map((p: any) => p.url) || [],
     };
   }
 }

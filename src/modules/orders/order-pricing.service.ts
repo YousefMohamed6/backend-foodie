@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CouponsService } from '../coupons/coupons.service';
 import { APP_SETTINGS } from '../settings/settings.constants';
@@ -10,7 +10,7 @@ export class OrderPricingService {
   constructor(
     private prisma: PrismaService,
     private couponsService: CouponsService,
-  ) {}
+  ) { }
 
   async calculatePricing(
     createOrderDto: CreateOrderDto,
@@ -40,7 +40,7 @@ export class OrderPricingService {
     );
     const deliveryFeePerKm = Number(
       settings.find((s) => s.key === APP_SETTINGS.DELIVERY_FEE_PER_KM)?.value ||
-        0,
+      0,
     );
     const firstOrderFreeDeliveryEnabled =
       settings.find(
@@ -49,9 +49,42 @@ export class OrderPricingService {
 
     const vendor = await this.prisma.vendor.findUnique({
       where: { id: createOrderDto.vendorId },
-      include: { subscriptionPlan: true },
+      include: {
+        subscriptionPlan: true,
+        schedules: {
+          where: { isActive: true },
+        },
+      },
     });
+
     if (!vendor) throw new NotFoundException('VENDOR_NOT_FOUND');
+
+    // --- CHECK IF VENDOR IS OPEN ---
+    const now = new Date();
+    const currentDayId = now.getDay();
+    const daySchedules = vendor.schedules.filter(
+      (s) => s.dayId === currentDayId,
+    );
+
+    let isOpen = false;
+    if (daySchedules.length > 0) {
+      const currentTime = `${now.getHours().toString().padStart(2, '0')}:${now
+        .getMinutes()
+        .toString()
+        .padStart(2, '0')}`;
+      isOpen = daySchedules.some(
+        (s) =>
+          s.openTime &&
+          s.closeTime &&
+          currentTime >= s.openTime &&
+          currentTime <= s.closeTime,
+      );
+    }
+
+    if (!isOpen) {
+      throw new BadRequestException('VENDOR_CLOSED');
+    }
+    // -------------------------------
 
     const address = await this.prisma.address.findUnique({
       where: { id: createOrderDto.addressId },

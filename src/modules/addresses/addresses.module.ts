@@ -3,10 +3,12 @@ import { AddressesService } from './addresses.service';
 
 import { AddressesController } from './addresses.controller';
 
+import { ZonesModule } from '../zones/zones.module';
+
 @Module({
-  imports: [],
+  imports: [ZonesModule],
   controllers: [AddressesController],
   providers: [AddressesService],
   exports: [AddressesService],
 })
-export class AddressesModule {}
+export class AddressesModule { }

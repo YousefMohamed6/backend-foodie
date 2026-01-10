@@ -20,18 +20,18 @@ export class WalletService {
   constructor(
     private prisma: PrismaService,
     private readonly fawaterakService: FawaterakService,
-  ) {}
+  ) { }
 
   async getBalance(userId: string) {
     const getSum = async (type: TransactionType) => {
       const depositFilter =
         type === TransactionType.DEPOSIT
           ? {
-              OR: [
-                { paymentStatus: WalletConstants.PAYMENT_STATUS_PAID },
-                { paymentStatus: null },
-              ],
-            }
+            OR: [
+              { paymentStatus: WalletConstants.PAYMENT_STATUS_PAID },
+              { paymentStatus: null },
+            ],
+          }
           : {};
       const aggregations = await this.prisma.walletTransaction.aggregate({
         _sum: {
@@ -186,11 +186,7 @@ export class WalletService {
       },
     });
 
-    // Deduct immediately?
-    // Usually withdrawals are requests. But to reflect in balance calculation (deposits - withdrawals),
-    // creating the record naturally deducts it from getBalance() result.
 
-    // However, if we maintain walletAmount on User:
     await this.updateUserWallet(
       userId,
       withdrawDto.amount,

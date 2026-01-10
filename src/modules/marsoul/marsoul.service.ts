@@ -5,7 +5,7 @@ import { MarsoulResponseDto } from './dto/marsoul-response.dto';
 
 @Injectable()
 export class MarsoulService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService) { }
 
   async findAll(): Promise<MarsoulResponseDto[]> {
     const managers = await this.prisma.user.findMany({
@@ -21,17 +21,17 @@ export class MarsoulService {
         zoneId: true,
         zone: {
           select: {
-            name: true,
+            arabicName: true,
           },
         },
       },
     });
 
-    return managers.map((manager) => ({
+    return managers.map((manager: any) => ({
       managerName: `${manager.firstName} ${manager.lastName}`.trim(),
       phone: manager.phoneNumber || '',
       zoneId: manager.zoneId!,
-      zoneName: manager.zone?.name || '',
+      zoneName: manager.zone?.arabicName || '',
     }));
   }
 }

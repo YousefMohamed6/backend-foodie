@@ -16,7 +16,7 @@ export class CategoriesService {
     private prisma: PrismaService,
     private vendorsService: VendorsService,
     private redis: RedisService,
-  ) {}
+  ) { }
 
   private readonly CACHE_KEY_HOME = 'categories:home';
 
@@ -51,8 +51,8 @@ export class CategoriesService {
         reviewAttributes:
           attributeIds.length > 0
             ? {
-                connect: attributeIds.map((id) => ({ id })),
-              }
+              connect: attributeIds.map((id) => ({ id })),
+            }
             : undefined,
       },
       include: {
@@ -75,7 +75,7 @@ export class CategoriesService {
     const limit = Math.min(Number(query.limit) || 20, 100); // Max 100 per page
     const skip = (page - 1) * limit;
 
-    const where: Prisma.CategoryWhereInput = {};
+    const where: Prisma.CategoryWhereInput = { isActive: true };
     if (query.vendorId) {
       where.vendorId = query.vendorId;
     }
@@ -157,8 +157,8 @@ export class CategoriesService {
         ...rest,
         reviewAttributes: reviewAttributes
           ? {
-              set: attributeIds.map((id) => ({ id })),
-            }
+            set: attributeIds.map((id) => ({ id })),
+          }
           : undefined,
       },
       include: {
@@ -180,7 +180,10 @@ export class CategoriesService {
       }
     }
 
-    const result = await this.prisma.category.delete({ where: { id } });
+    const result = await this.prisma.category.update({
+      where: { id },
+      data: { isActive: false },
+    });
     await this.redis.del(this.CACHE_KEY_HOME);
     return result;
   }

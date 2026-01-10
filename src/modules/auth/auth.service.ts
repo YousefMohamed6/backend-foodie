@@ -12,6 +12,7 @@ import { JwtService } from '@nestjs/jwt';
 import { User, UserRole } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 import * as crypto from 'crypto';
+import { normalizePhoneNumber } from '../../common/utils/phone.utils';
 import { PrismaService } from '../../prisma/prisma.service';
 import { RedisService } from '../../shared/services/redis.service';
 import { SmsService } from '../../shared/services/sms.service';
@@ -23,10 +24,13 @@ import { RegisterDto } from './dto/register.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 import { SendOtpDto } from './dto/send-otp.dto';
 import { SocialLoginDto } from './dto/social-login.dto';
+import { VerifyFirebaseOtpDto } from './dto/verify-firebase-otp.dto';
 import { VerifyOtpDto } from './dto/verify-otp.dto';
 import { JwtPayload } from './interfaces/jwt-payload.interface';
 import { AppleAuthService } from './services/apple-auth.service';
+import { FirebaseAuthService } from './services/firebase-auth.service';
 import { GoogleAuthService } from './services/google-auth.service';
+
 
 @Injectable()
 export class AuthService {
@@ -39,9 +43,10 @@ export class AuthService {
     private prisma: PrismaService,
     private googleAuthService: GoogleAuthService,
     private appleAuthService: AppleAuthService,
+    private firebaseAuthService: FirebaseAuthService,
     private smsService: SmsService,
     private redisService: RedisService,
-  ) {}
+  ) { }
 
   async register(
     registerDto: RegisterDto,
@@ -170,11 +175,16 @@ export class AuthService {
     if (!user)
       throw new UnauthorizedException(AUTH_ERRORS.USER_CREATION_FAILED);
 
+    if (!user.isActive) {
+      throw new UnauthorizedException(AUTH_ERRORS.USER_INACTIVE);
+    }
+
     return this.generateTokens(user, context);
   }
 
   async sendOtp(sendOtpDto: SendOtpDto) {
-    const { phoneNumber } = sendOtpDto;
+    let { phoneNumber } = sendOtpDto;
+    phoneNumber = normalizePhoneNumber(phoneNumber);
 
     // 1. Generate 6-digit OTP
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
@@ -203,7 +213,8 @@ export class AuthService {
     verifyOtpDto: VerifyOtpDto,
     context: { ip: string; userAgent: string; deviceId?: string },
   ) {
-    const { phoneNumber, code } = verifyOtpDto;
+    let { phoneNumber, code } = verifyOtpDto;
+    phoneNumber = normalizePhoneNumber(phoneNumber);
     const otpKey = `otp:${phoneNumber}`;
 
     // 1. Verify OTP code
@@ -222,7 +233,68 @@ export class AuthService {
       throw new UnauthorizedException(AUTH_ERRORS.PHONE_NOT_REGISTERED);
     }
 
+    if (!user.isActive) {
+      throw new UnauthorizedException(AUTH_ERRORS.USER_INACTIVE);
+    }
+
     return this.generateTokens(user, context);
+  }
+
+  async verifyFirebaseOtp(
+    dto: VerifyFirebaseOtpDto,
+    context: { ip: string; userAgent: string; deviceId?: string },
+  ) {
+    const decodedToken = await this.firebaseAuthService.verifyIdToken(
+      dto.idToken,
+    );
+
+    if (!decodedToken.phoneNumber) {
+      throw new UnauthorizedException(AUTH_ERRORS.FIREBASE_PHONE_NOT_FOUND);
+    }
+
+    const phoneNumber = normalizePhoneNumber(decodedToken.phoneNumber);
+
+    let user: any = await this.usersService.findByPhone(phoneNumber);
+
+    if (!user) {
+      if (
+        dto.role &&
+        !([UserRole.CUSTOMER, UserRole.DRIVER, UserRole.VENDOR, UserRole.MANAGER] as UserRole[]).includes(dto.role)
+      ) {
+        throw new ForbiddenException(AUTH_ERRORS.ROLE_NOT_ALLOWED);
+      }
+
+      const newUserData = {
+        firstName: dto.firstName,
+        lastName: dto.lastName,
+        email: dto.email,
+        password: crypto.randomBytes(32).toString('hex'),
+        phoneNumber,
+        role: dto.role || UserRole.CUSTOMER,
+        provider: 'phone',
+        fcmToken: dto.fcmToken,
+        devicePlatform: dto.devicePlatform,
+        referralCode: dto.referralCode,
+        zoneId: dto.zoneId,
+      };
+
+      user = await this.usersService.create(newUserData as any);
+      this.logger.log(`New user created via Firebase Phone Auth: ${phoneNumber}`);
+    } else {
+      if (dto.fcmToken && dto.fcmToken !== (user as any).fcmToken) {
+        await this.usersService.updateToken(user.id, dto.fcmToken);
+      }
+    }
+
+    if (!user) {
+      throw new UnauthorizedException(AUTH_ERRORS.USER_CREATION_FAILED);
+    }
+
+    if (!(user as any).isActive) {
+      throw new UnauthorizedException(AUTH_ERRORS.USER_INACTIVE);
+    }
+
+    return this.generateTokens(user as any, context);
   }
 
   async forgotPassword(forgotPasswordDto: ForgotPasswordDto) {

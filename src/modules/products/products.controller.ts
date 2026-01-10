@@ -15,8 +15,7 @@ import {
   ApiQuery,
   ApiTags,
 } from '@nestjs/swagger';
-import type { User } from '@prisma/client';
-import { UserRole } from '@prisma/client';
+import * as Prisma from '@prisma/client';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
@@ -29,16 +28,16 @@ import { ProductsService } from './products.service';
 @ApiTags('Products')
 @Controller('products')
 export class ProductsController {
-  constructor(private readonly productsService: ProductsService) {}
+  constructor(private readonly productsService: ProductsService) { }
 
   @Post()
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.VENDOR)
+  @Roles(Prisma.UserRole.VENDOR)
   @ApiOperation({ summary: 'Create a new product' })
   create(
     @Body() createProductDto: CreateProductDto,
-    @CurrentUser() user: User,
+    @CurrentUser() user: Prisma.User,
   ) {
     return this.productsService.create(createProductDto, user);
   }
@@ -54,8 +53,25 @@ export class ProductsController {
     enum: ['TakeAway', 'DineIn'],
     description: 'Filter by food type',
   })
-  findAll(@Query() query: FindAllProductsQueryDto) {
-    return this.productsService.findAll(query);
+  findAll(
+    @Query() query: FindAllProductsQueryDto,
+    @CurrentUser() user?: Prisma.User,
+  ) {
+    return this.productsService.findAll(query, user);
+  }
+
+  @Get('search')
+  @ApiOperation({ summary: 'Search products' })
+  @ApiQuery({ name: 'q', required: true })
+  @ApiQuery({ name: 'page', required: false })
+  @ApiQuery({ name: 'limit', required: false })
+  search(
+    @Query('q') query: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+    @CurrentUser() user?: Prisma.User,
+  ) {
+    return this.productsService.search(query, page, limit, user);
   }
 
   @Get(':id')
@@ -64,15 +80,26 @@ export class ProductsController {
     return this.productsService.findOne(id);
   }
 
+  @Get('category/:categoryId/zone-filtered')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Get products by category filtered by user zone' })
+  getByCategoryAndZone(
+    @Param('categoryId') categoryId: string,
+    @CurrentUser() user: Prisma.User,
+  ) {
+    return this.productsService.findByCategoryAndZone(categoryId, user);
+  }
+
   @Patch(':id')
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.VENDOR)
+  @Roles(Prisma.UserRole.VENDOR)
   @ApiOperation({ summary: 'Update a product' })
   update(
     @Param('id') id: string,
     @Body() updateProductDto: UpdateProductDto,
-    @CurrentUser() user: User,
+    @CurrentUser() user: Prisma.User,
   ) {
     return this.productsService.update(id, updateProductDto, user);
   }
@@ -80,9 +107,9 @@ export class ProductsController {
   @Delete(':id')
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.VENDOR)
+  @Roles(Prisma.UserRole.VENDOR)
   @ApiOperation({ summary: 'Delete a product' })
-  remove(@Param('id') id: string, @CurrentUser() user: User) {
+  remove(@Param('id') id: string, @CurrentUser() user: Prisma.User) {
     return this.productsService.remove(id, user);
   }
 }

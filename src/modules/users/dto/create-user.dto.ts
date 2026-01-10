@@ -1,5 +1,7 @@
 import { DevicePlatform, UserRole } from '@prisma/client';
+import { Transform } from 'class-transformer';
 import { IsEmail, IsEnum, IsOptional, IsString } from 'class-validator';
+import { normalizePhoneNumber } from '../../../common/utils/phone.utils';
 
 export class CreateUserDto {
   @IsString()
@@ -20,6 +22,7 @@ export class CreateUserDto {
 
   @IsOptional()
   @IsString()
+  @Transform(({ value }) => normalizePhoneNumber(value))
   phoneNumber?: string;
 
   @IsOptional()

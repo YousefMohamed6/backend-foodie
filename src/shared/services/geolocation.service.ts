@@ -5,7 +5,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 export class GeolocationService {
   private readonly logger = new Logger(GeolocationService.name);
 
-  constructor(private prisma: PrismaService) {}
+  constructor(private prisma: PrismaService) { }
 
   /**
    * Calculate distance between two coordinates using Haversine formula
@@ -23,9 +23,9 @@ export class GeolocationService {
     const a =
       Math.sin(dLat / 2) * Math.sin(dLat / 2) +
       Math.cos(this.toRad(lat1)) *
-        Math.cos(this.toRad(lat2)) *
-        Math.sin(dLon / 2) *
-        Math.sin(dLon / 2);
+      Math.cos(this.toRad(lat2)) *
+      Math.sin(dLon / 2) *
+      Math.sin(dLon / 2);
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     return R * c;
   }
@@ -122,7 +122,7 @@ export class GeolocationService {
         SELECT z.*
         FROM zones z
         WHERE 
-          z.is_active = true
+          z.is_publish = true
           AND ST_Contains(
             z.area::geometry,
             ST_MakePoint(${longitude}::float, ${latitude}::float)::geometry
@@ -166,7 +166,7 @@ export class GeolocationService {
 
   private async getNearestZone(latitude: number, longitude: number) {
     const zones = await this.prisma.zone.findMany({
-      where: { isActive: true },
+      where: { isPublish: true },
     });
 
     if (zones.length === 0) return null;

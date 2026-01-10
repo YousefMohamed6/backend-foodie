@@ -15,14 +15,14 @@ import {
   ApiQuery,
   ApiTags,
 } from '@nestjs/swagger';
-import type { User } from '@prisma/client';
-import { UserRole } from '@prisma/client';
+import * as Prisma from '@prisma/client';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { CreateVendorDto } from './dto/create-vendor.dto';
 import { FindNearestVendorsDto } from './dto/find-nearest-vendors.dto';
+import { UpdateVendorScheduleDto } from './dto/update-vendor-schedule.dto';
 import { UpdateVendorDto } from './dto/update-vendor.dto';
 import { VendorsService } from './vendors.service';
 
@@ -30,20 +30,42 @@ import { VendorsService } from './vendors.service';
 @ApiBearerAuth()
 @Controller('vendors')
 export class VendorsController {
-  constructor(private readonly vendorsService: VendorsService) {}
+  constructor(private readonly vendorsService: VendorsService) { }
 
   @Post()
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.VENDOR, UserRole.ADMIN)
+  @Roles(Prisma.UserRole.VENDOR, Prisma.UserRole.ADMIN)
   @ApiOperation({ summary: 'Create a new vendor profile' })
-  create(@Body() createVendorDto: CreateVendorDto, @CurrentUser() user: User) {
+  create(@Body() createVendorDto: CreateVendorDto, @CurrentUser() user: Prisma.User) {
     return this.vendorsService.create(createVendorDto, user);
   }
 
   @Get()
   @ApiOperation({ summary: 'Get all vendors' })
-  findAll() {
-    return this.vendorsService.findAll();
+  @ApiQuery({ name: 'page', required: false, type: Number })
+  @ApiQuery({ name: 'limit', required: false, type: Number })
+  @ApiQuery({ name: 'zoneId', required: false, type: String })
+  findAll(
+    @Query('page') page?: number,
+    @Query('limit') limit?: number,
+    @Query('zoneId') zoneId?: string,
+    @CurrentUser() user?: Prisma.User,
+  ) {
+    return this.vendorsService.findAll({ page, limit, zoneId }, user);
+  }
+
+  @Get('search')
+  @ApiOperation({ summary: 'Search vendors' })
+  @ApiQuery({ name: 'q', required: true })
+  @ApiQuery({ name: 'page', required: false })
+  @ApiQuery({ name: 'limit', required: false })
+  search(
+    @Query('q') query: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+    @CurrentUser() user?: Prisma.User,
+  ) {
+    return this.vendorsService.search(query, page, limit, user);
   }
 
   @Get('nearest')
@@ -67,13 +89,14 @@ export class VendorsController {
     type: Boolean,
     description: 'Filter by dine-in availability',
   })
-  findNearest(@Query() dto: FindNearestVendorsDto) {
+  findNearest(@Query() dto: FindNearestVendorsDto, @CurrentUser() user?: Prisma.User) {
     return this.vendorsService.findNearest(
       dto.latitude,
       dto.longitude,
       dto.radius,
       dto.isDining,
       dto.categoryId,
+      user,
     );
   }
 
@@ -97,7 +120,7 @@ export class VendorsController {
 
   @Get(':id/orders')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.VENDOR, UserRole.ADMIN)
+  @Roles(Prisma.UserRole.VENDOR, Prisma.UserRole.ADMIN)
   @ApiOperation({ summary: 'Get vendor orders' })
   getOrders(@Param('id') id: string, @Query() query) {
     return this.vendorsService.getOrders(id, query);
@@ -115,9 +138,27 @@ export class VendorsController {
     return this.vendorsService.getReviewAttributes(id);
   }
 
+  @Get(':id/schedules')
+  @ApiOperation({ summary: 'Get vendor working hours' })
+  getSchedules(@Param('id') id: string) {
+    return this.vendorsService.getSchedules(id);
+  }
+
+  @Patch(':id/schedule')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Prisma.UserRole.VENDOR, Prisma.UserRole.ADMIN)
+  @ApiOperation({ summary: 'Update vendor working hours' })
+  updateSchedule(
+    @Param('id') id: string,
+    @Body() dto: UpdateVendorScheduleDto,
+    @CurrentUser() user: Prisma.User,
+  ) {
+    return this.vendorsService.updateSchedule(id, dto, user);
+  }
+
   @Patch(':id')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.VENDOR, UserRole.ADMIN)
+  @Roles(Prisma.UserRole.VENDOR, Prisma.UserRole.ADMIN)
   @ApiOperation({ summary: 'Update a vendor profile' })
   update(@Param('id') id: string, @Body() updateVendorDto: UpdateVendorDto) {
     return this.vendorsService.update(id, updateVendorDto);
@@ -125,7 +166,7 @@ export class VendorsController {
 
   @Delete(':id')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.ADMIN)
+  @Roles(Prisma.UserRole.ADMIN)
   @ApiOperation({ summary: 'Delete a vendor' })
   remove(@Param('id') id: string) {
     return this.vendorsService.remove(id);

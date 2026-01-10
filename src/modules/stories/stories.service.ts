@@ -13,11 +13,16 @@ export class StoriesService {
   constructor(
     private prisma: PrismaService,
     private readonly vendorsService: VendorsService,
-  ) {}
+  ) { }
 
-  async findAll(vendorId?: string) {
+  async findAll(vendorId?: string, user?: User) {
     const where: Prisma.StoryWhereInput = { isActive: true };
     if (vendorId) where.vendorId = vendorId;
+
+    if (user?.role === UserRole.CUSTOMER && user.zoneId) {
+      where.vendor = { zoneId: user.zoneId };
+    }
+
     return this.prisma.story.findMany({
       where,
       include: { vendor: true },
@@ -58,6 +63,9 @@ export class StoriesService {
     ) {
       throw new ForbiddenException('STORY_DELETE_PERMISSION');
     }
-    return this.prisma.story.delete({ where: { id } });
+    return this.prisma.story.update({
+      where: { id },
+      data: { isActive: false },
+    });
   }
 }

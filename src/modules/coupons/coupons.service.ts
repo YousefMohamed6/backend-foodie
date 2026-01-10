@@ -17,7 +17,7 @@ export class CouponsService {
     private prisma: PrismaService,
     @Inject(forwardRef(() => VendorsService))
     private vendorsService: VendorsService,
-  ) {}
+  ) { }
 
   async create(createCouponDto: CreateCouponDto, user: User) {
     let vendorId = createCouponDto.vendorId || null;
@@ -43,7 +43,7 @@ export class CouponsService {
   }
 
   findAll(query: { isPublic?: string | boolean; vendorId?: string } = {}) {
-    const where: Prisma.CouponWhereInput = {};
+    const where: Prisma.CouponWhereInput = { isActive: true };
     if (query.isPublic !== undefined)
       where.isPublic = query.isPublic === 'true' || query.isPublic === true;
     if (query.vendorId) where.vendorId = query.vendorId;
@@ -77,7 +77,10 @@ export class CouponsService {
 
   async remove(id: string) {
     await this.findOne(id);
-    return this.prisma.coupon.delete({ where: { id } });
+    return this.prisma.coupon.update({
+      where: { id },
+      data: { isActive: false },
+    });
   }
 
   async validate(code: string, vendorId: string | null, orderAmount: number) {

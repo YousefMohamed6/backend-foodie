@@ -114,7 +114,7 @@ import {
     I18nModule.forRoot({
       fallbackLanguage: 'ar',
       loaderOptions: {
-        path: join(__dirname, '..', 'i18n/'),
+        path: join(__dirname, 'i18n/'),
         watch: true,
       },
       resolvers: [new HeaderResolver(['x-lang']), AcceptLanguageResolver],

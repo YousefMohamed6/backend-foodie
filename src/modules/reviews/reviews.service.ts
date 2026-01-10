@@ -10,7 +10,7 @@ type ReviewWithRelations = Prisma.ReviewGetPayload<{
 
 @Injectable()
 export class ReviewsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(private prisma: PrismaService) { }
 
   async create(createReviewDto: CreateReviewDto, user: User) {
     const { images, reviewAttributes, ...rest } = createReviewDto;
@@ -37,17 +37,26 @@ export class ReviewsService {
         customerId: user.id,
         images: images
           ? {
-              create: images.map((url) => ({ url })),
-            }
+            create: images.map((url) => ({ url })),
+          }
           : undefined,
         ratings:
           ratingsData.length > 0
             ? {
-                create: ratingsData,
-              }
+              create: ratingsData,
+            }
             : undefined,
       },
       include: { images: true, ratings: true, customer: true },
+    });
+
+    // Update Vendor's reviewsSum and reviewsCount
+    await this.prisma.vendor.update({
+      where: { id: rest.vendorId },
+      data: {
+        reviewsSum: { increment: rest.rating },
+        reviewsCount: { increment: 1 },
+      },
     });
 
     return this.mapReviewResponse(savedReview);
@@ -98,12 +107,15 @@ export class ReviewsService {
   }
 
   async update(id: string, updateReviewDto: UpdateReviewDto, user: User) {
-    const review = await this.findOne(id);
-    if (review.customerId !== user.id) {
+    const oldReview = await this.prisma.review.findUnique({ where: { id } });
+    if (!oldReview || oldReview.customerId !== user.id) {
       throw new NotFoundException('REVIEW_NOT_FOUND');
     }
 
     const { images, reviewAttributes, ...rest } = updateReviewDto;
+    const oldRating = oldReview.rating;
+    const newRating = rest.rating !== undefined ? rest.rating : oldRating;
+    const ratingDelta = newRating - oldRating;
 
     // Normalize reviewAttributes
     let ratingsData: { attributeId: string; rating: number }[] = [];
@@ -127,19 +139,28 @@ export class ReviewsService {
         ...rest,
         images: images
           ? {
-              deleteMany: {},
-              create: images.map((url) => ({ url })),
-            }
+            deleteMany: {},
+            create: images.map((url) => ({ url })),
+          }
           : undefined,
         ratings: reviewAttributes
           ? {
-              deleteMany: {},
-              create: ratingsData,
-            }
+            deleteMany: {},
+            create: ratingsData,
+          }
           : undefined,
       },
       include: { images: true, ratings: true, customer: true },
     });
+
+    if (ratingDelta !== 0) {
+      await this.prisma.vendor.update({
+        where: { id: oldReview.vendorId },
+        data: {
+          reviewsSum: { increment: ratingDelta },
+        },
+      });
+    }
 
     return this.mapReviewResponse(savedReview);
   }
@@ -149,6 +170,16 @@ export class ReviewsService {
     if (review.customerId !== user.id) {
       throw new NotFoundException('REVIEW_NOT_FOUND');
     }
+
+    // Update Vendor's reviewsSum and reviewsCount
+    await this.prisma.vendor.update({
+      where: { id: review.vendorId },
+      data: {
+        reviewsSum: { decrement: review.rating },
+        reviewsCount: { decrement: 1 },
+      },
+    });
+
     return this.prisma.review.delete({ where: { id } });
   }
 

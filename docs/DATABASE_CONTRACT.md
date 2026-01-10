@@ -47,9 +47,10 @@ This document describes the database architecture for the Food Delivery applicat
 - **Address**: User delivery addresses
 
 ### Vendor System
-- **Vendor**: Restaurant/store information
+- **Vendor**: Restaurant/store information (Requires `zoneId` and `vendorTypeId`)
 - **Zone**: Geographic delivery boundaries with pricing
 - **VendorCategory**: Category organization, **Product**: Menu items with extras
+- **SubscriptionPlan**: Tiered plans for vendors (Includes `totalOrders` limit)
 
 ### Order System
 - **Order**: Complete order lifecycle with state machine

@@ -26,12 +26,13 @@ import { RegisterDto } from './dto/register.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 import { SendOtpDto } from './dto/send-otp.dto';
 import { SocialLoginDto } from './dto/social-login.dto';
+import { VerifyFirebaseOtpDto } from './dto/verify-firebase-otp.dto';
 import { VerifyOtpDto } from './dto/verify-otp.dto';
 
 @ApiTags('Auth')
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(private readonly authService: AuthService) { }
 
   @Post('register')
   @Throttle({ default: { ttl: 60000, limit: 5 } }) // 5 requests per minute
@@ -119,6 +120,28 @@ export class AuthController {
       ip,
       userAgent,
       deviceId: verifyOtpDto.deviceId,
+    });
+  }
+
+  @Post('verify-firebase-otp')
+  @Throttle({ default: { ttl: 60000, limit: 10 } })
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Verify Firebase Phone Auth token',
+    description:
+      'Verifies a Firebase ID token from phone authentication. Creates a new user if not exists.',
+  })
+  @ApiResponse({ status: 200, description: 'Successfully verified and authenticated' })
+  @ApiResponse({ status: 401, description: 'Invalid or expired Firebase token' })
+  verifyFirebaseOtp(
+    @Body() verifyFirebaseOtpDto: VerifyFirebaseOtpDto,
+    @Ip() ip: string,
+    @Headers('user-agent') userAgent: string,
+  ) {
+    return this.authService.verifyFirebaseOtp(verifyFirebaseOtpDto, {
+      ip,
+      userAgent,
+      deviceId: verifyFirebaseOtpDto.deviceId,
     });
   }
 

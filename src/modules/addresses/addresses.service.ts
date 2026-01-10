@@ -5,19 +5,22 @@ import {
 } from '@nestjs/common';
 import { User } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
+import { ZonesService } from '../zones/zones.service';
 import { CreateAddressDto } from './dto/create-address.dto';
 import { UpdateAddressDto } from './dto/update-address.dto';
 
 @Injectable()
 export class AddressesService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private zonesService: ZonesService,
+  ) { }
 
   async create(createAddressDto: CreateAddressDto, user: User) {
     const profile = await this.prisma.customerProfile.findUnique({
       where: { userId: user.id },
     });
     if (!profile) {
-      // In a real app, this should be handled at user signup
       throw new ForbiddenException('MISSING_CUSTOMER_PROFILE');
     }
 
@@ -28,12 +31,26 @@ export class AddressesService {
           data: { isDefault: false },
         });
 
-        return tx.address.create({
+        const newAddress = await tx.address.create({
           data: {
             ...createAddressDto,
             customerId: profile.id,
           },
         });
+
+        // Update user zoneId based on this coordinates
+        const zone = await this.zonesService.findZoneByLocation(
+          Number(createAddressDto.latitude),
+          Number(createAddressDto.longitude),
+        );
+        if (zone) {
+          await tx.user.update({
+            where: { id: user.id },
+            data: { zoneId: zone.id },
+          });
+        }
+
+        return newAddress;
       });
       return this.transformAddress(address);
     }
@@ -90,10 +107,28 @@ export class AddressesService {
           data: { isDefault: false },
         });
 
-        return tx.address.update({
+        const updatedAddress = await tx.address.update({
           where: { id },
           data: updateAddressDto,
         });
+
+        // Update user zoneId based on this coordinates
+        const lat = updateAddressDto.latitude
+          ? Number(updateAddressDto.latitude)
+          : Number(updatedAddress.latitude);
+        const lng = updateAddressDto.longitude
+          ? Number(updateAddressDto.longitude)
+          : Number(updatedAddress.longitude);
+
+        const zone = await this.zonesService.findZoneByLocation(lat, lng);
+        if (zone) {
+          await tx.user.update({
+            where: { id: user.id },
+            data: { zoneId: zone.id },
+          });
+        }
+
+        return updatedAddress;
       });
       return this.transformAddress(address);
     }

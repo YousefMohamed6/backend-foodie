@@ -1,4 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { Transform } from 'class-transformer';
 import {
   IsArray,
   IsBoolean,
@@ -7,6 +8,7 @@ import {
   IsOptional,
   IsString,
 } from 'class-validator';
+import { normalizePhoneNumber } from '../../../common/utils/phone.utils';
 
 export class CreateVendorDto {
   @ApiProperty()
@@ -42,9 +44,20 @@ export class CreateVendorDto {
   @IsString()
   address?: string;
 
+  @ApiProperty()
+  @IsNotEmpty()
+  @IsString()
+  zoneId: string;
+
+  @ApiProperty()
+  @IsNotEmpty()
+  @IsString()
+  vendorTypeId: string;
+
   @ApiPropertyOptional()
   @IsOptional()
   @IsString()
+  @Transform(({ value }) => normalizePhoneNumber(value))
   phoneNumber?: string;
 
   @ApiPropertyOptional()

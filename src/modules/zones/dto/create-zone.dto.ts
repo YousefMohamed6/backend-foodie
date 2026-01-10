@@ -11,15 +11,20 @@ export class CreateZoneDto {
   @ApiProperty()
   @IsString()
   @IsNotEmpty()
-  name: string;
+  arabicName: string;
+
+  @ApiProperty()
+  @IsString()
+  @IsNotEmpty()
+  englishName: string;
 
   @ApiProperty({ type: [Object], description: 'Array of {lat, lng} points' })
   @IsArray()
   @IsNotEmpty()
-  coordinates: { lat: number; lng: number }[];
+  area: { lat: number; lng: number }[];
 
   @ApiProperty({ default: true })
   @IsBoolean()
   @IsOptional()
-  isActive?: boolean;
+  isPublish?: boolean;
 }
