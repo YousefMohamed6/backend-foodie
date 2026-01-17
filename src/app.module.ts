@@ -43,6 +43,7 @@ import { UploadModule } from './modules/upload/upload.module';
 import { UsersModule } from './modules/users/users.module';
 import { VendorsModule } from './modules/vendors/vendors.module';
 import { WalletModule } from './modules/wallet/wallet.module';
+import { WithdrawModule } from './modules/withdraw/withdraw.module';
 import { ZonesModule } from './modules/zones/zones.module';
 
 import { EmailTemplatesModule } from './modules/email-templates/email-templates.module';
@@ -166,6 +167,7 @@ import {
     MapsModule,
     ManagerAuditModule,
     MarsoulModule,
+    WithdrawModule,
   ],
   controllers: [AppController],
   providers: [

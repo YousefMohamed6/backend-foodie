@@ -9,6 +9,7 @@ import { Prisma, User, UserRole } from '@prisma/client';
 import { VendorStatusMessages } from '../../common/constants/vendor.constants';
 import { normalizePhoneNumber } from '../../common/utils/phone.utils';
 import { PrismaService } from '../../prisma/prisma.service';
+import { RedisService } from '../../shared/services/redis.service';
 import { CouponsService } from '../coupons/coupons.service';
 import { OrdersService } from '../orders/orders.service';
 import { ProductsService } from '../products/products.service';
@@ -32,7 +33,26 @@ export class VendorsService {
     @Inject(forwardRef(() => CouponsService))
     private couponsService: CouponsService,
     private walletService: WalletService,
+    private redisService: RedisService,
   ) { }
+
+  private readonly CACHE_KEYS = {
+    ALL_VENDORS: (zoneId?: string, page?: number | string, limit?: number | string) => `vendors:all:${zoneId || 'no_zone'}:p${page || 1}:l${limit || 20}`,
+    VENDOR_BY_ID: (id: string) => `vendors:id:${id}`,
+    NEAREST_VENDORS: (lat: number, lon: number, radius: number, isDining?: boolean, categoryId?: string, zoneId?: string) =>
+      `vendors:nearest:${lat}:${lon}:${radius}:${isDining || 'any'}:${categoryId || 'any'}:${zoneId || 'no_zone'}`,
+  };
+
+  private async invalidateVendorCache(vendorId?: string, zoneId?: string) {
+    // This is a simple invalidation. In a real production app, we might use patterns (keys *) or more specific tagging.
+    // For now, let's clear main public lists and the specific vendor.
+    if (vendorId) {
+      await this.redisService.del(this.CACHE_KEYS.VENDOR_BY_ID(vendorId));
+    }
+    // Since lists depend on zones/pagination, it's safer to clear or use a shorter TTL.
+    // Given the request for "heavy traffic", we'll use a short-ish TTL (e.g. 5-10 mins) for lists 
+    // and rely on manual invalidation for IDs.
+  }
 
   async create(createVendorDto: CreateVendorDto, user: User) {
     const { photos, restaurantMenuPhotos, ...rest } = createVendorDto;
@@ -124,14 +144,18 @@ export class VendorsService {
     const limit = Math.min(Number(query.limit) || 20, 100);
     const skip = (page - 1) * limit;
 
+    const zoneId = (user?.role === UserRole.CUSTOMER && user.zoneId) ? user.zoneId : query.zoneId;
+    const cacheKey = this.CACHE_KEYS.ALL_VENDORS(zoneId, page, limit);
+
+    const cached = await this.redisService.get<any[]>(cacheKey);
+    if (cached) return cached;
+
     const where: Prisma.VendorWhereInput = {
       isActive: true,
     };
 
-    if (user?.role === UserRole.CUSTOMER && user.zoneId) {
-      where.zoneId = user.zoneId;
-    } else if (query.zoneId) {
-      where.zoneId = query.zoneId;
+    if (zoneId) {
+      where.zoneId = zoneId;
     }
 
     const vendors = await this.prisma.vendor.findMany({
@@ -142,25 +166,42 @@ export class VendorsService {
         photos: true,
         restaurantMenuPhotos: true,
         schedules: true,
+        subscriptionPlan: true,
       },
       orderBy: { createdAt: 'desc' },
     });
-    return Promise.all(vendors.map((v) => this.mapVendorResponse(v as any)));
+
+    const response = await Promise.all(vendors.map((v) => this.mapVendorResponse(v as any)));
+
+    // Cache for 5 minutes
+    await this.redisService.set(cacheKey, response, 300);
+
+    return response;
   }
 
   async findOne(id: string) {
+    const cacheKey = this.CACHE_KEYS.VENDOR_BY_ID(id);
+    const cached = await this.redisService.get(cacheKey);
+    if (cached) return cached;
+
     const vendor = await this.prisma.vendor.findFirst({
       where: { id, isActive: true },
       include: {
         photos: true,
         restaurantMenuPhotos: true,
         schedules: true,
+        subscriptionPlan: true,
       },
     });
     if (!vendor) {
       throw new NotFoundException(VendorStatusMessages.VENDOR_NOT_FOUND);
     }
-    return await this.mapVendorResponse(vendor as any);
+    const response = await this.mapVendorResponse(vendor as any);
+
+    // Cache for 10 minutes
+    await this.redisService.set(cacheKey, response, 600);
+
+    return response;
   }
 
   async update(id: string, updateVendorDto: UpdateVendorDto) {
@@ -205,17 +246,22 @@ export class VendorsService {
         photos: true,
         restaurantMenuPhotos: true,
         schedules: true,
+        subscriptionPlan: true,
       },
     });
 
-    return await this.mapVendorResponse(vendor as any);
+    const response = await this.mapVendorResponse(vendor as any);
+    await this.invalidateVendorCache(id, vendor.zoneId);
+    return response;
   }
 
   async remove(id: string) {
-    return this.prisma.vendor.update({
+    const vendor = await this.prisma.vendor.update({
       where: { id },
       data: { isActive: false },
     });
+    await this.invalidateVendorCache(id, vendor.zoneId);
+    return vendor;
   }
 
   async findByAuthor(authorId: string) {
@@ -225,6 +271,7 @@ export class VendorsService {
         photos: true,
         restaurantMenuPhotos: true,
         schedules: true,
+        subscriptionPlan: true,
       },
     });
     return await this.mapVendorResponse(vendor as any);
@@ -238,6 +285,15 @@ export class VendorsService {
     categoryId?: string,
     user?: User,
   ) {
+    const zoneId = (user?.role === UserRole.CUSTOMER && user.zoneId) ? user.zoneId : undefined;
+    // Round lat/lon to 3 decimal places to increase cache hit rate (approx 100m accuracy)
+    const latKey = Math.round(latitude * 1000) / 1000;
+    const lonKey = Math.round(longitude * 1000) / 1000;
+
+    const cacheKey = this.CACHE_KEYS.NEAREST_VENDORS(latKey, lonKey, radius, isDining, categoryId, zoneId);
+    const cached = await this.redisService.get<any[]>(cacheKey);
+    if (cached) return cached;
+
     const nearbyVendorsRaw = await this.prisma.$queryRaw<{ id: string }[]>`
       SELECT id, 
       (6371 * acos(cos(radians(${latitude})) * cos(radians(latitude)) * cos(radians(longitude) - radians(${longitude})) + sin(radians(${latitude})) * sin(radians(latitude)))) AS distance
@@ -272,8 +328,8 @@ export class VendorsService {
         : {}),
     };
 
-    if (user?.role === UserRole.CUSTOMER && user.zoneId) {
-      where.zoneId = user.zoneId;
+    if (zoneId) {
+      where.zoneId = zoneId;
     }
 
     const vendors = await this.prisma.vendor.findMany({
@@ -283,10 +339,16 @@ export class VendorsService {
         photos: true,
         restaurantMenuPhotos: true,
         schedules: true,
+        subscriptionPlan: true,
       },
     });
 
-    return Promise.all(vendors.map((v) => this.mapVendorResponse(v as any)));
+    const response = await Promise.all(vendors.map((v) => this.mapVendorResponse(v as any)));
+
+    // Cache for 2 minutes (nearest is more dynamic)
+    await this.redisService.set(cacheKey, response, 120);
+
+    return response;
   }
 
   async getProducts(vendorId: string) {
@@ -374,6 +436,7 @@ export class VendorsService {
         photos: true,
         restaurantMenuPhotos: true,
         schedules: true,
+        subscriptionPlan: true,
       },
       skip,
       take: l,
@@ -442,9 +505,20 @@ export class VendorsService {
       );
     }
 
+    const hasValidPlan = !!vendor.subscriptionPlan;
+    const isNotExpired = vendor.subscriptionExpiryDate ? new Date(vendor.subscriptionExpiryDate) > now : true;
+    const isWithinLimits = hasValidPlan && (
+      Number(vendor.subscriptionPlan.price) <= 0 ||
+      vendor.subscriptionPlan.totalOrders === -1 ||
+      (vendor.subscriptionTotalOrders ?? 0) > 0
+    );
+
+    const isSubscriptionActive = hasValidPlan && isNotExpired && isWithinLimits;
+
     return {
       ...rest,
       isOpen,
+      isSubscriptionActive,
       photos: photos?.map((p: any) => p.url) || [],
       restaurantMenuPhotos: restaurantMenuPhotos?.map((p: any) => p.url) || [],
     };

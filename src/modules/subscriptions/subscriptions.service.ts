@@ -5,7 +5,7 @@ import { SubscribeDto } from './dto/subscribe.dto';
 
 @Injectable()
 export class SubscriptionsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(private prisma: PrismaService) { }
 
   async getPlans() {
     return this.prisma.subscriptionPlan.findMany({ where: { isActive: true } });
@@ -36,17 +36,48 @@ export class SubscriptionsService {
     const endDate = new Date();
     endDate.setDate(startDate.getDate() + plan.durationDays);
 
-    return this.prisma.subscription.create({
-      data: {
-        userId,
-        planId: plan.id,
-        startDate,
-        endDate,
-        amountPaid: plan.price,
-        paymentMethod: subscribeDto.paymentMethod,
-        paymentId: subscribeDto.paymentId,
-        status: SubscriptionStatus.ACTIVE,
-      },
+    return this.prisma.$transaction(async (tx) => {
+      // Create subscription record
+      const subscription = await tx.subscription.create({
+        data: {
+          userId,
+          planId: plan.id,
+          startDate,
+          endDate,
+          amountPaid: plan.price,
+          paymentMethod: subscribeDto.paymentMethod,
+          paymentId: subscribeDto.paymentId,
+          status: SubscriptionStatus.ACTIVE,
+        },
+      });
+
+      // Update vendor's subscription info
+      const vendor = await tx.vendor.findFirst({
+        where: { authorId: userId },
+      });
+
+      if (vendor) {
+        await tx.vendor.update({
+          where: { id: vendor.id },
+          data: {
+            subscriptionPlanId: plan.id,
+            subscriptionExpiryDate: endDate,
+            subscriptionTotalOrders: plan.totalOrders,
+            subscriptionId: subscription.id,
+          },
+        });
+      }
+
+      // Also update the User record's subscription fields
+      await tx.user.update({
+        where: { id: userId },
+        data: {
+          subscriptionPlanId: plan.id,
+          subscriptionExpiryDate: endDate,
+        },
+      });
+
+      return subscription;
     });
   }
 }

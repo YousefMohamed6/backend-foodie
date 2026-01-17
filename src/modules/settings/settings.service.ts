@@ -10,9 +10,10 @@ export class SettingsService {
     private prisma: PrismaService,
     private settingsGateway: SettingsGateway,
     private redis: RedisService,
-  ) {}
+  ) { }
 
   private readonly CACHE_KEY = 'global:settings';
+  private readonly CACHE_KEY_INDIVIDUAL = 'setting:';
 
   async findAll() {
     // Try to get from cache first
@@ -34,10 +35,16 @@ export class SettingsService {
   }
 
   async findOne(key: string) {
+    const cacheKey = `${this.CACHE_KEY_INDIVIDUAL}${key}`;
+    const cached = await this.redis.get<string>(cacheKey);
+    if (cached) return cached;
+
     const setting = await this.prisma.setting.findUnique({ where: { key } });
     if (!setting) {
       throw new NotFoundException('SETTING_NOT_FOUND');
     }
+
+    await this.redis.set(cacheKey, setting.value, 3600); // 1 hour
     return setting.value;
   }
 
@@ -50,6 +57,7 @@ export class SettingsService {
 
     // Invalidate cache
     await this.redis.del(this.CACHE_KEY);
+    await this.redis.del(`${this.CACHE_KEY_INDIVIDUAL}${key}`);
 
     // Emit real-time update
     this.settingsGateway.emitSettingsUpdate({ [key]: value });
@@ -99,23 +107,16 @@ export class SettingsService {
       APP_SETTINGS.WEBSITE_URL,
     ];
 
-    const settings = await this.prisma.setting.findMany({
-      where: {
-        key: {
-          in: publicKeys,
-        },
-      },
-    });
-
+    const allSettings = await this.findAll();
     const result: Record<string, any> = {};
 
-    for (const setting of settings) {
-      try {
-        // Try to parse as JSON first
-        result[setting.key] = JSON.parse(setting.value);
-      } catch {
-        // If not JSON, use as string
-        result[setting.key] = setting.value;
+    for (const key of publicKeys) {
+      if (allSettings[key]) {
+        try {
+          result[key] = JSON.parse(allSettings[key]);
+        } catch {
+          result[key] = allSettings[key];
+        }
       }
     }
 

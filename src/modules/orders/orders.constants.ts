@@ -29,6 +29,9 @@ export const ORDERS_ERRORS = {
   NO_HELD_BALANCE_OR_ALREADY_PROCESSED: 'NO_HELD_BALANCE_OR_ALREADY_PROCESSED',
   DISPUTE_ALREADY_EXISTS: 'DISPUTE_ALREADY_EXISTS',
   VENDOR_CLOSED: 'VENDOR_CLOSED',
+  SUBSCRIPTION_ORDER_LIMIT_REACHED: 'SUBSCRIPTION_ORDER_LIMIT_REACHED',
+  ORDER_NOT_SHIPPED: 'ORDER_NOT_SHIPPED',
+  INVALID_DELIVERY_OTP: 'INVALID_DELIVERY_OTP',
 } as const;
 
 export const ORDERS_NOTIFICATIONS = {
@@ -81,4 +84,18 @@ export const OrderConstants = {
   HELD_BALANCE_REASON_AWAITING_CONFIRMATION: 'awaiting_delivery_confirmation',
   MANAGER_AUDIT_ACTION_DISPATCH: 'dispatch',
   SYSTEM_ACTOR_ID: 'system',
+} as const;
+
+export const OrderSocketEvents = {
+  // Room prefixes
+  ZONE_ROOM_PREFIX: 'zone_',
+  VENDOR_ROOM_PREFIX: 'vendor_',
+
+  // Server events
+  ORDER_UPDATED: 'orderUpdated',
+  VENDOR_ORDER_UPDATED: 'vendorOrderUpdated',
+  CUSTOMER_ORDER_UPDATED: 'customerOrderUpdated',
+  DRIVER_ORDER_UPDATED: 'driverOrderUpdated',
+  ZONE_ORDER_UPDATED: 'zoneOrderUpdated',
+  DRIVER_LOCATION_UPDATED: 'orderDriverLocationUpdated',
 } as const;

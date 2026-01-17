@@ -6,12 +6,27 @@ import {
 import { Prisma } from '@prisma/client';
 import { isPointInPolygon } from '../../common/utils/geo.utils';
 import { PrismaService } from '../../prisma/prisma.service';
+import { RedisService } from '../../shared/services/redis.service';
 import { CreateZoneDto } from './dto/create-zone.dto';
 import { UpdateZoneDto } from './dto/update-zone.dto';
 
 @Injectable()
 export class ZonesService {
-  constructor(private prisma: PrismaService) { }
+  constructor(
+    private prisma: PrismaService,
+    private redisService: RedisService,
+  ) { }
+
+  private readonly CACHE_KEYS = {
+    ALL_ZONES: 'zones:all',
+    ZONE_BY_ID: (id: string) => `zones:id:${id}`,
+    PUBLISHED_ZONES: 'zones:published',
+  };
+
+  private async invalidateZonesCache() {
+    await this.redisService.del(this.CACHE_KEYS.ALL_ZONES);
+    await this.redisService.del(this.CACHE_KEYS.PUBLISHED_ZONES);
+  }
 
   async create(createZoneDto: CreateZoneDto) {
     const existingArabic = await this.prisma.zone.findFirst({
@@ -34,20 +49,33 @@ export class ZonesService {
       ...createZoneDto,
       area: createZoneDto.area as unknown as Prisma.InputJsonValue,
     };
-    return this.prisma.zone.create({
+    const result = await this.prisma.zone.create({
       data,
     });
+    await this.invalidateZonesCache();
+    return result;
   }
 
-  findAll() {
-    return this.prisma.zone.findMany();
+  async findAll() {
+    const cached = await this.redisService.get<any[]>(this.CACHE_KEYS.ALL_ZONES);
+    if (cached) return cached;
+
+    const zones = await this.prisma.zone.findMany();
+    await this.redisService.set(this.CACHE_KEYS.ALL_ZONES, zones, 3600); // 1 hour
+    return zones;
   }
 
   async findOne(id: string) {
+    const cacheKey = this.CACHE_KEYS.ZONE_BY_ID(id);
+    const cached = await this.redisService.get(cacheKey);
+    if (cached) return cached;
+
     const zone = await this.prisma.zone.findUnique({ where: { id } });
     if (!zone) {
       throw new NotFoundException(`Zone with ID ${id} not found`);
     }
+
+    await this.redisService.set(cacheKey, zone, 3600); // 1 hour
     return zone;
   }
 
@@ -86,21 +114,33 @@ export class ZonesService {
         ? (updateZoneDto.area as unknown as Prisma.InputJsonValue)
         : undefined,
     };
-    return this.prisma.zone.update({
+    const result = await this.prisma.zone.update({
       where: { id },
       data,
     });
+    await this.invalidateZonesCache();
+    await this.redisService.del(this.CACHE_KEYS.ZONE_BY_ID(id));
+    return result;
   }
 
   async remove(id: string) {
     await this.findOne(id);
-    return this.prisma.zone.delete({ where: { id } });
+    const result = await this.prisma.zone.delete({ where: { id } });
+    await this.invalidateZonesCache();
+    await this.redisService.del(this.CACHE_KEYS.ZONE_BY_ID(id));
+    return result;
   }
 
   async findZoneByLocation(lat: number, lng: number) {
-    const zones = await this.prisma.zone.findMany({
-      where: { isPublish: true },
-    });
+    const cachedPublished = await this.redisService.get<any[]>(this.CACHE_KEYS.PUBLISHED_ZONES);
+    let zones = cachedPublished;
+
+    if (!zones) {
+      zones = await this.prisma.zone.findMany({
+        where: { isPublish: true },
+      });
+      await this.redisService.set(this.CACHE_KEYS.PUBLISHED_ZONES, zones, 1800); // 30 mins
+    }
 
     for (const zone of zones) {
       const area = zone.area as unknown as { lat: number; lng: number }[];

@@ -40,6 +40,7 @@ All API responses follow a consistent structure to simplify client-side handling
 | `ERR_NOT_FOUND` | Resource does not exist |
 | `ERR_BAD_REQUEST` | Validation or logic error |
 | `ERR_DATABASE` | Data persistence failure |
+| `SUBSCRIPTION_ORDER_LIMIT_REACHED` | Vendor has reached their plan's order limit |
 
 ---
 
@@ -230,7 +231,7 @@ Response: {
 #### Get Vendor by ID
 ```
 GET /api/v1/vendors/{vendorId}
-Response: VendorModel
+Response: VendorModel (Includes `isSubscriptionActive` boolean)
 ```
 
 #### Get Vendor Products
@@ -465,32 +466,110 @@ Response: {
 }
 ```
 
-#### Withdraw Wallet Amount
+---
+
+## Withdrawals & Payout Accounts
+
+### 💸 Withdrawal Requests
+
+#### Create Withdrawal Request
 ```
-POST /api/v1/wallet/withdraw
-Headers: Authorization: Bearer {token} (vendor/driver)
+POST /api/v1/withdraw
+Headers: Authorization: Bearer {token} (vendor/driver/manager)
 Body: {
   "amount": number,
-  "withdrawMethodId": "string",
-  "accountDetails": object
+  "payoutAccountId"?: "string",
+  "accountDetails"?: object (if accountId not provided)
 }
 Response: {
-  "withdrawal": WithdrawalModel
+  "id": "string",
+  "userId": "string",
+  "amount": number,
+  "status": "PENDING",
+  "createdAt": "ISO8601"
 }
 ```
 
-#### Get Withdrawal History
+#### Get My Withdrawal History
 ```
-GET /api/v1/wallet/withdrawals
-Headers: Authorization: Bearer {token} (vendor/driver)
+GET /api/v1/withdraw/history
+Headers: Authorization: Bearer {token} (vendor/driver/manager)
 Query: {
   page?: number,
   limit?: number
 }
 Response: {
-  "withdrawals": WithdrawalModel[],
+  "requests": WithdrawalRequestModel[],
   "pagination": PaginationMeta
 }
+```
+
+#### [Admin] Get Pending Requests
+```
+GET /api/v1/withdraw/pending
+Headers: Authorization: Bearer {token} (admin)
+Response: WithdrawalRequestModel[]
+```
+
+#### [Admin] Approve Request
+```
+POST /api/v1/withdraw/approve/{id}
+Headers: Authorization: Bearer {token} (admin)
+Response: { "success": true }
+```
+
+#### [Admin] Reject Request
+```
+POST /api/v1/withdraw/reject/{id}
+Headers: Authorization: Bearer {token} (admin)
+Body: { "reason": "string" }
+Response: { "success": true }
+```
+
+#### [Admin] Complete Request (Finalize & Debit)
+```
+POST /api/v1/withdraw/complete/{id}
+Headers: Authorization: Bearer {token} (admin)
+Response: { "success": true }
+```
+
+### 💳 Payout Accounts
+
+#### Get Saved Payout Accounts
+```
+GET /api/v1/withdraw/accounts
+Headers: Authorization: Bearer {token} (vendor/driver/manager)
+Response: PayoutAccountModel[]
+```
+
+#### Create Payout Account
+```
+POST /api/v1/withdraw/accounts
+Headers: Authorization: Bearer {token} (vendor/driver/manager)
+Body: {
+  "method": "bank_transfer" | "paypal" | "stripe" | "vodafone_cash",
+  "details": object,
+  "isDefault": boolean
+}
+Response: PayoutAccountModel
+```
+
+#### Update Payout Account
+```
+PATCH /api/v1/withdraw/accounts/{id}
+Headers: Authorization: Bearer {token}
+Body: {
+  "details"?: object,
+  "isDefault"?: boolean
+}
+Response: PayoutAccountModel
+```
+
+#### Delete Payout Account
+```
+DELETE /api/v1/withdraw/accounts/{id}
+Headers: Authorization: Bearer {token}
+Response: { "success": true }
 ```
 
 ---
@@ -1170,47 +1249,71 @@ Response: {
 
 ---
 
-## Realtime Features (WebSocket/SSE)
+## Realtime Features (WebSocket)
 
-### WebSocket Connection
-```
-WS /api/v1/realtime
-Headers: Authorization: Bearer {token}
-```
+### Orders WebSocket
 
-### Events
+**Namespace**: `/orders`
 
-#### Order Updates
+**Connection**:
 ```
-Event: order:updated
-Data: OrderModel
+WS ws://host:port/orders
+Auth: { token: "Bearer {jwt}" } OR Headers: Authorization: Bearer {token}
 ```
 
-#### Driver Location Updates
+### Client Events (Subscribe)
+
+#### Watch Single Order
 ```
-Event: driver:location
-Data: {
-  driverId: string,
-  latitude: number,
-  longitude: number,
-  rotation: number
-}
+Event: watchOrder
+Data: { orderId: string }
+Response: { event: 'watching', orderId: string }
 ```
 
-#### Chat Messages
+#### Watch Vendor Orders (Vendor Role)
+Vendors subscribe using their vendorId automatically.
 ```
-Event: chat:message
-Data: ConversationModel
+Event: watchVendorOrders
+Response: { event: 'watching_vendor', vendorId: string }
 ```
 
-#### Order Status Changes
+#### Watch Zone Orders (Manager Role)
+Managers subscribe using their zoneId automatically.
 ```
-Event: order:status
-Data: {
-  orderId: string,
-  status: string
-}
+Event: watchZoneOrders
+Response: { event: 'watching_zone', zoneId: string }
 ```
+
+#### Stop Watching
+```
+Event: stopWatchOrder
+Data: { orderId: string }
+
+Event: stopWatchVendorOrders
+
+Event: stopWatchZoneOrders
+```
+
+### Server Events (Subscribe)
+
+| Event | Recipient | Description |
+|-------|-----------|-------------|
+| `orderUpdated` | Order room subscribers | Order data changed |
+| `customerOrderUpdated` | Customer (authorId) | Customer's own orders |
+| `vendorOrderUpdated` | Vendor (vendorId) | Vendor's orders |
+| `driverOrderUpdated` | Driver (driverId) | Driver's assigned orders |
+| `zoneOrderUpdated` | Manager (zoneId) | Zone orders for managers |
+| `orderDriverLocationUpdated` | Order room | Driver location update |
+
+### Role-Based Order Updates
+
+| Role | Subscription Method | Orders Received |
+|------|-------------------|-----------------|
+| Customer | Auto (authorId room) | Own orders only |
+| Vendor | `watchVendorOrders` | Orders by vendorId |
+| Manager | `watchZoneOrders` | Orders in assigned zone |
+| Driver | Auto (driverId room) | Assigned orders only |
+
 
 ---
 

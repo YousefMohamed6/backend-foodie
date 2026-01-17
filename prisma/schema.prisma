@@ -18,7 +18,7 @@ model User {
   countryCode              String?
   password                 String
   profilePictureURL        String?
-  fcmToken                 String?
+  fcmToken                 String?                     @unique
   role                     UserRole                    @default(CUSTOMER)
   isDocumentVerify         Boolean                     @default(false)
   zoneId                   String?
@@ -69,6 +69,8 @@ model User {
   walletTransactions       WalletTransaction[]
   withdrawMethod           WithdrawMethod?
   chatChannels             ChatChannel[]               @relation("UserChannels")
+  withdrawRequests         WithdrawRequest[]
+  payoutAccounts           PayoutAccount[]
 
   @@map("users")
 }
@@ -346,6 +348,7 @@ model Order {
   driverCommissionValue     Decimal                   @default(0) @map("driver_commission_value") @db.Decimal(10, 2)
   driverNet                 Decimal                   @default(0) @map("driver_net") @db.Decimal(10, 2)
   estimatedReadyAt          DateTime?                 @map("estimated_ready_at")
+  deliveryOtp               String?                   @map("delivery_otp")
   isReadyNotificationSent   Boolean                   @default(false) @map("is_ready_notification_sent")
   platformTotalCommission   Decimal                   @default(0) @map("platform_total_commission") @db.Decimal(10, 2)
   vendorCommissionApplied   Boolean                   @default(false) @map("vendor_commission_applied")
@@ -1558,3 +1561,57 @@ model SupportMessage {
   @@map("support_messages")
 }
 
+
+enum WithdrawStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  COMPLETED
+  FAILED
+}
+
+enum WithdrawalMethod {
+  MANUAL
+  BANK
+  INSTAPAY
+  VODAFONE_CASH
+}
+
+model WithdrawRequest {
+  id              String   @id @default(uuid())
+  userId          String
+  amount          Decimal  @db.Decimal(10, 2)
+  status          WithdrawStatus @default(PENDING)
+  method          WithdrawalMethod
+  accountDetails  Json?
+  referenceId     String?
+  adminNotes      String?
+  snapshotBalance Decimal? @db.Decimal(10, 2)
+  payoutAccountId String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  processedAt     DateTime?
+  completedAt     DateTime?
+  rejectedAt      DateTime?
+  failedAt        DateTime?
+
+  user           User           @relation(fields: [userId], references: [id])
+  payoutAccount  PayoutAccount? @relation(fields: [payoutAccountId], references: [id])
+  
+  @@map("withdraw_requests")
+}
+
+model PayoutAccount {
+  id          String           @id @default(uuid())
+  userId      String           @map("user_id")
+  method      WithdrawalMethod
+  details     Json             @map("details") // Stores { accountNumber, bankName, etc. }
+  isDefault   Boolean          @default(false) @map("is_default")
+  createdAt   DateTime         @default(now()) @map("created_at")
+  updatedAt   DateTime         @updatedAt      @map("updated_at")
+
+  user             User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  withdrawRequests WithdrawRequest[]
+
+  @@map("payout_accounts")
+}

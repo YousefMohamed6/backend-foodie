@@ -56,6 +56,18 @@ This application facilitates the order and delivery process involving four key r
 - Wallet transactions are atomic
 - Refunds and reversals handled strictly based on order state
 
+### Manual Withdrawals
+- **Eligibility**: Support for `VENDOR`, `DRIVER`, and `MANAGER` roles.
+- **Process**: Users submit a withdrawal request. Admin reviews and completes the request.
+- **Transactional Safety**: Funds are debited directly from the profile balance (`walletAmount`) within a database transaction upon completion to prevent concurrent overdrafts.
+- **Driver Debt**: Driver withdrawals are prevented if the resulting balance would fall below zero (accounting for cash collection debt).
+
+### Payout Accounts
+- **Functionality**: Users can save multiple payout methods (Stripe, PayPal, Bank Transfer, etc.).
+- **Details**: Specific account details are stored securely as JSON.
+- **Default Selection**: One account can be marked as default for quick withdrawal requests.
+- **Security**: CRUD operations are restricted to the account owner and protected by strict rate limits.
+
 ---
 
 ## 4. Cancellations and Refunds
@@ -199,6 +211,13 @@ When customer reports non-receipt:
 | Vendor Working Hours | ✅ Implemented |
 | Address-Zone Sync | ✅ Implemented |
 | Zone-Filtered Products| ✅ Implemented |
+| Manual Withdrawals | ✅ Implemented |
+| Payout Accounts | ✅ Implemented |
+| Heavy-Traffic Redis Caching | ✅ Implemented |
+| Vendor Subscriptions | ✅ Implemented |
+| Subscription Expiry Scheduler | ✅ Implemented |
+| Order Limit Enforcement | ✅ Implemented |
+| Expiry Notifications | ✅ Implemented |
 
 ---
 
@@ -246,4 +265,44 @@ Vendors have configurable working hours for each day of the week. The applicatio
 
 ---
 
-**Last Updated**: 2026-01-10
+## 10. Vendor Subscriptions & Order Limits
+
+### 10.1 Core Principle
+The system enforces order capacity limits for vendors based on their current paid subscription plan. This ensures platform sustainability and tiered service delivery.
+
+### 10.2 Plan Types
+- **Free/Basic Plan**: (Price = 0) Provides a baseline order capacity (default: unlimited).
+- **Paid Plans**: (Price > 0) Provides a specific number of available orders (`totalOrders`). Admin commission is typically waived for paid plans.
+- **Unlimited Plans**: Any plan with `totalOrders = -1` allows infinite order acceptance.
+
+### 10.3 Order Limit Enforcement
+- **Constraint**: Vendors on a paid plan with a limited capacity cannot accept new orders if their `subscriptionTotalOrders` count is zero or less.
+- **Real-time Tracking**: The remaining order count is decremented immediately upon order acceptance by the vendor.
+- **Error Handling**: Throws a `SUBSCRIPTION_ORDER_LIMIT_REACHED` error with localized instructions to upgrade.
+
+### 10.4 Subscription Lifecycle & Expiry
+- **Background Scheduler**: A daily cron job (midnight) deactivates expired subscriptions and resets vendors to the default Free Plan.
+- **Status Synchronization**: Expiry and plan changes are synchronized between the `Vendor` entity and the associated `User` record.
+- **Subscription Status API**: The vendor response includes a calculated `isSubscriptionActive` boolean, which factors in the expiry date, plan limits, and plan type.
+
+### 10.5 Expiry Notifications
+- **Proactive Alerts**: Vendors receive localized push notifications when their subscription has **3, 2, or 1 day(s)** remaining.
+- **Event Logging**: All subscription changes (success, expiry, upgrade) are recorded in an immutable `SubscriptionEventLog`.
+
+---
+
+## 11. Secure Delivery Verification (OTP)
+
+### 11.1 Purpose
+To prevent fraudulent delivery claims and ensure proof of receipt for prepaid (Wallet) orders, a secure 6-digit OTP verification mechanism is enforced.
+
+### 11.2 The Workflow
+1.  **OTP Generation**: When a driver confirms pickup from the vendor and the order status changes to `SHIPPED`, the system automatically generates a unique 6-digit `deliveryOtp` for that order.
+2.  **Customer Access**: The customer can retrieve this OTP via a dedicated API endpoint (`GET /orders/:id/delivery-otp`) only if the order is in the `SHIPPED` state.
+3.  **Physical Verification**: At the point of delivery, the customer must provide this OTP to the driver.
+4.  **Driver Confirmation**: The driver enters the OTP into their mobile application to mark the order as `COMPLETED`.
+5.  **Enforcement**: For all `Wallet` orders, the system blocks completion unless the correct OTP is provided.
+
+---
+
+**Last Updated**: 2026-01-12

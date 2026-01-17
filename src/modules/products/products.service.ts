@@ -8,6 +8,7 @@ import {
 } from '@nestjs/common';
 import { Prisma, User, UserRole } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
+import { RedisService } from '../../shared/services/redis.service';
 import { VendorsService } from '../vendors/vendors.service';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
@@ -22,7 +23,21 @@ export class ProductsService {
     private prisma: PrismaService,
     @Inject(forwardRef(() => VendorsService))
     private vendorsService: VendorsService,
+    private redisService: RedisService,
   ) { }
+
+  private readonly CACHE_KEYS = {
+    ALL_PRODUCTS: (query: any, zoneId?: string) => `products:all:${zoneId || 'no_zone'}:${JSON.stringify(query)}`,
+    PRODUCT_BY_ID: (id: string) => `products:id:${id}`,
+    BY_CATEGORY_ZONE: (categoryId: string, zoneId: string) => `products:cat:${categoryId}:zone:${zoneId}`,
+  };
+
+  private async invalidateProductCache(productId?: string, vendorId?: string, zoneId?: string) {
+    if (productId) {
+      await this.redisService.del(this.CACHE_KEYS.PRODUCT_BY_ID(productId));
+    }
+    // Lists are cleared by TTL for simplicity, but we could be more aggressive if needed.
+  }
 
   async create(createProductDto: CreateProductDto, user: User) {
     const vendor = await this.vendorsService.findByAuthor(user.id);
@@ -50,6 +65,7 @@ export class ProductsService {
       include: { extras: true, itemAttributes: true },
     });
 
+    await this.invalidateProductCache(undefined, vendor.id, vendor.zoneId);
     return this.mapProductResponse(product);
   }
 
@@ -68,6 +84,12 @@ export class ProductsService {
     const limit = Math.min(Number(query.limit) || 20, 100); // Max 100 per page
     const skip = (page - 1) * limit;
 
+    const zoneId = (user?.role === UserRole.CUSTOMER && user.zoneId) ? user.zoneId : undefined;
+    const cacheKey = this.CACHE_KEYS.ALL_PRODUCTS(query, zoneId);
+
+    const cached = await this.redisService.get<any[]>(cacheKey);
+    if (cached) return cached;
+
     const where: Prisma.ProductWhereInput = {
       isActive:
         query.publish !== undefined
@@ -78,10 +100,10 @@ export class ProductsService {
     if (query.vendorId) where.vendorId = query.vendorId;
     if (query.categoryId) where.categoryId = query.categoryId;
 
-    if (user?.role === UserRole.CUSTOMER && user.zoneId) {
+    if (zoneId) {
       where.vendor = {
         isActive: true,
-        zoneId: user.zoneId,
+        zoneId: zoneId,
       };
     }
 
@@ -100,13 +122,20 @@ export class ProductsService {
       include: { extras: true, itemAttributes: true },
     });
 
-    return products.map((p) => this.mapProductResponse(p));
+    const response = products.map((p) => this.mapProductResponse(p));
+    // Cache for 5 minutes
+    await this.redisService.set(cacheKey, response, 300);
+    return response;
   }
 
   async findByCategoryAndZone(categoryId: string, user: User) {
     if (!user.zoneId) {
       return [];
     }
+
+    const cacheKey = this.CACHE_KEYS.BY_CATEGORY_ZONE(categoryId, user.zoneId);
+    const cached = await this.redisService.get<any[]>(cacheKey);
+    if (cached) return cached;
 
     const products = await this.prisma.product.findMany({
       where: {
@@ -124,7 +153,10 @@ export class ProductsService {
       orderBy: { createdAt: 'desc' },
     });
 
-    return products.map((p) => this.mapProductResponse(p));
+    const response = products.map((p) => this.mapProductResponse(p));
+    // Cache for 5 minutes
+    await this.redisService.set(cacheKey, response, 300);
+    return response;
   }
 
   async count(query: { vendorId?: string }) {
@@ -134,6 +166,10 @@ export class ProductsService {
   }
 
   async findOne(id: string) {
+    const cacheKey = this.CACHE_KEYS.PRODUCT_BY_ID(id);
+    const cached = await this.redisService.get(cacheKey);
+    if (cached) return cached;
+
     const product = await this.prisma.product.findUnique({
       where: { id },
       include: { vendor: true, extras: true, itemAttributes: true },
@@ -141,7 +177,11 @@ export class ProductsService {
     if (!product || !product.vendor?.isActive) {
       throw new NotFoundException('PRODUCT_NOT_FOUND');
     }
-    return this.mapProductResponse(product);
+    const response = this.mapProductResponse(product);
+
+    // Cache for 10 minutes
+    await this.redisService.set(cacheKey, response, 600);
+    return response;
   }
 
   async update(id: string, updateProductDto: UpdateProductDto, user: User) {
@@ -197,9 +237,10 @@ export class ProductsService {
             }
             : undefined,
       },
-      include: { extras: true, itemAttributes: true },
+      include: { extras: true, itemAttributes: true, vendor: true },
     });
 
+    await this.invalidateProductCache(id, savedProduct.vendorId, savedProduct.vendor?.zoneId);
     return this.mapProductResponse(savedProduct);
   }
 
@@ -214,10 +255,14 @@ export class ProductsService {
       throw new ForbiddenException('FORBIDDEN');
     }
 
-    return this.prisma.product.update({
+    const updatedProduct = await this.prisma.product.update({
       where: { id },
       data: { isActive: false },
+      include: { vendor: true },
     });
+
+    await this.invalidateProductCache(id, updatedProduct.vendorId, updatedProduct.vendor?.zoneId);
+    return updatedProduct;
   }
 
   async search(

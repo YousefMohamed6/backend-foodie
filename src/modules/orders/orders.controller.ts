@@ -22,6 +22,7 @@ import { AssignDriverDto } from './dto/assign-driver.dto';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { DriverReportProblemDto } from './dto/driver-report-problem.dto';
 import { FindAllOrdersQueryDto } from './dto/find-all-orders-query.dto';
+import { MarkOrderDeliveredDto } from './dto/mark-order-delivered.dto';
 import { VendorAcceptOrderDto } from './dto/vendor-accept-order.dto';
 import { OrdersService } from './orders.service';
 
@@ -30,7 +31,7 @@ import { OrdersService } from './orders.service';
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('orders')
 export class OrdersController {
-  constructor(private readonly ordersService: OrdersService) {}
+  constructor(private readonly ordersService: OrdersService) { }
 
   @Post()
   @Roles(UserRole.CUSTOMER)
@@ -211,8 +212,12 @@ export class OrdersController {
   @ApiOperation({
     summary: 'Mark order as completed (triggers driver commission)',
   })
-  async markOrderCompleted(@Param('id') id: string, @Request() req) {
-    const data = await this.ordersService.markOrderDelivered(id, req.user);
+  async markOrderCompleted(
+    @Param('id') id: string,
+    @Body() dto: MarkOrderDeliveredDto,
+    @Request() req,
+  ) {
+    const data = await this.ordersService.markOrderDelivered(id, req.user, dto);
     return { success: true, message: 'ORDER_COMPLETED', data };
   }
 
@@ -344,5 +349,13 @@ export class OrdersController {
       req.user,
     );
     return { success: true, message: 'PROTECTION_STATUS_RETRIEVED', data };
+  }
+
+  @Get(':id/delivery-otp')
+  @Roles(UserRole.CUSTOMER)
+  @ApiOperation({ summary: 'Get delivery OTP for a shipped order' })
+  async getDeliveryOtp(@Param('id') id: string, @Request() req) {
+    const data = await this.ordersService.getDeliveryOtp(id, req.user);
+    return { success: true, message: 'OTP_RETRIEVED', data };
   }
 }

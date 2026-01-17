@@ -40,6 +40,7 @@ import { CommissionService } from './commission.service';
 import { AssignDriverDto } from './dto/assign-driver.dto';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { DriverReportProblemDto } from './dto/driver-report-problem.dto';
+import { MarkOrderDeliveredDto } from './dto/mark-order-delivered.dto';
 import { VendorAcceptOrderDto } from './dto/vendor-accept-order.dto';
 import { OrderManagementService } from './order-management.service';
 import { OrderPricingService } from './order-pricing.service';
@@ -562,13 +563,24 @@ export class OrdersService {
   async vendorAcceptOrder(id: string, user: User, dto?: VendorAcceptOrderDto) {
     const order = await this.prisma.order.findUnique({
       where: { id },
-      include: { vendor: true },
+      include: { vendor: { include: { subscriptionPlan: true } } },
     });
 
     if (!order) throw new NotFoundException(ORDERS_ERRORS.ORDER_NOT_FOUND);
 
     if (user.role === UserRole.VENDOR && order.vendor.authorId !== user.id) {
       throw new ForbiddenException(ORDERS_ERRORS.ACCESS_DENIED);
+    }
+
+    // Check subscription order limit for paid plans (totalOrders -1 means unlimited)
+    const plan = order.vendor.subscriptionPlan;
+    if (plan && Number(plan.price) !== 0 && plan.totalOrders !== -1) {
+      const remainingOrders = order.vendor.subscriptionTotalOrders ?? 0;
+      if (remainingOrders <= 0) {
+        throw new BadRequestException(
+          ORDERS_ERRORS.SUBSCRIPTION_ORDER_LIMIT_REACHED,
+        );
+      }
     }
 
     return await this.prisma.$transaction(async (tx) => {
@@ -584,6 +596,14 @@ export class OrdersService {
         throw new BadRequestException(ORDERS_ERRORS.ORDER_NOT_PLACED);
       if (currentOrder.vendorCommissionApplied)
         throw new BadRequestException(ORDERS_ERRORS.COMMISSION_ALREADY_APPLIED);
+
+      // Decrement subscription orders for paid plans
+      if (plan && Number(plan.price) !== 0) {
+        await tx.vendor.update({
+          where: { id: order.vendorId },
+          data: { subscriptionTotalOrders: { decrement: 1 } },
+        });
+      }
 
       const isFreePlan = await this.commissionService.isVendorOnFreePlan(
         order.vendorId,
@@ -672,7 +692,7 @@ export class OrdersService {
     });
   }
 
-  async markOrderDelivered(id: string, user: User) {
+  async markOrderDelivered(id: string, user: User, dto?: MarkOrderDeliveredDto) {
     const order = await this.prisma.order.findUnique({
       where: { id },
       include: { vendor: true },
@@ -682,6 +702,16 @@ export class OrdersService {
 
     if (user.role === UserRole.DRIVER && order.driverId !== user.id) {
       throw new ForbiddenException(ORDERS_ERRORS.ACCESS_DENIED);
+    }
+
+    // OTP validation for wallet orders
+    if (order.paymentMethod === PaymentMethod.wallet) {
+      if (!dto?.otp) {
+        throw new BadRequestException('OTP_REQUIRED');
+      }
+      if (order.deliveryOtp !== dto.otp) {
+        throw new BadRequestException(ORDERS_ERRORS.INVALID_DELIVERY_OTP);
+      }
     }
 
     return await this.prisma.$transaction(async (tx) => {
@@ -709,21 +739,12 @@ export class OrdersService {
         throw new BadRequestException(ORDERS_ERRORS.INVALID_ORDER_STATUS);
       }
 
-      // Update order status to COMPLETED
       const savedOrder = await tx.order.update({
         where: { id },
         data: {
           status: OrderStatus.COMPLETED,
         },
         include: orderInclude,
-      });
-
-      // Update Vendor metrics
-      await tx.vendor.update({
-        where: { id: order.vendorId },
-        data: {
-          subscriptionTotalOrders: { increment: 1 },
-        },
       });
 
       // --- WALLET UPDATES FOR CASH ON DELIVERY ---
@@ -942,7 +963,10 @@ export class OrdersService {
       const platformTotal =
         Number(order.vendorCommissionValue) + driverCommissionValue;
 
-      // 2. Update Order Status and metrics
+      // 2. Generate Delivery OTP for secure confirmation
+      const deliveryOtp = Math.floor(100000 + Math.random() * 900000).toString();
+
+      // 3. Update Order Status and metrics
       const savedOrder = await tx.order.update({
         where: { id },
         data: {
@@ -952,6 +976,7 @@ export class OrdersService {
           driverCommissionValue, // Platform's cut
           driverNet, // Driver pay portion
           platformTotalCommission: platformTotal,
+          deliveryOtp,
         },
         include: orderInclude,
       });
@@ -1385,7 +1410,9 @@ export class OrdersService {
   private emitUpdate(order: any) {
     const mappedOrder = mapOrderResponse(order);
     if (mappedOrder) {
-      this.ordersGateway.emitOrderUpdate(mappedOrder);
+      // Extract zoneId from vendor for zone-based WebSocket broadcasts
+      const zoneId = order.vendor?.zoneId;
+      this.ordersGateway.emitOrderUpdate(mappedOrder, zoneId);
     }
     return mappedOrder;
   }
@@ -1581,12 +1608,13 @@ export class OrdersService {
       throw new BadRequestException(
         ORDERS_ERRORS.NO_HELD_BALANCE_OR_ALREADY_PROCESSED,
       );
+      ```typescript
     }
     if (order.disputes && order.disputes.length > 0) {
       throw new BadRequestException(ORDERS_ERRORS.DISPUTE_ALREADY_EXISTS);
     }
 
-    // Create dispute - this will also mark HeldBalance as DISPUTED
+    // Create dispute - this will also mark HeldBalance
     const dispute = await this.walletProtectionService.createDispute(
       orderId,
       user.id,
@@ -1594,7 +1622,6 @@ export class OrdersService {
       evidence,
     );
 
-    // Notify driver
     // Notify driver
     if (order.driverId) {
       const titleEn = await this.i18n.translate(
@@ -1686,6 +1713,40 @@ export class OrdersService {
       canDispute:
         order.heldBalance?.status === HeldBalanceStatus.HELD &&
         order.disputes.length === 0,
+    };
+  }
+
+  async getDeliveryOtp(orderId: string, user: User) {
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      select: {
+        authorId: true,
+        status: true,
+        deliveryOtp: true,
+        paymentMethod: true,
+      },
+    });
+
+    if (!order) throw new NotFoundException(ORDERS_ERRORS.ORDER_NOT_FOUND);
+
+    // Only the customer who placed the order can see the OTP
+    if (order.authorId !== user.id) {
+      throw new ForbiddenException(ORDERS_ERRORS.ACCESS_DENIED);
+    }
+
+    // OTP only accessible when order is SHIPPED
+    if (order.status !== OrderStatus.SHIPPED) {
+      throw new BadRequestException(ORDERS_ERRORS.ORDER_NOT_SHIPPED);
+    }
+
+    // OTP only for wallet orders as requested
+    if (order.paymentMethod !== PaymentMethod.wallet) {
+      throw new BadRequestException(ORDERS_ERRORS.NOT_A_WALLET_ORDER);
+    }
+
+    return {
+      orderId,
+      otp: order.deliveryOtp,
     };
   }
 }

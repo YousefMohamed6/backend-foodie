@@ -47,10 +47,11 @@ This document describes the database architecture for the Food Delivery applicat
 - **Address**: User delivery addresses
 
 ### Vendor System
-- **Vendor**: Restaurant/store information (Requires `zoneId` and `vendorTypeId`)
+- **Vendor**: Restaurant/store information (Includes `subscriptionPlanId`, `subscriptionExpiryDate`, `subscriptionTotalOrders`)
 - **Zone**: Geographic delivery boundaries with pricing
 - **VendorCategory**: Category organization, **Product**: Menu items with extras
 - **SubscriptionPlan**: Tiered plans for vendors (Includes `totalOrders` limit)
+- **SubscriptionEventLog**: Immutable audit log for all subscription events (Upgrades, Expiry, Renewals)
 
 ### Order System
 - **Order**: Complete order lifecycle with state machine
@@ -100,4 +101,4 @@ PLACED → VENDOR_ACCEPTED → DRIVER_PENDING → DRIVER_ACCEPTED → SHIPPED �
 
 ---
 
-**Last Updated**: 2026-01-09
+**Last Updated**: 2026-01-12

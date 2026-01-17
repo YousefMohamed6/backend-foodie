@@ -150,5 +150,12 @@
     "CHAT_FILE_REQUIRED": "File is required for image or video messages",
     "CHAT_EMPTY_MESSAGE": "Cannot send an empty message",
     "ORDER_NO_DRIVER_ASSIGNED": "No driver has been assigned to this order yet",
-    "VENDOR_CLOSED": "The vendor is currently closed"
+    "VENDOR_CLOSED": "The vendor is currently closed",
+    "SUBSCRIPTION_ORDER_LIMIT_REACHED": "You have reached the maximum order capacity for your current plan. Upgrade your subscription to continue accepting orders seamlessly!",
+    "SUBSCRIPTION_EXPIRING_TITLE": "Subscription Expiring Soon",
+    "SUBSCRIPTION_EXPIRING_BODY": "Your subscription will expire in {days} days. Please renew to avoid service interruption.",
+    "OTP_REQUIRED": "A delivery OTP is required to complete this wallet order",
+    "INVALID_OTP": "The provided delivery OTP is incorrect",
+    "ORDER_NOT_SHIPPED": "The order is not in a status that allows retrieving the delivery OTP",
+    "NOT_A_WALLET_ORDER": "This order does not require an OTP as it is not a wallet order"
 }
