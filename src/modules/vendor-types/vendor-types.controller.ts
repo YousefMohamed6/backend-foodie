@@ -6,7 +6,7 @@ import { VendorTypesService } from './vendor-types.service';
 @ApiTags('Vendor Types')
 @Controller('vendor-types')
 export class VendorTypesController {
-  constructor(private readonly vendorTypesService: VendorTypesService) { }
+  constructor(private readonly vendorTypesService: VendorTypesService) {}
 
   @Get()
   @ApiOperation({ summary: 'Get all vendor types' })

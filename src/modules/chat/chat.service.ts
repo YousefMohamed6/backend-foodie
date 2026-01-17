@@ -20,7 +20,7 @@ import {
 export class ChatService {
   private readonly logger = new Logger(ChatService.name);
 
-  constructor(private prisma: PrismaService) { }
+  constructor(private prisma: PrismaService) {}
 
   async getChannels(userId: string) {
     return this.prisma.chatChannel.findMany({
@@ -411,9 +411,7 @@ export class ChatService {
       }),
     ]);
 
-    this.logger.log(
-      `Message ${message.id} sent to channel ${dto.channelId}`,
-    );
+    this.logger.log(`Message ${message.id} sent to channel ${dto.channelId}`);
 
     return {
       success: true,

@@ -11,7 +11,7 @@ export class SearchController {
   constructor(
     private readonly vendorsService: VendorsService,
     private readonly productsService: ProductsService,
-  ) { }
+  ) {}
 
   @Get('restaurants')
   @ApiBearerAuth()

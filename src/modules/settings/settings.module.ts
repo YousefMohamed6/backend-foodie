@@ -10,4 +10,4 @@ import { SettingsService } from './settings.service';
   providers: [SettingsService, SettingsGateway],
   exports: [SettingsService],
 })
-export class SettingsModule { }
+export class SettingsModule {}

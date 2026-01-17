@@ -24,6 +24,24 @@ async function seedOnboarding() {
             image: 'https://img.freepik.com/free-vector/mobile-payments-concept-illustration_114360-1243.jpg',
             type: OnboardingType.customerApp,
         },
+        {
+            title: 'Welcome to Foodie Vendor',
+            description: 'Grow your business by reaching thousands of customers in your city.',
+            image: 'https://img.freepik.com/free-vector/restaurant-management-concept-illustration_114360-6861.jpg',
+            type: OnboardingType.vendorApp,
+        },
+        {
+            title: 'Manage Orders Effortlessly',
+            description: 'Receive, process, and track all your orders in real-time with our intuitive dashboard.',
+            image: 'https://img.freepik.com/free-vector/order-confirmed-concept-illustration_114360-1486.jpg',
+            type: OnboardingType.vendorApp,
+        },
+        {
+            title: 'Track Your Growth',
+            description: 'Get detailed insights and analytics about your sales, earnings, and customer preferences.',
+            image: 'https://img.freepik.com/free-vector/business-analytics-concept-illustration_114360-1243.jpg',
+            type: OnboardingType.vendorApp,
+        },
     ];
 
     for (const data of onboardingData) {
@@ -32,7 +50,7 @@ async function seedOnboarding() {
         });
     }
 
-    console.log('✓ Successfully seeded 3 onboarding items for customerApp');
+    console.log(`✓ Successfully seeded ${onboardingData.length} onboarding items`);
 }
 
 seedOnboarding()

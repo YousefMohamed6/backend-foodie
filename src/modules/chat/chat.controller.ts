@@ -41,7 +41,7 @@ export class ChatController {
   constructor(
     private readonly chatService: ChatService,
     private readonly chatGateway: ChatGateway,
-  ) { }
+  ) {}
 
   @Get('threads')
   @ApiOperation({ summary: 'Get user chat threads' })
@@ -81,7 +81,10 @@ export class ChatController {
 
   @Post('threads')
   @ApiOperation({ summary: 'Create a new chat thread' })
-  createThread(@Body() createChannelDto: CreateChannelDto, @Request() req: any) {
+  createThread(
+    @Body() createChannelDto: CreateChannelDto,
+    @Request() req: any,
+  ) {
     return this.chatService.createChannel(req.user.id, createChannelDto);
   }
 
@@ -101,7 +104,10 @@ export class ChatController {
 
   @Post('messages')
   @ApiOperation({ summary: 'Send a text chat message' })
-  async sendMessage(@Body() sendMessageDto: SendMessageDto, @Request() req: any) {
+  async sendMessage(
+    @Body() sendMessageDto: SendMessageDto,
+    @Request() req: any,
+  ) {
     const result = await this.chatService.sendMessage(
       req.user.id,
       sendMessageDto,
@@ -121,10 +127,25 @@ export class ChatController {
       type: 'object',
       properties: {
         channelId: { type: 'string', description: 'Channel ID' },
-        content: { type: 'string', description: 'Text message (optional for media)' },
-        type: { type: 'string', enum: ['TEXT', 'IMAGE', 'VIDEO'], description: 'Message type' },
-        file: { type: 'string', format: 'binary', description: 'Image or video file' },
-        videoThumbnail: { type: 'string', format: 'binary', description: 'Video thumbnail' },
+        content: {
+          type: 'string',
+          description: 'Text message (optional for media)',
+        },
+        type: {
+          type: 'string',
+          enum: ['TEXT', 'IMAGE', 'VIDEO'],
+          description: 'Message type',
+        },
+        file: {
+          type: 'string',
+          format: 'binary',
+          description: 'Image or video file',
+        },
+        videoThumbnail: {
+          type: 'string',
+          format: 'binary',
+          description: 'Video thumbnail',
+        },
       },
       required: ['channelId', 'type'],
     },
@@ -156,7 +177,10 @@ export class ChatController {
     @Request() req: any,
     @Body() dto: SendMediaMessageDto,
     @UploadedFiles()
-    files: { file?: Express.Multer.File[]; videoThumbnail?: Express.Multer.File[] },
+    files: {
+      file?: Express.Multer.File[];
+      videoThumbnail?: Express.Multer.File[];
+    },
   ) {
     const file = files?.file?.[0];
     const videoThumbnail = files?.videoThumbnail?.[0];

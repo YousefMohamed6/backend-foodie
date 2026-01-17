@@ -10,4 +10,4 @@ import { VendorTypesService } from './vendor-types.service';
   providers: [VendorTypesService, VendorTypesSeederService],
   exports: [VendorTypesService],
 })
-export class VendorTypesModule {}
+export class VendorTypesModule { }

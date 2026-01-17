@@ -31,7 +31,7 @@ import { OrdersService } from './orders.service';
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('orders')
 export class OrdersController {
-  constructor(private readonly ordersService: OrdersService) { }
+  constructor(private readonly ordersService: OrdersService) {}
 
   @Post()
   @Roles(UserRole.CUSTOMER)
@@ -352,6 +352,7 @@ export class OrdersController {
   }
 
   @Get(':id/delivery-otp')
+  @ApiBearerAuth()
   @Roles(UserRole.CUSTOMER)
   @ApiOperation({ summary: 'Get delivery OTP for a shipped order' })
   async getDeliveryOtp(@Param('id') id: string, @Request() req) {

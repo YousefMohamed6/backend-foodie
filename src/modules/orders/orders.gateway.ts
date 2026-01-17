@@ -28,7 +28,7 @@ export class OrdersGateway implements OnGatewayConnection, OnGatewayDisconnect {
   constructor(
     private readonly jwtService: JwtService,
     private readonly prisma: PrismaService,
-  ) { }
+  ) {}
 
   @WebSocketServer()
   server: Server;
@@ -166,7 +166,9 @@ export class OrdersGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
     const zoneRoom = `${OrderSocketEvents.ZONE_ROOM_PREFIX}${dbUser.zoneId}`;
     client.join(zoneRoom);
-    this.logger.log(`Manager ${user.sub} watching zone orders: ${dbUser.zoneId}`);
+    this.logger.log(
+      `Manager ${user.sub} watching zone orders: ${dbUser.zoneId}`,
+    );
     return { event: 'watching_zone', zoneId: dbUser.zoneId };
   }
 

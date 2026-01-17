@@ -28,7 +28,7 @@ import { UpdateCategoryDto } from './dto/update-category.dto';
 @ApiTags('Categories')
 @Controller('categories')
 export class CategoriesController {
-  constructor(private readonly categoriesService: CategoriesService) {}
+  constructor(private readonly categoriesService: CategoriesService) { }
 
   @Post()
   @ApiBearerAuth()
@@ -40,6 +40,19 @@ export class CategoriesController {
     @CurrentUser() user: User,
   ) {
     return this.categoriesService.create(createCategoryDto, user);
+  }
+
+  @Get('by-vendor-categories')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.VENDOR)
+  @ApiOperation({
+    summary: 'Get product categories by vendor category IDs',
+    description:
+      'Returns product categories that belong to vendors matching the authenticated vendor\'s category IDs',
+  })
+  findByVendorCategories(@CurrentUser() user: User) {
+    return this.categoriesService.findByVendorCategories(user);
   }
 
   @Get()

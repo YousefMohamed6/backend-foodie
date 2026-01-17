@@ -76,4 +76,9 @@ export class CreateVendorDto {
   @IsArray()
   @IsString({ each: true })
   restaurantMenuPhotos?: string[];
+
+  @ApiProperty()
+  @IsArray()
+  @IsString({ each: true })
+  categoryIds: string[];
 }

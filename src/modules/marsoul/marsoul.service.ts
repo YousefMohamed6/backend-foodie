@@ -5,7 +5,7 @@ import { MarsoulResponseDto } from './dto/marsoul-response.dto';
 
 @Injectable()
 export class MarsoulService {
-  constructor(private readonly prisma: PrismaService) { }
+  constructor(private readonly prisma: PrismaService) {}
 
   async findAll(): Promise<MarsoulResponseDto[]> {
     const managers = await this.prisma.user.findMany({

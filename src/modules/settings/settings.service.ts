@@ -10,7 +10,7 @@ export class SettingsService {
     private prisma: PrismaService,
     private settingsGateway: SettingsGateway,
     private redis: RedisService,
-  ) { }
+  ) {}
 
   private readonly CACHE_KEY = 'global:settings';
   private readonly CACHE_KEY_INDIVIDUAL = 'setting:';
@@ -119,7 +119,6 @@ export class SettingsService {
         }
       }
     }
-
     return result;
   }
 }

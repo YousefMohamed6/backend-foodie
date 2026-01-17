@@ -2,6 +2,8 @@ import {
   BadRequestException,
   ConflictException,
   ForbiddenException,
+  forwardRef,
+  Inject,
   Injectable,
   Logger,
   NotFoundException,
@@ -17,6 +19,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { RedisService } from '../../shared/services/redis.service';
 import { SmsService } from '../../shared/services/sms.service';
 import { UsersService } from '../users/users.service';
+import { VendorsService } from '../vendors/vendors.service';
 import { AUTH_ERRORS } from './auth.constants';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { LoginDto } from './dto/login.dto';
@@ -30,7 +33,6 @@ import { JwtPayload } from './interfaces/jwt-payload.interface';
 import { AppleAuthService } from './services/apple-auth.service';
 import { FirebaseAuthService } from './services/firebase-auth.service';
 import { GoogleAuthService } from './services/google-auth.service';
-
 
 @Injectable()
 export class AuthService {
@@ -46,6 +48,8 @@ export class AuthService {
     private firebaseAuthService: FirebaseAuthService,
     private smsService: SmsService,
     private redisService: RedisService,
+    @Inject(forwardRef(() => VendorsService))
+    private vendorsService: VendorsService,
   ) { }
 
   async register(
@@ -60,9 +64,9 @@ export class AuthService {
     // Security: Restrict public registration to specific roles
     if (
       registerDto.role &&
-      !([UserRole.CUSTOMER, UserRole.DRIVER] as UserRole[]).includes(
-        registerDto.role,
-      )
+      !(
+        [UserRole.CUSTOMER, UserRole.DRIVER, UserRole.VENDOR] as UserRole[]
+      ).includes(registerDto.role)
     ) {
       // Force to CUSTOMER or throw error. Throwing error is safer.
       throw new ForbiddenException(AUTH_ERRORS.ROLE_NOT_ALLOWED);
@@ -221,6 +225,8 @@ export class AuthService {
     const storedOtp = await this.redisService.get(otpKey);
 
     if (!storedOtp || storedOtp !== code) {
+      // Always change/invalidate OTP for any request/attempt that fails
+      await this.redisService.del(otpKey);
       throw new UnauthorizedException(AUTH_ERRORS.INVALID_OTP);
     }
 
@@ -259,7 +265,14 @@ export class AuthService {
     if (!user) {
       if (
         dto.role &&
-        !([UserRole.CUSTOMER, UserRole.DRIVER, UserRole.VENDOR, UserRole.MANAGER] as UserRole[]).includes(dto.role)
+        !(
+          [
+            UserRole.CUSTOMER,
+            UserRole.DRIVER,
+            UserRole.VENDOR,
+            UserRole.MANAGER,
+          ] as UserRole[]
+        ).includes(dto.role)
       ) {
         throw new ForbiddenException(AUTH_ERRORS.ROLE_NOT_ALLOWED);
       }
@@ -279,9 +292,11 @@ export class AuthService {
       };
 
       user = await this.usersService.create(newUserData as any);
-      this.logger.log(`New user created via Firebase Phone Auth: ${phoneNumber}`);
+      this.logger.log(
+        `New user created via Firebase Phone Auth: ${phoneNumber}`,
+      );
     } else {
-      if (dto.fcmToken && dto.fcmToken !== (user as any).fcmToken) {
+      if (dto.fcmToken && dto.fcmToken !== user.fcmToken) {
         await this.usersService.updateToken(user.id, dto.fcmToken);
       }
     }
@@ -290,11 +305,11 @@ export class AuthService {
       throw new UnauthorizedException(AUTH_ERRORS.USER_CREATION_FAILED);
     }
 
-    if (!(user as any).isActive) {
+    if (!user.isActive) {
       throw new UnauthorizedException(AUTH_ERRORS.USER_INACTIVE);
     }
 
-    return this.generateTokens(user as any, context);
+    return this.generateTokens(user, context);
   }
 
   async forgotPassword(forgotPasswordDto: ForgotPasswordDto) {
@@ -331,6 +346,23 @@ export class AuthService {
 
     if (!user) {
       throw new NotFoundException(AUTH_ERRORS.USER_NOT_FOUND);
+    }
+
+    // For VENDOR role, return vendor data with author field
+    if (user.role === UserRole.VENDOR) {
+      const vendor = await this.vendorsService.findByAuthor(user.id);
+      if (vendor) {
+        // Return vendor with author (user) embedded
+        return {
+          ...vendor,
+          author: this.mapUserResponse(user),
+        };
+      } else {
+        // No vendor profile yet - return user data as author structure
+        return {
+          author: this.mapUserResponse(user),
+        };
+      }
     }
 
     return this.mapUserResponse(user);
@@ -417,10 +449,28 @@ export class AuthService {
 
     await this.storeRefreshToken(refreshToken, user.id, context);
 
+    // For VENDOR role, return vendor data with author field
+    let responseUser: any = user;
+    if (user.role === UserRole.VENDOR) {
+      const vendor = await this.vendorsService.findByAuthor(user.id);
+      if (vendor) {
+        // Return vendor with author (user) embedded
+        responseUser = {
+          ...vendor,
+          author: this.mapUserResponse(user as User),
+        };
+      } else {
+        // No vendor profile yet - return user data as author structure
+        responseUser = {
+          author: this.mapUserResponse(user as User),
+        };
+      }
+    }
+
     return {
       access_token: accessToken,
       refresh_token: refreshToken,
-      user,
+      user: responseUser,
     };
   }
 
@@ -452,7 +502,13 @@ export class AuthService {
   }
 
   private mapUserResponse(user: User) {
-    const { password, ...result } = user;
+    const {
+      password,
+      isDocumentVerify,
+      subscriptionPlanId,
+      subscriptionExpiryDate,
+      ...result
+    } = user as any;
     return result;
   }
 }

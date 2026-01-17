@@ -14,7 +14,7 @@ export class AddressesService {
   constructor(
     private prisma: PrismaService,
     private zonesService: ZonesService,
-  ) { }
+  ) {}
 
   async create(createAddressDto: CreateAddressDto, user: User) {
     const profile = await this.prisma.customerProfile.findUnique({

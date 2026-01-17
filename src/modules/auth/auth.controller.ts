@@ -32,7 +32,7 @@ import { VerifyOtpDto } from './dto/verify-otp.dto';
 @ApiTags('Auth')
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService) { }
+  constructor(private readonly authService: AuthService) {}
 
   @Post('register')
   @Throttle({ default: { ttl: 60000, limit: 5 } }) // 5 requests per minute
@@ -131,8 +131,14 @@ export class AuthController {
     description:
       'Verifies a Firebase ID token from phone authentication. Creates a new user if not exists.',
   })
-  @ApiResponse({ status: 200, description: 'Successfully verified and authenticated' })
-  @ApiResponse({ status: 401, description: 'Invalid or expired Firebase token' })
+  @ApiResponse({
+    status: 200,
+    description: 'Successfully verified and authenticated',
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Invalid or expired Firebase token',
+  })
   verifyFirebaseOtp(
     @Body() verifyFirebaseOtpDto: VerifyFirebaseOtpDto,
     @Ip() ip: string,

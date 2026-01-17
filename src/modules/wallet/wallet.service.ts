@@ -20,18 +20,18 @@ export class WalletService {
   constructor(
     private prisma: PrismaService,
     private readonly fawaterakService: FawaterakService,
-  ) { }
+  ) {}
 
   async getBalance(userId: string) {
     const getSum = async (type: TransactionType) => {
       const depositFilter =
         type === TransactionType.DEPOSIT
           ? {
-            OR: [
-              { paymentStatus: WalletConstants.PAYMENT_STATUS_PAID },
-              { paymentStatus: null },
-            ],
-          }
+              OR: [
+                { paymentStatus: WalletConstants.PAYMENT_STATUS_PAID },
+                { paymentStatus: null },
+              ],
+            }
           : {};
       const aggregations = await this.prisma.walletTransaction.aggregate({
         _sum: {
@@ -185,7 +185,6 @@ export class WalletService {
         },
       },
     });
-
 
     await this.updateUserWallet(
       userId,

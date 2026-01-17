@@ -1,6 +1,8 @@
 # Project Overview
 
-This application facilitates the order and delivery process involving four key roles: Customer, Vendor, Manager, and Delivery Driver. The workflow includes order placement, acceptance by the vendor, notification of the manager for shipping, and final delivery to the customer.
+This application is a comprehensive multi-vendor food delivery and service ecosystem involving five key roles: Customer, Vendor, Manager, Delivery Driver, and Admin. The platform supports complex operations including real-time order tracking, secure wallet-based payments, table bookings, loyalty programs (Referrals, Cashback), and tiered vendor subscriptions.
+
+The core workflow involves a customer placing an order, its acceptance by a vendor, automated assignment or manual notification of a manager/driver for shipping, and secure final delivery via OTP verification.
 
 ---
 
@@ -12,7 +14,7 @@ This application facilitates the order and delivery process involving four key r
 - **Placement**: Total amount (Order Subtotal + Delivery Fee + Tip) is immediately deducted from the customer's wallet and moved to HELD state.
 - **SHIPPED**: HeldBalance record is updated with calculated vendor/driver/admin amounts. Funds remain HELD.
 - **DELIVERED**: Driver marks delivered. Customer is notified to confirm receipt. Funds still HELD.
-- **CONFIRMED**: Upon customer confirmation, OTP validation, or auto-release timeout, funds are distributed:
+- **COMPLETED**: Upon customer confirmation, OTP validation, or auto-release timeout, funds are distributed:
   - **Vendor**: Receives (Subtotal - Admin Commission)
   - **Driver**: Receives (Driver Portion of Delivery Fee + 100% of Tip)
   - **Admin**: Receives (Vendor Commission + Admin Portion of Delivery Fee)
@@ -40,45 +42,44 @@ This application facilitates the order and delivery process involving four key r
 - **Driver Safety Floor**: Driver receives at least `min_delivery_pay`. Platform commission reduced if necessary.
 
 ### Tips
-- **Wallet**: 100% digital credit to Driver's wallet
-- **COD**: Tips kept physically by driver, NOT credited digitally, NOT included in debt
-- Neither platform nor vendor takes any share
+- **Wallet**: 100% digital credit to Driver's wallet.
+- **COD**: Tips kept physically by driver, NOT credited digitally, NOT included in debt.
+- Neither platform nor vendor takes any share.
 
 ---
 
 ## 3. Financial Safety & Safeguards
 
 ### Driver Debt Limit
-- Configurable `max_driver_debt` limit
-- Managers prevented from assigning new COD orders if debt would exceed limit
+- Configurable `max_driver_debt` limit.
+- Managers prevented from assigning new COD orders if debt would exceed limit.
 
 ### Negative Balance Prevention
-- Wallet transactions are atomic
-- Refunds and reversals handled strictly based on order state
+- Wallet transactions are atomic using database transactions.
+- Refunds and reversals handled strictly based on valid order state transitions.
 
 ### Manual Withdrawals
 - **Eligibility**: Support for `VENDOR`, `DRIVER`, and `MANAGER` roles.
-- **Process**: Users submit a withdrawal request. Admin reviews and completes the request.
-- **Transactional Safety**: Funds are debited directly from the profile balance (`walletAmount`) within a database transaction upon completion to prevent concurrent overdrafts.
+- **Process**: Users submit a withdrawal request choosing from their saved `Payout Accounts`. Admin reviews and completes the request.
+- **Transactional Safety**: Funds are debited directly from the profile balance (`walletAmount`) upon completion to prevent concurrent overdrafts.
 - **Driver Debt**: Driver withdrawals are prevented if the resulting balance would fall below zero (accounting for cash collection debt).
 
 ### Payout Accounts
-- **Functionality**: Users can save multiple payout methods (Stripe, PayPal, Bank Transfer, etc.).
-- **Details**: Specific account details are stored securely as JSON.
-- **Default Selection**: One account can be marked as default for quick withdrawal requests.
-- **Security**: CRUD operations are restricted to the account owner and protected by strict rate limits.
+- **Functionality**: Users can save multiple payout methods (Stripe, PayPal, Bank Transfer).
+- **Details**: Specific account details (IBAN, Email, Account No) are stored securely as JSON.
+- **Default Selection**: One account can be marked as default for automatic selection in withdrawal requests.
 
 ---
 
 ## 4. Cancellations and Refunds
 
 ### Pre-Shipping Cancellations
-- Wallet orders: Full refund to customer (including tip)
-- COD orders: No wallet action needed
+- Wallet orders: Full refund to customer (including tip).
+- COD orders: No wallet action needed.
 
 ### Post-Shipping Cancellations
-- Wallet orders: Platform reverses credits and refunds customer
-- Tips only reversed if order never reached delivery attempt
+- Wallet orders: Platform reverses credits and refunds customer.
+- Tips only reversed if order never reached delivery attempt.
 
 ### Post-Delivery (Completed)
 - Financial transactions are final. No automated reversals.
@@ -88,7 +89,7 @@ This application facilitates the order and delivery process involving four key r
 ## 5. Wallet Protection & Dispute Handling
 
 ### 5.1 Core Principle
-Wallet balance is NEVER released immediately upon driver confirmation alone. Funds remain in a HELD state until delivery confirmation is verified.
+Wallet balance is NEVER released immediately upon driver confirmation alone for prepaid orders. Funds remain in a HELD state until delivery confirmation is verified.
 
 ### 5.2 Wallet Balance States
 
@@ -105,90 +106,17 @@ Wallet balance is NEVER released immediately upon driver confirmation alone. Fun
 |------|-------------|---------|
 | `CUSTOMER_CONFIRMATION` | Customer confirms receipt via app | Customer action |
 | `OTP_CONFIRMED` | Valid OTP entered at delivery | Driver enters customer OTP |
-| `PHOTO_PROOF` | Photo evidence validated (future) | Admin/AI validation |
 | `TIMEOUT_RELEASE` | Auto-release after N days (default: 7) | System cron job |
 | `ADMIN_RESOLUTION` | Manual resolution by admin/manager | Admin dashboard |
-
-### 5.4 Transaction Flow
-
-1. **Payment**: Customer pays → Funds deducted → HeldBalance created → Status: HELD
-2. **Shipped**: Driver picks up → HeldBalance updated with amounts → Funds still HELD
-3. **Delivered**: Driver marks complete → Customer notified → Funds still HELD
-4. **Released**: One of confirmation types triggers → Funds distributed to vendor/driver/admin
-
-### 5.5 Dispute Handling
-
-When customer reports non-receipt:
-- Transaction status → DISPUTED
-- Funds remain in HELD state
-- Auto-release timer disabled
-- Driver and vendor notified
-- Dispute record created
-- Escalated to admin/manager
-
-### 5.6 Resolution Outcomes
-
-| Outcome | Wallet Action |
-|---------|---------------|
-| Customer Wins | Full refund to customer |
-| Driver Wins | Funds released to vendor/driver/admin |
-| Partial Refund | Split proportionally |
-| Fraud Suspected | Lock wallet, flag account |
-
-### 5.7 Anti-Fraud Safeguards
-
-**Per-User Tracking**:
-- Dispute count (30 days and lifetime)
-- Dispute win rate
-- Fraud risk score (0-100)
-
-**Escalation Rules**:
-- 3+ disputes in 30 days → Require admin approval
-- 80%+ win rate with 5+ disputes → Flag for review
-- Driver with 3+ disputes → Require OTP for all deliveries
-- Multiple disputes from same address → Flag as high-risk
-
-**Dynamic Confirmation Strictness**:
-- Low Risk (0-30): 7-day auto-release allowed
-- Medium Risk (31-60): 3-day auto-release, encourage confirmation
-- High Risk (61-100): Require OTP, no auto-release, admin review required
-
-### 5.8 Database Models
-
-**HeldBalance**: Tracks held funds per order with vendor/driver/admin amounts, status, and auto-release date
-
-**Dispute**: Manages dispute lifecycle with customer/driver evidence, status, assigned admin, and resolution
-
-**DisputeAuditLog**: Immutable audit trail for all dispute actions
-
-**WalletTransaction**: Extended with balanceType, heldBalanceId, deliveryConfirmationType fields
-
-### 5.9 Configuration Settings
-
-| Setting | Default | Description |
-|---------|---------|-------------|
-| `wallet_auto_release_enabled` | true | Enable auto-release feature |
-| `wallet_auto_release_days` | 7 | Days before auto-release |
-| `wallet_otp_required_risk_threshold` | 61 | Risk score requiring OTP |
-| `wallet_dispute_max_per_month` | 3 | Max disputes per user/month |
-| `wallet_require_customer_confirmation` | false | Require confirmation for all |
 
 ---
 
 ## 6. Order Auto-Cancellation
 
 ### Vendor Timeout
-- Orders in PLACED status auto-cancelled if vendor doesn't accept within timeout
-- Default timeout: 30 minutes (configurable via `order_timeout_minutes`)
-- Wallet payments automatically refunded
-- Customer notified with reason
-
-### Configuration Settings
-
-| Setting | Default | Description |
-|---------|---------|-------------|
-| `vendor_auto_cancel_enabled` | true | Enable auto-cancel feature |
-| `order_timeout_minutes` | 30 | Minutes before auto-cancel |
+- Orders in PLACED status auto-cancelled if vendor doesn't accept within timeout.
+- Default timeout: 30 minutes (configurable via `order_timeout_minutes`).
+- Wallet payments automatically refunded.
 
 ---
 
@@ -204,105 +132,140 @@ When customer reports non-receipt:
 | Wallet Protection (HeldBalance) | ✅ Implemented |
 | Dispute System | ✅ Implemented |
 | Auto-Release Scheduler | ✅ Implemented |
-| Customer Confirmation Endpoint | ✅ Implemented |
-| Vendor Timeout Auto-Cancel | ✅ Implemented |
-| OTP Verification | ⏳ Future Enhancement |
-| Photo Proof Validation | ⏳ Future Enhancement |
+| OTP Verification (Wallet Orders) | ✅ Implemented |
 | Vendor Working Hours | ✅ Implemented |
 | Address-Zone Sync | ✅ Implemented |
 | Zone-Filtered Products| ✅ Implemented |
 | Manual Withdrawals | ✅ Implemented |
 | Payout Accounts | ✅ Implemented |
-| Heavy-Traffic Redis Caching | ✅ Implemented |
-| Vendor Subscriptions | ✅ Implemented |
+| Vendor Subscriptions (Limits) | ✅ Implemented |
 | Subscription Expiry Scheduler | ✅ Implemented |
-| Order Limit Enforcement | ✅ Implemented |
-| Expiry Notifications | ✅ Implemented |
+| Order & Product Limit Enforcement | ✅ Implemented |
+| Dine-in Table Bookings | ✅ Implemented |
+| Referrals & Promo Codes | ✅ Implemented |
+| Cashback System | ✅ Implemented |
+| Gift Cards (Purchase & Redeem) | ✅ Implemented |
+| Multi-Vendor Chat | ✅ Implemented |
+| Business Analytics Reports | ✅ Implemented |
+| Product Visibility (Soft Delete) | ✅ Implemented |
 
 ---
 
 ## 8. Vendor Working Hours
 
 ### 8.1 Core Principle
-Vendors have configurable working hours for each day of the week. The application dynamically determines if a vendor is "Open" or "Closed" based on these hours.
+Vendors have configurable working hours for each day of the week. The application determines if a vendor is "Open" or "Closed" dynamically.
 
-### 8.2 Initialization
-- **Default**: New vendors are initialized with 24/7 working hours (00:00 to 23:59) for all 7 days of the week.
-- **Table**: `WeekDay` stores the 7 days (0=Sunday, 6=Saturday) with localized names (Arabic/English).
-
-### 8.3 Working Hours Logic
-- **Multiple Timeslots**: A vendor can have multiple active timeslots within the same day (e.g., 08:00-14:00 and 18:00-23:00).
-- **IsOpen Calculation**:
-  - Checks the current day of the week.
-  - Checks all active timeslots for that day.
-  - `isOpen = true` if current time falls within ANY active timeslots.
-- **Closing a Day**: A day is considered closed if it has no active timeslots or if `isActive` is false for all slots.
-
-### 8.4 Management
-- **Vendor Role**: Can edit their own working hours. Denied access to other vendors' hours.
-- **Admin Role**: Full access to view and edit any vendor's working hours.
-- **Replacement Logic**: Updating a day's schedule replaces all existing timeslots for that day to ensure consistency.
-
-### 8.5 Order Placement Restriction
-- **Constraint**: Orders cannot be placed if the vendor is currently "Closed".
-- **Validation**: The system checks working hours during the order pricing and creation phase.
-- **Error Handling**: Throws a `VENDOR_CLOSED` error with localized messages (English: "The vendor is currently closed", Arabic: "المتجر مغلق حالياً").
+### 8.2 Working Hours Logic
+- **Multiple Timeslots**: Supports split shifts (e.g., Lunch and Dinner sessions).
+- **Validation**: Orders are blocked if the vendor status is "Closed".
 
 ---
 
 ## 9. Geospatial Logic & Zone-Based Filtering
 
 ### 9.1 Address-Zone Synchronization
-- **Trigger**: When a customer user creates a new address or updates an existing address and sets it as `isDefault`.
-- **Action**: The system automatically identifies the specific delivery `Zone` that contains the address's coordinates (latitude/longitude).
-- **Update**: If a matching zone is found, the user's profile is updated with the corresponding `zoneId`.
-- **Matching Algorithm**: Uses points-in-polygon logic against the coordinates stored in each zone's `area` field.
+- Automatically maps a customer's default address to a delivery `Zone` using point-in-polygon logic.
+- Updates the user profile with `zoneId` for targeted product discovery.
 
 ### 9.2 Zone-Filtered Product Discovery
-- **Requirement**: Customers can browse products within a specific category filtered specifically for their current delivery zone.
-- **Filtering Rule**: Only products from vendors located within the user's active zone (matching their default address) are displayed.
-- **Endpoint**: `GET /products/category/:categoryId/zone-filtered`.
+- Customers only see products from vendors operating within their current active zone.
+- Ensures delivery feasibility at the browsing stage.
 
 ---
 
-## 10. Vendor Subscriptions & Order Limits
+## 10. Vendor Subscriptions & Capacity Limits
 
 ### 10.1 Core Principle
-The system enforces order capacity limits for vendors based on their current paid subscription plan. This ensures platform sustainability and tiered service delivery.
+Subscription plans control vendor capabilities and capacity. Plans are categorized by price (Free vs. Paid).
 
-### 10.2 Plan Types
-- **Free/Basic Plan**: (Price = 0) Provides a baseline order capacity (default: unlimited).
-- **Paid Plans**: (Price > 0) Provides a specific number of available orders (`totalOrders`). Admin commission is typically waived for paid plans.
-- **Unlimited Plans**: Any plan with `totalOrders = -1` allows infinite order acceptance.
+### 10.2 Capability Limits
+- **Order Limit**: Paid plans may have a fixed quota of orders (`totalOrders`).
+- **Product Limit**: Controls how many active products a vendor can manage simultaneously (`productsLimit`).
+- **Feature Toggles**: Controls access to specific modules like Dine-in, Chat, or Mobile App.
 
-### 10.3 Order Limit Enforcement
-- **Constraint**: Vendors on a paid plan with a limited capacity cannot accept new orders if their `subscriptionTotalOrders` count is zero or less.
-- **Real-time Tracking**: The remaining order count is decremented immediately upon order acceptance by the vendor.
-- **Error Handling**: Throws a `SUBSCRIPTION_ORDER_LIMIT_REACHED` error with localized instructions to upgrade.
-
-### 10.4 Subscription Lifecycle & Expiry
-- **Background Scheduler**: A daily cron job (midnight) deactivates expired subscriptions and resets vendors to the default Free Plan.
-- **Status Synchronization**: Expiry and plan changes are synchronized between the `Vendor` entity and the associated `User` record.
-- **Subscription Status API**: The vendor response includes a calculated `isSubscriptionActive` boolean, which factors in the expiry date, plan limits, and plan type.
-
-### 10.5 Expiry Notifications
-- **Proactive Alerts**: Vendors receive localized push notifications when their subscription has **3, 2, or 1 day(s)** remaining.
-- **Event Logging**: All subscription changes (success, expiry, upgrade) are recorded in an immutable `SubscriptionEventLog`.
+### 10.3 Enforcement
+- **Soft Limit**: Vendors are prevented from creating new products if they exceed their plan's `productsLimit`.
+- **Order Blocking**: Vendors on limited plans cannot accept new orders if their quota is exhausted.
 
 ---
 
 ## 11. Secure Delivery Verification (OTP)
 
 ### 11.1 Purpose
-To prevent fraudulent delivery claims and ensure proof of receipt for prepaid (Wallet) orders, a secure 6-digit OTP verification mechanism is enforced.
+Mandatory for **Wallet (Prepaid)** orders to ensure funds are only released upon physical verification of receipt.
 
 ### 11.2 The Workflow
-1.  **OTP Generation**: When a driver confirms pickup from the vendor and the order status changes to `SHIPPED`, the system automatically generates a unique 6-digit `deliveryOtp` for that order.
-2.  **Customer Access**: The customer can retrieve this OTP via a dedicated API endpoint (`GET /orders/:id/delivery-otp`) only if the order is in the `SHIPPED` state.
-3.  **Physical Verification**: At the point of delivery, the customer must provide this OTP to the driver.
-4.  **Driver Confirmation**: The driver enters the OTP into their mobile application to mark the order as `COMPLETED`.
-5.  **Enforcement**: For all `Wallet` orders, the system blocks completion unless the correct OTP is provided.
+1. **Generation**: Unique 6-digit OTP created when order status becomes `SHIPPED`.
+2. **Access**: Customer views OTP in order details.
+3. **Verification**: Driver must enter the correct OTP in their app to transition the order to `COMPLETED`.
+4. **Safety**: Blocks fraudulent "marked delivered" claims by drivers without physical contact.
 
 ---
 
-**Last Updated**: 2026-01-12
+## 12. Vendor Document Verification
+
+### 12.1 Regulatory Compliance
+Vendors must upload identity and business documents.
+- **Workflow**: Upload → `PENDING` → Admin Review → `ACCEPTED` / `REJECTED`.
+- **Integrity**: Any document update resets status to `PENDING`, triggering a new review cycle.
+
+---
+
+## 13. Special Discounts & Coupons
+
+### 13.1 Vendor Coupons
+Vendors create flat or percentage discounts with configurable limits:
+- **Scope**: Can be public (visible on profile) or private (code-based).
+- **Constraints**: Minimum order amount, maximum discount cap, and expiry date.
+
+---
+
+## 14. Product Visibility & Soft Deletion
+
+### 14.1 Status Definitions
+- **isActive**: Internal flag for deletion. If `false`, the product is "deleted" and hidden from all users (Vendors & Customers).
+- **isPublish**: Visibility flag for customers.
+  - `isPublish = true`: Visible to everyone.
+  - `isPublish = false`: Visible only to the Vendor for management purposes.
+
+### 14.2 Business Rules
+- **Creation**: New products are automatically initialized as `isActive = true`.
+- **Soft Delete**: When a vendor "deletes" a product, `isActive` and `isPublish` are both set to `false`. These records are preserved in the DB for order history integrity but removed from all listings.
+
+---
+
+## 15. Dine-in Table Bookings
+
+### 15.1 Core Principle
+Allows customers to reserve tables at restaurant-type vendors for specific dates and times.
+- **Tracking**: Manage upcoming vs. past bookings.
+- **Availability**: Integrated with vendor working hours to ensure bookings only occur during operational hours.
+
+---
+
+## 16. Loyalty & Growth Systems
+
+### 16.1 Referrals
+- Custom referral codes for every user.
+- Rewards (Wallet credits) applied to the referrer upon successful referral registration or first order.
+
+### 16.2 Cashback
+- Percentage-based cashback on orders that credits the customer's wallet after completion.
+- Configurable per-campaign or per-vendor.
+
+### 16.3 Gift Cards
+- **Purchase**: Digital gift cards purchased via wallet or payment gateway.
+- **Redemption**: Unique codes that instantly top-up the recipient's wallet balance upon redemption.
+
+---
+
+## 17. Business Intelligence & Analytics
+
+### 17.1 Reporting
+Comprehensive data aggregation for Admin and Vendors:
+- **Revenue Tracking**: Daily/Weekly/Monthly income reports.
+- **Order Analytics**: Success vs. Cancellation rates.
+- **Product Performance**: Top selling items and low-performing categories.
+
+**Last Updated**: 2026-01-17

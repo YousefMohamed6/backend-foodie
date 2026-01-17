@@ -27,12 +27,18 @@ export class ProductsService {
   ) { }
 
   private readonly CACHE_KEYS = {
-    ALL_PRODUCTS: (query: any, zoneId?: string) => `products:all:${zoneId || 'no_zone'}:${JSON.stringify(query)}`,
+    ALL_PRODUCTS: (query: any, zoneId?: string) =>
+      `products:all:${zoneId || 'no_zone'}:${JSON.stringify(query)}`,
     PRODUCT_BY_ID: (id: string) => `products:id:${id}`,
-    BY_CATEGORY_ZONE: (categoryId: string, zoneId: string) => `products:cat:${categoryId}:zone:${zoneId}`,
+    BY_CATEGORY_ZONE: (categoryId: string, zoneId: string) =>
+      `products:cat:${categoryId}:zone:${zoneId}`,
   };
 
-  private async invalidateProductCache(productId?: string, vendorId?: string, zoneId?: string) {
+  private async invalidateProductCache(
+    productId?: string,
+    vendorId?: string,
+    zoneId?: string,
+  ) {
     if (productId) {
       await this.redisService.del(this.CACHE_KEYS.PRODUCT_BY_ID(productId));
     }
@@ -40,9 +46,39 @@ export class ProductsService {
   }
 
   async create(createProductDto: CreateProductDto, user: User) {
-    const vendor = await this.vendorsService.findByAuthor(user.id);
+    const vendor = await this.prisma.vendor.findUnique({
+      where: { authorId: user.id },
+      include: { subscriptionPlan: true },
+    });
     if (!vendor) {
       throw new NotFoundException('VENDOR_NOT_FOUND');
+    }
+
+    if (!vendor.subscriptionPlanId) {
+      throw new BadRequestException('VENDOR_SUBSCRIPTION_REQUIRED');
+    }
+
+    if (
+      vendor.subscriptionExpiryDate &&
+      new Date() > vendor.subscriptionExpiryDate
+    ) {
+      throw new BadRequestException('VENDOR_SUBSCRIPTION_EXPIRED');
+    }
+
+    // Check product limit only if plan is not free (price > 0) and limit is not unlimited (-1)
+    const isFreePlan = Number(vendor.subscriptionPlan?.price || 0) === 0;
+    const vendorWithLimit = vendor as any;
+    const hasLimit =
+      vendorWithLimit.subscriptionProductsLimit !== null &&
+      vendorWithLimit.subscriptionProductsLimit !== -1;
+
+    if (!isFreePlan && hasLimit) {
+      if (
+        vendorWithLimit.subscriptionProductsLimit !== null &&
+        vendorWithLimit.subscriptionProductsLimit <= 0
+      ) {
+        throw new BadRequestException('PRODUCT_LIMIT_REACHED');
+      }
     }
 
     await this.validateProductPrice(
@@ -55,14 +91,36 @@ export class ProductsService {
     // Normalize itemAttributes string to relational objects
     const attributeData = this.parseItemAttributes(itemAttributes);
 
-    const product = await this.prisma.product.create({
-      data: {
-        ...productData,
-        vendorId: vendor.id,
-        extras: extras ? { create: extras } : undefined,
-        itemAttributes: attributeData ? { create: attributeData } : undefined,
-      },
-      include: { extras: true, itemAttributes: true },
+    // Use transaction to create product and decrement limit atomically if needed
+    const product = await this.prisma.$transaction(async (tx) => {
+      const newProduct = await tx.product.create({
+        data: {
+          ...productData,
+          isActive: true,
+          description: productData.description || '',
+          vendorId: vendor.id,
+          extras: extras ? { create: extras } : undefined,
+          itemAttributes: attributeData ? { create: attributeData } : undefined,
+        },
+        include: { extras: true, itemAttributes: true },
+      });
+
+      // Decrement limit if it's a constrained paid plan
+      if (
+        !isFreePlan &&
+        hasLimit &&
+        vendorWithLimit.subscriptionProductsLimit !== null &&
+        vendorWithLimit.subscriptionProductsLimit > 0
+      ) {
+        await tx.vendor.update({
+          where: { id: vendor.id },
+          data: {
+            subscriptionProductsLimit: { decrement: 1 } as any,
+          },
+        });
+      }
+
+      return newProduct;
     });
 
     await this.invalidateProductCache(undefined, vendor.id, vendor.zoneId);
@@ -84,19 +142,27 @@ export class ProductsService {
     const limit = Math.min(Number(query.limit) || 20, 100); // Max 100 per page
     const skip = (page - 1) * limit;
 
-    const zoneId = (user?.role === UserRole.CUSTOMER && user.zoneId) ? user.zoneId : undefined;
+    const zoneId =
+      user?.role === UserRole.CUSTOMER && user.zoneId ? user.zoneId : undefined;
     const cacheKey = this.CACHE_KEYS.ALL_PRODUCTS(query, zoneId);
 
     const cached = await this.redisService.get<any[]>(cacheKey);
     if (cached) return cached;
 
     const where: Prisma.ProductWhereInput = {
-      isActive:
-        query.publish !== undefined
-          ? query.publish === 'true' || query.publish === true
-          : true,
+      isActive: true,
       vendor: { isActive: true },
     };
+
+    // Vendors see all active products. Customers see only published products.
+    if (user?.role === UserRole.VENDOR) {
+      if (query.publish !== 'all' && query.publish !== undefined) {
+        where.isPublish = query.publish === 'true' || query.publish === true;
+      }
+    } else {
+      where.isPublish = true;
+    }
+
     if (query.vendorId) where.vendorId = query.vendorId;
     if (query.categoryId) where.categoryId = query.categoryId;
 
@@ -106,7 +172,6 @@ export class ProductsService {
         zoneId: zoneId,
       };
     }
-
 
     // Filter by food type (TakeAway or DineIn)
     if (query.foodType) {
@@ -141,6 +206,7 @@ export class ProductsService {
       where: {
         categoryId,
         isActive: true,
+        isPublish: true, // Only show published products to customers
         vendor: {
           zoneId: user.zoneId,
           isActive: true,
@@ -153,14 +219,18 @@ export class ProductsService {
       orderBy: { createdAt: 'desc' },
     });
 
-    const response = products.map((p) => this.mapProductResponse(p));
+    const response = products.map((p) =>
+      this.mapProductResponse(p as ProductWithRelations),
+    );
     // Cache for 5 minutes
     await this.redisService.set(cacheKey, response, 300);
     return response;
   }
 
   async count(query: { vendorId?: string }) {
-    const where: Prisma.ProductWhereInput = {};
+    const where: Prisma.ProductWhereInput = {
+      isActive: true,
+    };
     if (query.vendorId) where.vendorId = query.vendorId;
     return this.prisma.product.count({ where });
   }
@@ -174,7 +244,7 @@ export class ProductsService {
       where: { id },
       include: { vendor: true, extras: true, itemAttributes: true },
     });
-    if (!product || !product.vendor?.isActive) {
+    if (!product || !product.isActive || !product.vendor?.isActive) {
       throw new NotFoundException('PRODUCT_NOT_FOUND');
     }
     const response = this.mapProductResponse(product);
@@ -186,7 +256,7 @@ export class ProductsService {
 
   async update(id: string, updateProductDto: UpdateProductDto, user: User) {
     const product = await this.prisma.product.findUnique({ where: { id } });
-    if (!product) {
+    if (!product || !product.isActive) {
       throw new NotFoundException('PRODUCT_NOT_FOUND');
     }
 
@@ -223,6 +293,7 @@ export class ProductsService {
       where: { id },
       data: {
         ...updateData,
+        isActive: undefined, // Ensure isActive is never updated from DTO
         extras: extras
           ? {
             deleteMany: {},
@@ -240,8 +311,34 @@ export class ProductsService {
       include: { extras: true, itemAttributes: true, vendor: true },
     });
 
-    await this.invalidateProductCache(id, savedProduct.vendorId, savedProduct.vendor?.zoneId);
+    await this.invalidateProductCache(
+      id,
+      savedProduct.vendorId,
+      savedProduct.vendor?.zoneId,
+    );
     return this.mapProductResponse(savedProduct);
+  }
+
+  async updateRatings(
+    productId: string,
+    reviewsSum: number,
+    reviewsCount: number,
+  ) {
+    const product = await this.prisma.product.update({
+      where: { id: productId },
+      data: {
+        reviewsSum,
+        reviewsCount,
+      },
+      include: { vendor: true, extras: true, itemAttributes: true },
+    });
+
+    await this.invalidateProductCache(
+      productId,
+      product.vendorId,
+      product.vendor?.zoneId,
+    );
+    return this.mapProductResponse(product as any);
   }
 
   async remove(id: string, user: User) {
@@ -249,20 +346,31 @@ export class ProductsService {
     if (!product) {
       throw new NotFoundException('PRODUCT_NOT_FOUND');
     }
+    if (!product.isActive) {
+      throw new NotFoundException('PRODUCT_ALREADY_DELETED');
+    }
     const vendor = await this.vendorsService.findByAuthor(user.id);
 
     if (!vendor || product.vendorId !== vendor.id) {
       throw new ForbiddenException('FORBIDDEN');
     }
 
+    // Soft delete: set isActive and isPublish to false
     const updatedProduct = await this.prisma.product.update({
       where: { id },
-      data: { isActive: false },
+      data: {
+        isActive: false,
+        isPublish: false,
+      },
       include: { vendor: true },
     });
 
-    await this.invalidateProductCache(id, updatedProduct.vendorId, updatedProduct.vendor?.zoneId);
-    return updatedProduct;
+    await this.invalidateProductCache(
+      id,
+      updatedProduct.vendorId,
+      (updatedProduct as any).vendor?.zoneId,
+    );
+    return { message: 'Product deleted successfully', product: updatedProduct };
   }
 
   async search(
@@ -284,6 +392,10 @@ export class ProductsService {
       vendor: { isActive: true },
     };
 
+    if (user?.role !== UserRole.VENDOR) {
+      where.isPublish = true;
+    }
+
     if (user?.role === UserRole.CUSTOMER && user.zoneId) {
       where.vendor = {
         isActive: true,
@@ -297,7 +409,9 @@ export class ProductsService {
       skip,
       take: l,
     });
-    return products.map((p) => this.mapProductResponse(p));
+    return products.map((p) =>
+      this.mapProductResponse(p as ProductWithRelations),
+    );
   }
 
   private async validateProductPrice(price: number, discountPrice?: number) {
@@ -327,9 +441,22 @@ export class ProductsService {
   }
 
   private parseItemAttributes(
-    attrString?: string,
+    attrInput?: string | string[],
   ): { key: string; value: string }[] | null {
-    if (!attrString) return null;
+    if (!attrInput) return null;
+
+    // Handle array of key:value strings
+    if (Array.isArray(attrInput)) {
+      return attrInput
+        .map((item) => {
+          const [key, value] = item.split(':');
+          return { key: key?.trim(), value: value?.trim() || '' };
+        })
+        .filter((p) => p.key);
+    }
+
+    // Handle single string
+    const attrString = attrInput;
     try {
       // Try parsing as JSON array
       const parsed = JSON.parse(attrString);

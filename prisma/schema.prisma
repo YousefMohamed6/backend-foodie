@@ -158,6 +158,7 @@ model Vendor {
   isDineInActive          Boolean                 @default(false) @map("is_dine_in_active")
   phoneNumber             String?                 @map("phone_number")
   subscriptionTotalOrders Int?                    @default(0)
+  subscriptionProductsLimit Int?                  @default(0) @map("subscription_products_limit")
   subscriptionId          String?
   advertisements          Advertisement[]
   categoriesOwned         Category[]              @relation("CategoryVendor")
@@ -181,6 +182,8 @@ model Vendor {
   vendorType              VendorType              @relation(fields: [vendorTypeId], references: [id])
   zone                    Zone                    @relation(fields: [zoneId], references: [id])
   categories              Category[]              @relation("VendorCategories")
+  documents               VendorDocument[]
+  specialDiscounts        SpecialDiscount[]
 
   @@map("vendors")
 }
@@ -251,17 +254,13 @@ model Product {
   image            String?            @map("photo")
   quantity         Int                @default(0)
   takeawayOption   Boolean            @default(true) @map("takeaway")
-  calories         String?
-  gram             String?
-  fats             String?
-  proteins         String?
   isApprove        Boolean            @default(true)
   createdAt        DateTime           @default(now())
   updatedAt        DateTime           @updatedAt
   categoryId       String?            @map("category_id")
   discountPrice    Decimal?           @map("dis_price") @db.Decimal(10, 2)
   isActive         Boolean            @default(true) @map("is_active")
-  isVeg            Boolean            @default(false) @map("is_veg")
+  isPublish        Boolean            @default(true) @map("is_publish")
   vendorId         String             @map("vendor_id")
   favoriteProducts FavoriteProduct[]
   orderItems       OrderItem[]
@@ -269,6 +268,8 @@ model Product {
   extras           ProductExtra[]
   category         Category?          @relation(fields: [categoryId], references: [id])
   vendor           Vendor             @relation(fields: [vendorId], references: [id])
+  reviewsSum       Decimal            @default(0) @db.Decimal(10, 2)
+  reviewsCount     Int                @default(0)
   reviews          Review[]
 
   @@map("products")
@@ -302,7 +303,10 @@ model ProductAttribute {
 model Category {
   id               String            @id @default(uuid())
   name             String            @map("title")
+  englishName      String?           @map("english_name")
+  arabicName       String?           @map("arabic_name")
   description      String?
+  descriptionAr    String?           @map("description_ar")
   image            String?           @map("photo")
   createdAt        DateTime          @default(now())
   updatedAt        DateTime          @updatedAt
@@ -449,21 +453,37 @@ model Zone {
 }
 
 model SubscriptionPlan {
-  id            String         @id @default(uuid())
-  name          String
+  id            String                @id @default(uuid())
+  arabicName    String                @map("arabic_name")
+  englishName   String                @map("english_name")
   description   String?
-  price         Decimal
-  features      Json?
-  createdAt     DateTime       @default(now())
-  updatedAt     DateTime       @updatedAt
-  durationDays  Int            @map("duration_days")
-  totalOrders   Int            @default(0) @map("total_orders")
-  isActive      Boolean        @default(true) @map("is_active")
+  price         Decimal               @db.Decimal(10, 2)
+  createdAt     DateTime              @default(now())
+  updatedAt     DateTime              @updatedAt
+  durationDays  Int                   @map("duration_days")
+  totalOrders   Int                   @default(0) @map("total_orders")
+  isActive      Boolean               @default(true) @map("is_active")
   subscriptions Subscription[]
   users         User[]
   vendors       Vendor[]
+  productsLimit Int                   @map("products_limit")
+  place         String
+  image         String
+  type          String
+  planPoints    String[]              @map("plan_points")
+  features      SubscriptionFeature[]
 
   @@map("subscription_plans")
+}
+
+model SubscriptionFeature {
+  id     String           @id @default(uuid())
+  key    String
+  value  Boolean          @default(true)
+  planId String           @map("plan_id")
+  plan   SubscriptionPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+
+  @@map("subscription_features")
 }
 
 model Subscription {
@@ -1614,4 +1634,48 @@ model PayoutAccount {
   withdrawRequests WithdrawRequest[]
 
   @@map("payout_accounts")
+}
+
+model VendorDocument {
+  id             String   @id @default(uuid())
+  vendorId       String   @map("vendor_id")
+  documentId     String   @map("document_id")
+  frontImage     String?  @map("front_image")
+  backImage      String?        @map("back_image")
+  status         DocumentStatus @default(PENDING)
+  createdAt      DateTime       @default(now()) @map("created_at")
+  updatedAt      DateTime       @updatedAt @map("updated_at")
+  vendor         Vendor         @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+
+  @@unique([vendorId, documentId])
+  @@map("vendor_documents")
+}
+
+enum DocumentStatus {
+  PENDING  @map("pending")
+  ACCEPTED @map("accepted")
+  REJECTED @map("rejected")
+}
+
+
+model SpecialDiscount {
+  id                String          @id @default(uuid())
+  vendorId          String          @map("vendor_id")
+  vendor            Vendor          @relation(fields: [vendorId], references: [id])
+  endDate           DateTime
+  discount          Decimal         @db.Decimal(10, 2)
+  couponCode        String          @map("coupon_code")
+  photo             String          @map("photo")
+  discountType      DiscountType    @default(PERCENTAGE) @map("discount_type")
+  enable            Boolean         @default(false)
+  public            Boolean         @default(false)
+  createdAt         DateTime        @default(now()) @map("created_at")
+  updatedAt         DateTime        @updatedAt @map("updated_at")
+
+  @@map("special_discounts")
+}
+
+enum DiscountType {
+  PERCENTAGE @map("percentage")
+  FIXED      @map("fixed")
 }

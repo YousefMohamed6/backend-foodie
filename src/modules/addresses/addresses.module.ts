@@ -11,4 +11,4 @@ import { ZonesModule } from '../zones/zones.module';
   providers: [AddressesService],
   exports: [AddressesService],
 })
-export class AddressesModule { }
+export class AddressesModule {}

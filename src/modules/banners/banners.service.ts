@@ -9,7 +9,7 @@ export class BannersService {
   constructor(
     private prisma: PrismaService,
     private redisService: RedisService,
-  ) { }
+  ) {}
 
   private readonly CACHE_KEY_PREFIX = 'banners:';
 

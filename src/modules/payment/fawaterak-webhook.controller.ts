@@ -2,6 +2,7 @@ import { BadRequestException, Body, Controller, Post } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { PrismaService } from '../../prisma/prisma.service';
 import { FawaterakService } from '../../shared/services/fawaterak.service';
+import { MailService } from '../../shared/services/mail.service';
 import { WalletService } from '../wallet/wallet.service';
 
 @ApiTags('Payment')
@@ -11,6 +12,7 @@ export class FawaterakWebhookController {
     private readonly prisma: PrismaService,
     private readonly fawaterakService: FawaterakService,
     private readonly walletService: WalletService,
+    private readonly mailService: MailService,
   ) {}
 
   @Post('webhook')

@@ -21,4 +21,4 @@ import { VendorsGateway } from './vendors.gateway';
   providers: [VendorsService, VendorsGateway],
   exports: [VendorsService],
 })
-export class VendorsModule { }
+export class VendorsModule {}

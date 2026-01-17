@@ -7,6 +7,7 @@ import { DriversModule } from '../drivers/drivers.module';
 import { ProductsModule } from '../products/products.module';
 import { ReviewsModule } from '../reviews/reviews.module';
 import { SettingsModule } from '../settings/settings.module';
+import { SpecialDiscountsModule } from '../special-discounts/special-discounts.module';
 import { VendorsModule } from '../vendors/vendors.module';
 import { WalletModule } from '../wallet/wallet.module';
 import { CommissionService } from './commission.service';
@@ -17,13 +18,24 @@ import { OrdersController } from './orders.controller';
 import { OrdersGateway } from './orders.gateway';
 import { OrdersSchedulerService } from './orders.scheduler.service';
 import { OrdersService } from './orders.service';
+import {
+  OrderCashService,
+  OrderCommissionReportsService,
+  OrderCreationService,
+  OrderDeliveryService,
+  OrderDisputeService,
+  OrderDriverService,
+  OrderQueryService,
+  OrderVendorService,
+} from './services';
 
 @Module({
   imports: [
     forwardRef(() => ProductsModule),
     forwardRef(() => VendorsModule),
     forwardRef(() => DriversModule),
-    CouponsModule,
+    forwardRef(() => CouponsModule),
+    SpecialDiscountsModule,
     CashbackModule,
     WalletModule,
     ReviewsModule,
@@ -33,7 +45,18 @@ import { OrdersService } from './orders.service';
   ],
   controllers: [OrdersController, ManagerCashController],
   providers: [
+    // Facade
     OrdersService,
+    // Sub-services
+    OrderCreationService,
+    OrderQueryService,
+    OrderDriverService,
+    OrderVendorService,
+    OrderDeliveryService,
+    OrderCashService,
+    OrderDisputeService,
+    OrderCommissionReportsService,
+    // Infrastructure
     OrdersGateway,
     OrderPricingService,
     OrderManagementService,
@@ -48,4 +71,4 @@ import { OrdersService } from './orders.service';
     CommissionService,
   ],
 })
-export class OrdersModule {}
+export class OrdersModule { }

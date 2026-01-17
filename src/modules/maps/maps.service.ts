@@ -5,7 +5,7 @@ import { ConfigService } from '@nestjs/config';
 export class MapsService {
   private readonly logger = new Logger(MapsService.name);
 
-  constructor(private configService: ConfigService) { }
+  constructor(private configService: ConfigService) {}
 
   async getRoute(
     sourceLat: number,
@@ -69,7 +69,10 @@ export class MapsService {
       return [];
     }
   }
-  async getGeocode(address: string, language = 'ar'): Promise<{ lat: number; lng: number } | null> {
+  async getGeocode(
+    address: string,
+    language = 'ar',
+  ): Promise<{ lat: number; lng: number } | null> {
     const key = this.configService.get<string>('GOOGLE_MAPS_API_KEY');
 
     if (!key) {
@@ -99,7 +102,11 @@ export class MapsService {
       throw error;
     }
   }
-  async reverseGeocode(lat: number, lng: number, language = 'ar'): Promise<string> {
+  async reverseGeocode(
+    lat: number,
+    lng: number,
+    language = 'ar',
+  ): Promise<string> {
     const key = this.configService.get<string>('GOOGLE_MAPS_API_KEY');
 
     if (!key) {

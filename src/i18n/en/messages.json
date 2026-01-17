@@ -155,7 +155,10 @@
     "SUBSCRIPTION_EXPIRING_TITLE": "Subscription Expiring Soon",
     "SUBSCRIPTION_EXPIRING_BODY": "Your subscription will expire in {days} days. Please renew to avoid service interruption.",
     "OTP_REQUIRED": "A delivery OTP is required to complete this wallet order",
-    "INVALID_OTP": "The provided delivery OTP is incorrect",
+    "INVALID_DELIVERY_OTP": "The provided delivery OTP is incorrect",
     "ORDER_NOT_SHIPPED": "The order is not in a status that allows retrieving the delivery OTP",
-    "NOT_A_WALLET_ORDER": "This order does not require an OTP as it is not a wallet order"
+    "NOT_A_WALLET_ORDER": "This order does not require an OTP as it is not a wallet order",
+    "ROLE_NOT_ALLOWED": "You are not allowed to register with this role",
+    "INVALID_COUPON_CODE": "Invalid Coupon Code",
+    "INSUFFICIENT_STOCK": "The requested quantity is not available in stock"
 }

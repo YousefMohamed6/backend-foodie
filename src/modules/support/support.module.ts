@@ -10,4 +10,4 @@ import { SupportService } from './support.service';
   providers: [SupportService, SupportGateway],
   exports: [SupportService, SupportGateway],
 })
-export class SupportModule { }
+export class SupportModule {}

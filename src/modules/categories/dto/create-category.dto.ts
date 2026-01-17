@@ -7,6 +7,16 @@ export class CreateCategoryDto {
   @IsNotEmpty()
   name: string;
 
+  @ApiPropertyOptional({ example: 'Starters' })
+  @IsString()
+  @IsOptional()
+  englishName?: string;
+
+  @ApiPropertyOptional({ example: 'مقبلات' })
+  @IsString()
+  @IsOptional()
+  arabicName?: string;
+
   @ApiPropertyOptional({ example: 'image-url.jpg' })
   @IsString()
   @IsOptional()
@@ -21,6 +31,11 @@ export class CreateCategoryDto {
   @IsString()
   @IsOptional()
   description?: string;
+
+  @ApiPropertyOptional()
+  @IsString()
+  @IsOptional()
+  descriptionAr?: string;
 
   @ApiPropertyOptional()
   @IsOptional()

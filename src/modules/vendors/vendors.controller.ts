@@ -22,21 +22,26 @@ import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { CreateVendorDto } from './dto/create-vendor.dto';
 import { FindNearestVendorsDto } from './dto/find-nearest-vendors.dto';
+import { UpdateVendorDocumentDto } from './dto/update-vendor-document.dto';
 import { UpdateVendorScheduleDto } from './dto/update-vendor-schedule.dto';
 import { UpdateVendorDto } from './dto/update-vendor.dto';
+import { VerifyVendorDocumentDto } from './dto/verify-vendor-document.dto';
 import { VendorsService } from './vendors.service';
 
 @ApiTags('Vendors')
 @ApiBearerAuth()
 @Controller('vendors')
 export class VendorsController {
-  constructor(private readonly vendorsService: VendorsService) { }
+  constructor(private readonly vendorsService: VendorsService) {}
 
   @Post()
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Prisma.UserRole.VENDOR, Prisma.UserRole.ADMIN)
   @ApiOperation({ summary: 'Create a new vendor profile' })
-  create(@Body() createVendorDto: CreateVendorDto, @CurrentUser() user: Prisma.User) {
+  create(
+    @Body() createVendorDto: CreateVendorDto,
+    @CurrentUser() user: Prisma.User,
+  ) {
     return this.vendorsService.create(createVendorDto, user);
   }
 
@@ -89,7 +94,10 @@ export class VendorsController {
     type: Boolean,
     description: 'Filter by dine-in availability',
   })
-  findNearest(@Query() dto: FindNearestVendorsDto, @CurrentUser() user?: Prisma.User) {
+  findNearest(
+    @Query() dto: FindNearestVendorsDto,
+    @CurrentUser() user?: Prisma.User,
+  ) {
     return this.vendorsService.findNearest(
       dto.latitude,
       dto.longitude,
@@ -98,6 +106,33 @@ export class VendorsController {
       dto.categoryId,
       user,
     );
+  }
+
+  @Get('documents')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Prisma.UserRole.VENDOR)
+  @ApiOperation({ summary: 'Get vendor documents' })
+  getDocuments(@CurrentUser() user: Prisma.User) {
+    return this.vendorsService.getDocuments(user);
+  }
+
+  @Post('documents')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Prisma.UserRole.VENDOR)
+  @ApiOperation({ summary: 'Update or upload vendor documents' })
+  updateDocument(
+    @Body() dto: UpdateVendorDocumentDto,
+    @CurrentUser() user: Prisma.User,
+  ) {
+    return this.vendorsService.updateDocument(user, dto);
+  }
+
+  @Post('documents/verify')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Prisma.UserRole.ADMIN)
+  @ApiOperation({ summary: 'Verify vendor document (Admin only)' })
+  verifyDocument(@Body() dto: VerifyVendorDocumentDto) {
+    return this.vendorsService.verifyDocument(dto);
   }
 
   @Get(':id')

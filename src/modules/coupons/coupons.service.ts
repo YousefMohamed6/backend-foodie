@@ -17,7 +17,7 @@ export class CouponsService {
     private prisma: PrismaService,
     @Inject(forwardRef(() => VendorsService))
     private vendorsService: VendorsService,
-  ) { }
+  ) {}
 
   async create(createCouponDto: CreateCouponDto, user: User) {
     let vendorId = createCouponDto.vendorId || null;

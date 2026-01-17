@@ -10,4 +10,4 @@ import { SubscriptionsService } from './subscriptions.service';
   providers: [SubscriptionsService, SubscriptionsSchedulerService],
   exports: [SubscriptionsService],
 })
-export class SubscriptionsModule { }
+export class SubscriptionsModule {}

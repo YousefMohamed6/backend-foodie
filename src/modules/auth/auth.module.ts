@@ -1,9 +1,10 @@
-import { Module } from '@nestjs/common';
+import { forwardRef, Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
 import { SharedModule } from '../../shared/shared.module';
 import { UsersModule } from '../users/users.module';
+import { VendorsModule } from '../vendors/vendors.module';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { AppleAuthService } from './services/apple-auth.service';
@@ -18,6 +19,7 @@ import { JwtStrategy } from './strategies/jwt.strategy';
     UsersModule,
     SharedModule,
     PassportModule,
+    forwardRef(() => VendorsModule),
     JwtModule.registerAsync({
       imports: [ConfigModule],
       useFactory: async (configService: ConfigService) => ({

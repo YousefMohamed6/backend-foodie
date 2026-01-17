@@ -22,6 +22,7 @@ import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { CreateProductDto } from './dto/create-product.dto';
 import { FindAllProductsQueryDto } from './dto/find-all-products-query.dto';
+import { UpdateProductRatingsDto } from './dto/update-product-ratings.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
 import { ProductsService } from './products.service';
 
@@ -102,6 +103,19 @@ export class ProductsController {
     @CurrentUser() user: Prisma.User,
   ) {
     return this.productsService.update(id, updateProductDto, user);
+  }
+
+  @Patch(':id/ratings')
+  @ApiOperation({ summary: 'Update product ratings statistics' })
+  updateRatings(
+    @Param('id') id: string,
+    @Body() dto: UpdateProductRatingsDto,
+  ) {
+    return this.productsService.updateRatings(
+      id,
+      dto.reviewsSum,
+      dto.reviewsCount,
+    );
   }
 
   @Delete(':id')

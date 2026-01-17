@@ -21,7 +21,7 @@ import { UpdateAdvertisementDto } from './dto/update-advertisement.dto';
 @ApiTags('Advertisements')
 @Controller('advertisements')
 export class AdvertisementsController {
-  constructor(private readonly adsService: AdvertisementsService) { }
+  constructor(private readonly adsService: AdvertisementsService) {}
 
   @Get()
   @ApiOperation({ summary: 'Get all active advertisements' })

@@ -7,7 +7,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 
 @Injectable()
 export class FavouritesService {
-  constructor(private prisma: PrismaService) { }
+  constructor(private prisma: PrismaService) {}
 
   async getFavoriteVendors(userId: string) {
     return this.prisma.favoriteVendor.findMany({

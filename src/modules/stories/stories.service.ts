@@ -13,7 +13,7 @@ export class StoriesService {
   constructor(
     private prisma: PrismaService,
     private readonly vendorsService: VendorsService,
-  ) { }
+  ) {}
 
   async findAll(vendorId?: string, user?: User) {
     const where: Prisma.StoryWhereInput = { isActive: true };

@@ -6,16 +6,13 @@ import { UpdateAdvertisementDto } from './dto/update-advertisement.dto';
 
 @Injectable()
 export class AdvertisementsService {
-  constructor(private prisma: PrismaService) { }
+  constructor(private prisma: PrismaService) {}
 
   async findAll(user?: User) {
     const where: any = { isActive: true };
 
     if (user?.role === 'CUSTOMER' && user.zoneId) {
-      where.OR = [
-        { vendorId: null },
-        { vendor: { zoneId: user.zoneId } }
-      ];
+      where.OR = [{ vendorId: null }, { vendor: { zoneId: user.zoneId } }];
     }
 
     return this.prisma.advertisement.findMany({

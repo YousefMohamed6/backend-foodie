@@ -118,6 +118,35 @@ export class CategoriesService {
     return categories;
   }
 
+  /**
+   * Get product categories that belong to vendors matching the authenticated vendor's category IDs
+   * @param user The authenticated vendor user
+   */
+  async findByVendorCategories(user: User) {
+    // Get the vendor and their categories directly
+    const vendor = await this.prisma.vendor.findUnique({
+      where: { authorId: user.id },
+      include: {
+        categories: {
+          where: { isActive: true },
+          include: {
+            products: true,
+            reviewAttributes: true,
+          },
+          orderBy: {
+            name: 'asc',
+          },
+        },
+      },
+    });
+
+    if (!vendor) {
+      throw new NotFoundException('VENDOR_NOT_FOUND');
+    }
+
+    return vendor.categories;
+  }
+
   async findOne(id: string) {
     const category = await this.prisma.category.findUnique({
       where: { id },

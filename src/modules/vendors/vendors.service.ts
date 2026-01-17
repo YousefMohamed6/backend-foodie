@@ -16,9 +16,15 @@ import { ProductsService } from '../products/products.service';
 import { ReviewsService } from '../reviews/reviews.service';
 import { WalletService } from '../wallet/wallet.service';
 import { CreateVendorDto } from './dto/create-vendor.dto';
+import { UpdateVendorDocumentDto } from './dto/update-vendor-document.dto';
 import { UpdateVendorScheduleDto } from './dto/update-vendor-schedule.dto';
 import { UpdateVendorDto } from './dto/update-vendor.dto';
-import { VendorDefaults, VendorScheduleDefaults } from './vendor.constants';
+import { VerifyVendorDocumentDto } from './dto/verify-vendor-document.dto';
+import {
+  VendorDefaults,
+  VendorDocumentStatus,
+  VendorScheduleDefaults,
+} from './vendor.constants';
 
 @Injectable()
 export class VendorsService {
@@ -37,9 +43,20 @@ export class VendorsService {
   ) { }
 
   private readonly CACHE_KEYS = {
-    ALL_VENDORS: (zoneId?: string, page?: number | string, limit?: number | string) => `vendors:all:${zoneId || 'no_zone'}:p${page || 1}:l${limit || 20}`,
+    ALL_VENDORS: (
+      zoneId?: string,
+      page?: number | string,
+      limit?: number | string,
+    ) => `vendors:all:${zoneId || 'no_zone'}:p${page || 1}:l${limit || 20}`,
     VENDOR_BY_ID: (id: string) => `vendors:id:${id}`,
-    NEAREST_VENDORS: (lat: number, lon: number, radius: number, isDining?: boolean, categoryId?: string, zoneId?: string) =>
+    NEAREST_VENDORS: (
+      lat: number,
+      lon: number,
+      radius: number,
+      isDining?: boolean,
+      categoryId?: string,
+      zoneId?: string,
+    ) =>
       `vendors:nearest:${lat}:${lon}:${radius}:${isDining || 'any'}:${categoryId || 'any'}:${zoneId || 'no_zone'}`,
   };
 
@@ -50,12 +67,13 @@ export class VendorsService {
       await this.redisService.del(this.CACHE_KEYS.VENDOR_BY_ID(vendorId));
     }
     // Since lists depend on zones/pagination, it's safer to clear or use a shorter TTL.
-    // Given the request for "heavy traffic", we'll use a short-ish TTL (e.g. 5-10 mins) for lists 
+    // Given the request for "heavy traffic", we'll use a short-ish TTL (e.g. 5-10 mins) for lists
     // and rely on manual invalidation for IDs.
   }
 
   async create(createVendorDto: CreateVendorDto, user: User) {
-    const { photos, restaurantMenuPhotos, ...rest } = createVendorDto;
+    const { photos, restaurantMenuPhotos, categoryIds, ...rest } =
+      createVendorDto;
 
     const {
       subscriptionPlanId,
@@ -76,16 +94,66 @@ export class VendorsService {
     }
 
     const vendor = await this.prisma.$transaction(async (tx) => {
+      // Check if user already has a vendor
+      const existingVendor = await tx.vendor.findUnique({
+        where: { authorId: user.id },
+      });
+      if (existingVendor) {
+        throw new ForbiddenException('USER_ALREADY_HAS_VENDOR');
+      }
+
+      // Check if VendorType exists
+      const vendorType = await tx.vendorType.findUnique({
+        where: { id: cleanRest.vendorTypeId },
+      });
+      if (!vendorType) {
+        throw new NotFoundException('VENDOR_TYPE_NOT_FOUND');
+      }
+
+      // Check if Zone exists
+      const zone = await tx.zone.findUnique({
+        where: { id: cleanRest.zoneId },
+      });
+      if (!zone) {
+        throw new NotFoundException('ZONE_NOT_FOUND');
+      }
+
+      // Check if categories exist
+      if (categoryIds && categoryIds.length > 0) {
+        const categories = await tx.category.findMany({
+          where: { id: { in: categoryIds } },
+        });
+        if (categories.length !== categoryIds.length) {
+          throw new NotFoundException('SOME_CATEGORIES_NOT_FOUND');
+        }
+      }
+
       // Find Free Plan
       const freePlan = await tx.subscriptionPlan.findFirst({
         where: { price: 0, isActive: true },
-        orderBy: { createdAt: 'asc' }
+        orderBy: { createdAt: 'asc' },
       });
 
       let expiryDate: Date | null = null;
       if (freePlan) {
         expiryDate = new Date();
-        expiryDate.setDate(expiryDate.getDate() + (freePlan as any).durationDays);
+        expiryDate.setDate(
+          expiryDate.getDate() + (freePlan as any).durationDays,
+        );
+      }
+
+      let subscription: any = null;
+      if (freePlan) {
+        subscription = await tx.subscription.create({
+          data: {
+            userId: user.id,
+            planId: freePlan.id,
+            startDate: new Date(),
+            endDate: expiryDate as Date,
+            amountPaid: 0,
+            status: 'ACTIVE',
+          },
+        });
       }
 
       const newVendor = await tx.vendor.create({
@@ -93,17 +161,33 @@ export class VendorsService {
           ...cleanRest,
           authorId: user.id,
           subscriptionPlanId: freePlan?.id,
+          subscriptionId: subscription?.id,
           subscriptionExpiryDate: expiryDate,
-          subscriptionTotalOrders: VendorDefaults.INITIAL_TOTAL_ORDERS,
+          subscriptionTotalOrders:
+            freePlan?.totalOrders ?? VendorDefaults.INITIAL_TOTAL_ORDERS,
+          subscriptionProductsLimit: freePlan?.productsLimit ?? 0,
           reviewsSum: VendorDefaults.INITIAL_REVIEWS_SUM,
           reviewsCount: VendorDefaults.INITIAL_REVIEWS_COUNT,
           isActive: VendorDefaults.DEFAULT_STATUS,
-          photos: photos
-            ? { create: photos.map((url) => ({ url })) }
-            : undefined,
+          photos: photos ? { create: photos.map((url: string) => ({ url })) } : undefined,
           restaurantMenuPhotos: restaurantMenuPhotos
-            ? { create: restaurantMenuPhotos.map((url) => ({ url })) }
+            ? { create: restaurantMenuPhotos.map((url: string) => ({ url })) }
             : undefined,
+          categories:
+            categoryIds && categoryIds.length > 0
+              ? {
+                connect: categoryIds.map((id: string) => ({ id })),
+              }
+              : undefined,
+        },
+      });
+
+      // Update user with subscription info
+      await tx.user.update({
+        where: { id: user.id },
+        data: {
+          subscriptionPlanId: freePlan?.id,
+          subscriptionExpiryDate: expiryDate,
         },
       });
 
@@ -124,7 +208,13 @@ export class VendorsService {
           photos: true,
           restaurantMenuPhotos: true,
           schedules: true,
-          subscriptionPlan: true,
+          subscriptionPlan: {
+            include: {
+              features: true,
+            },
+          },
+          author: true,
+          categories: true,
         },
       });
     });
@@ -144,7 +234,10 @@ export class VendorsService {
     const limit = Math.min(Number(query.limit) || 20, 100);
     const skip = (page - 1) * limit;
 
-    const zoneId = (user?.role === UserRole.CUSTOMER && user.zoneId) ? user.zoneId : query.zoneId;
+    const zoneId =
+      user?.role === UserRole.CUSTOMER && user.zoneId
+        ? user.zoneId
+        : query.zoneId;
     const cacheKey = this.CACHE_KEYS.ALL_VENDORS(zoneId, page, limit);
 
     const cached = await this.redisService.get<any[]>(cacheKey);
@@ -166,12 +259,20 @@ export class VendorsService {
         photos: true,
         restaurantMenuPhotos: true,
         schedules: true,
-        subscriptionPlan: true,
+        subscriptionPlan: {
+          include: {
+            features: true,
+          },
+        },
+        author: true,
+        categories: true,
       },
       orderBy: { createdAt: 'desc' },
     });
 
-    const response = await Promise.all(vendors.map((v) => this.mapVendorResponse(v as any)));
+    const response = await Promise.all(
+      vendors.map((v) => this.mapVendorResponse(v as any)),
+    );
 
     // Cache for 5 minutes
     await this.redisService.set(cacheKey, response, 300);
@@ -190,7 +291,13 @@ export class VendorsService {
         photos: true,
         restaurantMenuPhotos: true,
         schedules: true,
-        subscriptionPlan: true,
+        subscriptionPlan: {
+          include: {
+            features: true,
+          },
+        },
+        author: true,
+        categories: true,
       },
     });
     if (!vendor) {
@@ -205,7 +312,8 @@ export class VendorsService {
   }
 
   async update(id: string, updateVendorDto: UpdateVendorDto) {
-    const { photos, restaurantMenuPhotos, ...rest } = updateVendorDto;
+    const { photos, restaurantMenuPhotos, categoryIds, ...rest } =
+      updateVendorDto as any;
 
     const {
       subscriptionPlanId,
@@ -229,6 +337,7 @@ export class VendorsService {
       where: { id },
       data: {
         ...cleanRest,
+        subscriptionPlanId,
         photos: photos
           ? {
             deleteMany: {},
@@ -241,12 +350,24 @@ export class VendorsService {
             create: restaurantMenuPhotos.map((url) => ({ url })),
           }
           : undefined,
+        categories:
+          categoryIds !== undefined
+            ? {
+              set: categoryIds.map((id: string) => ({ id })),
+            }
+            : undefined,
       },
       include: {
         photos: true,
         restaurantMenuPhotos: true,
         schedules: true,
-        subscriptionPlan: true,
+        subscriptionPlan: {
+          include: {
+            features: true,
+          },
+        },
+        author: true,
+        categories: true,
       },
     });
 
@@ -271,7 +392,13 @@ export class VendorsService {
         photos: true,
         restaurantMenuPhotos: true,
         schedules: true,
-        subscriptionPlan: true,
+        subscriptionPlan: {
+          include: {
+            features: true,
+          },
+        },
+        author: true,
+        categories: true,
       },
     });
     return await this.mapVendorResponse(vendor as any);
@@ -285,12 +412,20 @@ export class VendorsService {
     categoryId?: string,
     user?: User,
   ) {
-    const zoneId = (user?.role === UserRole.CUSTOMER && user.zoneId) ? user.zoneId : undefined;
+    const zoneId =
+      user?.role === UserRole.CUSTOMER && user.zoneId ? user.zoneId : undefined;
     // Round lat/lon to 3 decimal places to increase cache hit rate (approx 100m accuracy)
     const latKey = Math.round(latitude * 1000) / 1000;
     const lonKey = Math.round(longitude * 1000) / 1000;
 
-    const cacheKey = this.CACHE_KEYS.NEAREST_VENDORS(latKey, lonKey, radius, isDining, categoryId, zoneId);
+    const cacheKey = this.CACHE_KEYS.NEAREST_VENDORS(
+      latKey,
+      lonKey,
+      radius,
+      isDining,
+      categoryId,
+      zoneId,
+    );
     const cached = await this.redisService.get<any[]>(cacheKey);
     if (cached) return cached;
 
@@ -335,15 +470,22 @@ export class VendorsService {
     const vendors = await this.prisma.vendor.findMany({
       where,
       include: {
-        categories: true,
         photos: true,
         restaurantMenuPhotos: true,
         schedules: true,
-        subscriptionPlan: true,
+        subscriptionPlan: {
+          include: {
+            features: true,
+          },
+        },
+        author: true,
+        categories: true,
       },
     });
 
-    const response = await Promise.all(vendors.map((v) => this.mapVendorResponse(v as any)));
+    const response = await Promise.all(
+      vendors.map((v) => this.mapVendorResponse(v as any)),
+    );
 
     // Cache for 2 minutes (nearest is more dynamic)
     await this.redisService.set(cacheKey, response, 120);
@@ -353,7 +495,7 @@ export class VendorsService {
 
   async getProducts(vendorId: string) {
     await this.findOne(vendorId);
-    return this.productsService.findAll({ vendorId });
+    return this.productsService.findAll({ vendorId, publish: 'all' });
   }
 
   async getReviews(vendorId: string) {
@@ -436,7 +578,13 @@ export class VendorsService {
         photos: true,
         restaurantMenuPhotos: true,
         schedules: true,
-        subscriptionPlan: true,
+        subscriptionPlan: {
+          include: {
+            features: true,
+          },
+        },
+        author: true,
+        categories: true,
       },
       skip,
       take: l,
@@ -445,8 +593,11 @@ export class VendorsService {
   }
 
   async getSchedules(vendorId: string) {
-    const vendor = await this.prisma.vendor.findFirst({ where: { id: vendorId, isActive: true } });
-    if (!vendor) throw new NotFoundException(VendorStatusMessages.VENDOR_NOT_FOUND);
+    const vendor = await this.prisma.vendor.findFirst({
+      where: { id: vendorId, isActive: true },
+    });
+    if (!vendor)
+      throw new NotFoundException(VendorStatusMessages.VENDOR_NOT_FOUND);
 
     return (this.prisma as any).vendorSchedule.findMany({
       where: { vendorId },
@@ -455,9 +606,16 @@ export class VendorsService {
     });
   }
 
-  async updateSchedule(vendorId: string, updateScheduleDto: UpdateVendorScheduleDto, user: User) {
-    const vendor = await this.prisma.vendor.findUnique({ where: { id: vendorId } });
-    if (!vendor) throw new NotFoundException(VendorStatusMessages.VENDOR_NOT_FOUND);
+  async updateSchedule(
+    vendorId: string,
+    updateScheduleDto: UpdateVendorScheduleDto,
+    user: User,
+  ) {
+    const vendor = await this.prisma.vendor.findUnique({
+      where: { id: vendorId },
+    });
+    if (!vendor)
+      throw new NotFoundException(VendorStatusMessages.VENDOR_NOT_FOUND);
 
     if (user.role !== UserRole.ADMIN && vendor.authorId !== user.id) {
       throw new ForbiddenException(VendorStatusMessages.FORBIDDEN);
@@ -487,31 +645,122 @@ export class VendorsService {
     });
   }
 
+  async updateDocument(
+    user: User,
+    updateVendorDocumentDto: UpdateVendorDocumentDto,
+  ) {
+    const vendor = await this.prisma.vendor.findUnique({
+      where: { authorId: user.id },
+    });
+
+    if (!vendor) {
+      throw new NotFoundException(VendorStatusMessages.VENDOR_NOT_FOUND);
+    }
+
+    const { documentId, frontImage, backImage } = updateVendorDocumentDto;
+
+    return (this.prisma as any).vendorDocument.upsert({
+      where: {
+        vendorId_documentId: {
+          vendorId: vendor.id,
+          documentId: documentId,
+        },
+      },
+      update: {
+        frontImage,
+        backImage,
+        status: VendorDocumentStatus.PENDING, // Reset status to pending so admin must review again
+      },
+      create: {
+        vendorId: vendor.id,
+        documentId,
+        frontImage,
+        backImage,
+        status: VendorDocumentStatus.PENDING,
+      },
+    });
+  }
+
+  async getDocuments(user: User) {
+    const vendor = await this.prisma.vendor.findUnique({
+      where: { authorId: user.id },
+    });
+
+    if (!vendor) {
+      throw new NotFoundException(VendorStatusMessages.VENDOR_NOT_FOUND);
+    }
+
+    const docs = await (this.prisma as any).vendorDocument.findMany({
+      where: { vendorId: vendor.id },
+    });
+
+    return {
+      documents: docs.map((doc: any) => ({
+        ...doc,
+        // Ensure fields match frontend expectations
+        frontImage: doc.frontImage,
+        backImage: doc.backImage,
+        documentId: doc.documentId,
+      })),
+      id: vendor.id,
+      type: 'vendor',
+    };
+  }
+
+  async verifyDocument(dto: VerifyVendorDocumentDto) {
+    const { vendorId, documentId, isApproved, rejectionReason } = dto;
+
+    return (this.prisma as any).vendorDocument.update({
+      where: {
+        vendorId_documentId: {
+          vendorId,
+          documentId,
+        },
+      },
+      data: {
+        status: isApproved
+          ? VendorDocumentStatus.ACCEPTED
+          : VendorDocumentStatus.REJECTED,
+        // In a real app, we might store rejectionReason in a metadata JSON field
+        // or a new column if the schema supports it.
+      },
+    });
+  }
+
   private async mapVendorResponse(vendor: any | null) {
     if (!vendor) return null;
-    const { photos, restaurantMenuPhotos, schedules, ...rest } = vendor;
+    const { photos, restaurantMenuPhotos, schedules, categories, ...rest } = vendor;
 
     const walletAmount = await this.walletService.getBalance(vendor.authorId);
 
     const now = new Date();
     const currentDayId = now.getDay();
-    const daySchedules = schedules?.filter((s: any) => s.dayId === currentDayId);
+    const daySchedules = schedules?.filter(
+      (s: any) => s.dayId === currentDayId,
+    );
 
     let isOpen = false;
     if (daySchedules && daySchedules.length > 0) {
       const currentTime = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
-      isOpen = daySchedules.some((s: any) =>
-        s.isActive && s.openTime && s.closeTime && currentTime >= s.openTime && currentTime <= s.closeTime
+      isOpen = daySchedules.some(
+        (s: any) =>
+          s.isActive &&
+          s.openTime &&
+          s.closeTime &&
+          currentTime >= s.openTime &&
+          currentTime <= s.closeTime,
       );
     }
 
     const hasValidPlan = !!vendor.subscriptionPlan;
-    const isNotExpired = vendor.subscriptionExpiryDate ? new Date(vendor.subscriptionExpiryDate) > now : true;
-    const isWithinLimits = hasValidPlan && (
-      Number(vendor.subscriptionPlan.price) <= 0 ||
-      vendor.subscriptionPlan.totalOrders === -1 ||
-      (vendor.subscriptionTotalOrders ?? 0) > 0
-    );
+    const isNotExpired = vendor.subscriptionExpiryDate
+      ? new Date(vendor.subscriptionExpiryDate) > now
+      : true;
+    const isWithinLimits =
+      hasValidPlan &&
+      (Number(vendor.subscriptionPlan.price) <= 0 ||
+        vendor.subscriptionPlan.totalOrders === -1 ||
+        (vendor.subscriptionTotalOrders ?? 0) > 0);
 
     const isSubscriptionActive = hasValidPlan && isNotExpired && isWithinLimits;
 
@@ -519,6 +768,8 @@ export class VendorsService {
       ...rest,
       isOpen,
       isSubscriptionActive,
+      walletAmount,
+      categoryIds: categories?.map((c: any) => c.id) || [],
       photos: photos?.map((p: any) => p.url) || [],
       restaurantMenuPhotos: restaurantMenuPhotos?.map((p: any) => p.url) || [],
     };

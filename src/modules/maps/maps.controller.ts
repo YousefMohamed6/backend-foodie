@@ -39,7 +39,7 @@ export class MapsController {
   }
 
   @Get('autocomplete')
-  @Roles(UserRole.CUSTOMER)
+  @Roles(UserRole.CUSTOMER, UserRole.VENDOR, UserRole.DRIVER, UserRole.ADMIN, UserRole.MANAGER)
   @ApiOperation({ summary: 'Search places' })
   @ApiQuery({ name: 'input', required: true, type: String })
   @ApiQuery({ name: 'language', required: false, type: String })
@@ -49,8 +49,9 @@ export class MapsController {
   ) {
     return this.mapsService.searchPlaces(input, language);
   }
+
   @Get('geocode')
-  @Roles(UserRole.CUSTOMER)
+  @Roles(UserRole.CUSTOMER, UserRole.VENDOR, UserRole.DRIVER, UserRole.ADMIN, UserRole.MANAGER)
   @ApiOperation({ summary: 'Get coordinates from address string' })
   @ApiQuery({ name: 'address', required: true, type: String })
   @ApiQuery({ name: 'language', required: false, type: String })
@@ -60,8 +61,9 @@ export class MapsController {
   ) {
     return this.mapsService.getGeocode(address, language);
   }
+
   @Get('reverse-geocode')
-  @Roles(UserRole.CUSTOMER)
+  @Roles(UserRole.CUSTOMER, UserRole.VENDOR, UserRole.DRIVER, UserRole.ADMIN, UserRole.MANAGER)
   @ApiOperation({ summary: 'Get address from coordinates' })
   @ApiQuery({ name: 'lat', required: true, type: Number })
   @ApiQuery({ name: 'lng', required: true, type: Number })

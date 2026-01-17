@@ -15,7 +15,7 @@ export class ZonesService {
   constructor(
     private prisma: PrismaService,
     private redisService: RedisService,
-  ) { }
+  ) {}
 
   private readonly CACHE_KEYS = {
     ALL_ZONES: 'zones:all',
@@ -57,7 +57,9 @@ export class ZonesService {
   }
 
   async findAll() {
-    const cached = await this.redisService.get<any[]>(this.CACHE_KEYS.ALL_ZONES);
+    const cached = await this.redisService.get<any[]>(
+      this.CACHE_KEYS.ALL_ZONES,
+    );
     if (cached) return cached;
 
     const zones = await this.prisma.zone.findMany();
@@ -132,7 +134,9 @@ export class ZonesService {
   }
 
   async findZoneByLocation(lat: number, lng: number) {
-    const cachedPublished = await this.redisService.get<any[]>(this.CACHE_KEYS.PUBLISHED_ZONES);
+    const cachedPublished = await this.redisService.get<any[]>(
+      this.CACHE_KEYS.PUBLISHED_ZONES,
+    );
     let zones = cachedPublished;
 
     if (!zones) {

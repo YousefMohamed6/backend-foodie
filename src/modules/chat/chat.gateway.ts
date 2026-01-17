@@ -25,7 +25,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
   private readonly logger = new Logger(ChatGateway.name);
 
-  constructor(private readonly chatService: ChatService) { }
+  constructor(private readonly chatService: ChatService) {}
 
   handleConnection(client: Socket) {
     const userId = client.handshake.query.userId as string;
@@ -33,7 +33,9 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
       // Join user's personal room
       const userRoom = `${ChatConstants.SOCKET_ROOMS.USER_PREFIX}${userId}`;
       client.join(userRoom);
-      this.logger.log(`User ${userId} connected to chat, joined room: ${userRoom}`);
+      this.logger.log(
+        `User ${userId} connected to chat, joined room: ${userRoom}`,
+      );
     }
   }
 

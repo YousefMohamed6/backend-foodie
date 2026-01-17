@@ -35,7 +35,7 @@ async function bootstrap() {
   app.use(helmet(securityHeadersConfig));
   app.use(cookieParser());
   app.setGlobalPrefix('api/v1', {
-    exclude: ['/api', '/api/(.*)'],
+    exclude: ['/api', '/api/*path'],
   });
 
   const allowedOrigins = configService.get<string>('ALLOWED_ORIGINS');
@@ -54,8 +54,8 @@ async function bootstrap() {
     configService.get<string>('SESSION_SECRET') ||
     (isProduction
       ? (() => {
-          throw new Error('SESSION_SECRET is required in production');
-        })()
+        throw new Error('SESSION_SECRET is required in production');
+      })()
       : 'foodie-admin-secret-key-dev');
 
   app.use(

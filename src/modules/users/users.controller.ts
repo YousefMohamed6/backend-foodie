@@ -29,7 +29,7 @@ export class UsersController {
   @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: 'Get current user profile' })
   getMe(@Request() req) {
-    return this.usersService.findOne(req.user.id);
+    return this.usersService.findMe(req.user.id);
   }
 
   @Patch()

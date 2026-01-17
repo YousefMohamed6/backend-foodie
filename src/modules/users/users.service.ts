@@ -1,4 +1,9 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import {
+  BadRequestException,
+  forwardRef,
+  Inject,
+  Injectable,
+} from '@nestjs/common';
 import { DriverStatus, TransactionType, UserRole } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 import { normalizePhoneNumber } from '../../common/utils/phone.utils';
@@ -6,6 +11,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { RedisService } from '../../shared/services/redis.service';
 import { APP_SETTINGS } from '../settings/settings.constants';
 import { SettingsService } from '../settings/settings.service';
+import { VendorsService } from '../vendors/vendors.service';
 import { WalletTransactionDescriptions } from '../wallet/wallet-transaction.constants';
 import { WalletConstants } from '../wallet/wallet.constants';
 import { WalletService } from '../wallet/wallet.service';
@@ -19,7 +25,47 @@ export class UsersService {
     private redisService: RedisService,
     private walletService: WalletService,
     private settingsService: SettingsService,
+    @Inject(forwardRef(() => VendorsService))
+    private vendorsService: VendorsService,
   ) { }
+
+  async findMe(id: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id },
+    });
+    if (!user) return null;
+
+    // Map user to author (exclude password and subscription-related fields)
+    const mapUserToAuthor = (u: typeof user) => {
+      const {
+        password,
+        isDocumentVerify,
+        subscriptionPlanId,
+        subscriptionExpiryDate,
+        ...authorData
+      } = u;
+      return authorData;
+    };
+
+    if (user.role === UserRole.VENDOR) {
+      const vendor = await this.vendorsService.findByAuthor(user.id);
+      if (vendor) {
+        // Return vendor with author (user) embedded
+        return {
+          ...vendor,
+          author: mapUserToAuthor(user),
+        };
+      } else {
+        // No vendor profile yet - return user data as author structure
+        return {
+          author: mapUserToAuthor(user),
+        };
+      }
+    }
+
+    const { password, ...result } = user;
+    return result;
+  }
 
   async create(createUserDto: CreateUserDto) {
     const {
@@ -43,8 +89,12 @@ export class UsersService {
       }
     }
 
-    // Ensure zoneId is required for certain roles
-    const mandatoryRoles: UserRole[] = [UserRole.DRIVER, UserRole.VENDOR, UserRole.MANAGER];
+    // Ensure zoneId is required for certain roles during registration
+    // Note: VENDOR role is excluded here as vendors complete their profile (including zone) after registration
+    const mandatoryRoles: UserRole[] = [
+      UserRole.DRIVER,
+      UserRole.MANAGER,
+    ];
     const role = userData.role || UserRole.CUSTOMER;
     if (mandatoryRoles.includes(role) && !userData.zoneId) {
       throw new BadRequestException('ZONE_ID_REQUIRED_FOR_THIS_ROLE');
@@ -189,7 +239,9 @@ export class UsersService {
       updateUserDto.password = await bcrypt.hash(updateUserDto.password, 10);
     }
     if (updateUserDto.phoneNumber) {
-      updateUserDto.phoneNumber = normalizePhoneNumber(updateUserDto.phoneNumber);
+      updateUserDto.phoneNumber = normalizePhoneNumber(
+        updateUserDto.phoneNumber,
+      );
     }
 
     // Ensure zoneId is not removed for mandatory roles
@@ -198,7 +250,11 @@ export class UsersService {
       throw new BadRequestException('USER_NOT_FOUND');
     }
 
-    const mandatoryRoles: UserRole[] = [UserRole.DRIVER, UserRole.VENDOR, UserRole.MANAGER];
+    const mandatoryRoles: UserRole[] = [
+      UserRole.DRIVER,
+      UserRole.VENDOR,
+      UserRole.MANAGER,
+    ];
     if (mandatoryRoles.includes(userToUpdate.role)) {
       if (
         updateUserDto.zoneId === null ||

@@ -1,19 +1,39 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { SubscriptionStatus } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
+import { CreateSubscriptionPlanDto } from './dto/create-subscription-plan.dto';
 import { SubscribeDto } from './dto/subscribe.dto';
 
 @Injectable()
 export class SubscriptionsService {
   constructor(private prisma: PrismaService) { }
 
+  async create(createDto: CreateSubscriptionPlanDto) {
+    const { features, arabicName, englishName, ...planData } = createDto;
+    return this.prisma.subscriptionPlan.create({
+      data: {
+        ...planData,
+        arabicName,
+        englishName,
+        features: {
+          create: features,
+        },
+      },
+      include: { features: true },
+    });
+  }
+
   async getPlans() {
-    return this.prisma.subscriptionPlan.findMany({ where: { isActive: true } });
+    return this.prisma.subscriptionPlan.findMany({
+      where: { isActive: true },
+      include: { features: true },
+    });
   }
 
   async getPlan(id: string) {
     const plan = await this.prisma.subscriptionPlan.findUnique({
       where: { id },
+      include: { features: true },
     });
     if (!plan) {
       throw new NotFoundException('PLAN_NOT_FOUND');
@@ -63,6 +83,7 @@ export class SubscriptionsService {
             subscriptionPlanId: plan.id,
             subscriptionExpiryDate: endDate,
             subscriptionTotalOrders: plan.totalOrders,
+            subscriptionProductsLimit: plan.productsLimit,
             subscriptionId: subscription.id,
           },
         });

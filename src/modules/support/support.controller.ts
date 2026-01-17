@@ -38,7 +38,7 @@ export class SupportController {
   constructor(
     private readonly supportService: SupportService,
     private readonly supportGateway: SupportGateway,
-  ) { }
+  ) {}
 
   @Post('contact')
   @ApiOperation({ summary: 'Send contact message (public)' })
@@ -66,10 +66,25 @@ export class SupportController {
     schema: {
       type: 'object',
       properties: {
-        message: { type: 'string', description: 'Text message (required for text type)' },
-        type: { type: 'string', enum: ['TEXT', 'IMAGE', 'VIDEO'], description: 'Message type' },
-        file: { type: 'string', format: 'binary', description: 'Image or video file' },
-        videoThumbnail: { type: 'string', format: 'binary', description: 'Video thumbnail' },
+        message: {
+          type: 'string',
+          description: 'Text message (required for text type)',
+        },
+        type: {
+          type: 'string',
+          enum: ['TEXT', 'IMAGE', 'VIDEO'],
+          description: 'Message type',
+        },
+        file: {
+          type: 'string',
+          format: 'binary',
+          description: 'Image or video file',
+        },
+        videoThumbnail: {
+          type: 'string',
+          format: 'binary',
+          description: 'Video thumbnail',
+        },
       },
       required: ['type'],
     },
@@ -101,7 +116,10 @@ export class SupportController {
     @Request() req: any,
     @Body() dto: SendSupportMessageDto,
     @UploadedFiles()
-    files: { file?: Express.Multer.File[]; videoThumbnail?: Express.Multer.File[] },
+    files: {
+      file?: Express.Multer.File[];
+      videoThumbnail?: Express.Multer.File[];
+    },
   ) {
     const userInfo: SupportUserInfo = {
       userId: req.user.id,
@@ -140,10 +158,25 @@ export class SupportController {
     schema: {
       type: 'object',
       properties: {
-        message: { type: 'string', description: 'Text message (required for text type)' },
-        type: { type: 'string', enum: ['TEXT', 'IMAGE', 'VIDEO'], description: 'Message type' },
-        file: { type: 'string', format: 'binary', description: 'Image or video file' },
-        videoThumbnail: { type: 'string', format: 'binary', description: 'Video thumbnail' },
+        message: {
+          type: 'string',
+          description: 'Text message (required for text type)',
+        },
+        type: {
+          type: 'string',
+          enum: ['TEXT', 'IMAGE', 'VIDEO'],
+          description: 'Message type',
+        },
+        file: {
+          type: 'string',
+          format: 'binary',
+          description: 'Image or video file',
+        },
+        videoThumbnail: {
+          type: 'string',
+          format: 'binary',
+          description: 'Video thumbnail',
+        },
       },
       required: ['type'],
     },
@@ -176,7 +209,10 @@ export class SupportController {
     @Param('inboxId') inboxId: string,
     @Body() dto: SendSupportMessageDto,
     @UploadedFiles()
-    files: { file?: Express.Multer.File[]; videoThumbnail?: Express.Multer.File[] },
+    files: {
+      file?: Express.Multer.File[];
+      videoThumbnail?: Express.Multer.File[];
+    },
   ) {
     const file = files?.file?.[0];
     const videoThumbnail = files?.videoThumbnail?.[0];

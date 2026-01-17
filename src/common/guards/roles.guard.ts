@@ -5,7 +5,7 @@ import { ROLES_KEY } from '../decorators/roles.decorator';
 
 @Injectable()
 export class RolesGuard implements CanActivate {
-  constructor(private reflector: Reflector) {}
+  constructor(private reflector: Reflector) { }
 
   canActivate(context: ExecutionContext): boolean {
     const requiredRoles = this.reflector.getAllAndOverride<UserRole[]>(
@@ -16,6 +16,13 @@ export class RolesGuard implements CanActivate {
       return true;
     }
     const { user } = context.switchToHttp().getRequest();
-    return requiredRoles.some((role) => user.role === role);
+    return requiredRoles.some((role) => {
+      // Handle potential case mismatches (e.g. database lowercase vs Enum uppercase)
+      if (user.role === role) return true;
+      if (typeof user.role === 'string' && typeof role === 'string') {
+        return user.role.toUpperCase() === role.toUpperCase();
+      }
+      return false;
+    });
   }
 }

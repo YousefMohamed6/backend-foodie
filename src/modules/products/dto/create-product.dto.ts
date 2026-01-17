@@ -17,40 +17,48 @@ export class CreateProductDto {
   @IsString()
   name: string;
 
-  @ApiProperty()
-  @IsNotEmpty()
+  @ApiPropertyOptional()
+  @IsOptional()
   @IsString()
-  description: string;
+  description?: string;
 
   @ApiProperty()
   @IsNotEmpty()
   @IsNumber()
   price: number;
 
-  @ApiPropertyOptional()
-  @IsOptional()
+  @ApiProperty()
   @IsNumber()
-  discountPrice?: number;
+  discountPrice: number;
 
   @ApiPropertyOptional()
   @IsOptional()
   @IsString()
   image?: string;
 
+
+  @ApiProperty()
+  @IsString()
+  categoryId: string;
+
+  @ApiPropertyOptional()
+  @IsArray()
+  @IsOptional()
+  itemAttributes?: string[];
+
+  @ApiProperty()
+  @IsNumber()
+  quantity: number;
+
   @ApiPropertyOptional()
   @IsOptional()
   @IsBoolean()
-  available?: boolean;
+  takeawayOption?: boolean;
 
-  @ApiPropertyOptional()
-  @IsOptional()
-  @IsString()
-  categoryId?: string;
 
-  @ApiPropertyOptional()
-  @IsOptional()
-  @IsString()
-  itemAttributes?: string;
+  @ApiProperty()
+  @IsBoolean()
+  isPublish: boolean;
 
   @ApiPropertyOptional({ type: [ProductExtraDto] })
   @IsOptional()

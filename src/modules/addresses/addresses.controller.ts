@@ -21,7 +21,7 @@ import { UpdateAddressDto } from './dto/update-address.dto';
 @Controller('addresses')
 @UseGuards(JwtAuthGuard)
 export class AddressesController {
-  constructor(private readonly addressesService: AddressesService) { }
+  constructor(private readonly addressesService: AddressesService) {}
 
   @Post()
   @ApiOperation({ summary: 'Create a new address' })

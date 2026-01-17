@@ -13,7 +13,7 @@ import { I18nService } from 'nestjs-i18n';
 export class GlobalExceptionFilter implements ExceptionFilter {
   private readonly logger = new Logger(GlobalExceptionFilter.name);
 
-  constructor(private readonly i18n: I18nService) { }
+  constructor(private readonly i18n: I18nService) {}
 
   async catch(exception: any, host: ArgumentsHost) {
     const ctx = host.switchToHttp();

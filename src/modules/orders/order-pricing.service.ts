@@ -1,15 +1,26 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  forwardRef,
+  Inject,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
+import { DiscountType } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CouponsService } from '../coupons/coupons.service';
 import { APP_SETTINGS } from '../settings/settings.constants';
+import { SpecialDiscountsService } from '../special-discounts/special-discounts.service';
 import { CreateOrderDto } from './dto/create-order.dto';
+import { ORDERS_ERRORS } from './orders.constants';
 import { calculateDistance } from './orders.helper';
 
 @Injectable()
 export class OrderPricingService {
   constructor(
     private prisma: PrismaService,
+    @Inject(forwardRef(() => CouponsService))
     private couponsService: CouponsService,
+    private specialDiscountsService: SpecialDiscountsService,
   ) { }
 
   async calculatePricing(
@@ -122,12 +133,35 @@ export class OrderPricingService {
     const adminCommissionAmount = subtotal * (adminCommissionPercentage / 100);
     let discountAmount = 0;
     if (createOrderDto.couponCode) {
-      const couponResult = await this.couponsService.validate(
-        createOrderDto.couponCode,
-        createOrderDto.vendorId,
-        subtotal,
-      );
-      discountAmount = couponResult.discountValue;
+      try {
+        // 1. Try Special Discounts (Vendor Specific)
+        const specialDiscount =
+          await this.specialDiscountsService.validateCoupon({
+            couponCode: createOrderDto.couponCode,
+            vendorId: createOrderDto.vendorId,
+          });
+
+        if (specialDiscount.success) {
+          if (specialDiscount.discountType === DiscountType.PERCENTAGE) {
+            discountAmount = subtotal * (specialDiscount.discount / 100);
+          } else {
+            discountAmount = specialDiscount.discount; // Flat amount
+          }
+        }
+      } catch (e) {
+        // 2. Fallback to Standard Coupons
+        try {
+          const couponResult = await this.couponsService.validate(
+            createOrderDto.couponCode,
+            createOrderDto.vendorId,
+            subtotal,
+          );
+          discountAmount = couponResult.discountValue;
+        } catch (e2) {
+          // Both failed
+          throw new BadRequestException(ORDERS_ERRORS.INVALID_COUPON_CODE);
+        }
+      }
     }
 
     const vendorEarnings = subtotal - adminCommissionAmount - discountAmount;
