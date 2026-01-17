@@ -773,6 +773,19 @@ model Notification {
   @@map("notifications")
 }
 
+model NotificationTemplate {
+  id        String   @id @default(uuid())
+  key       String   @unique
+  subjectEn String   @map("subject_en")
+  subjectAr String   @map("subject_ar")
+  bodyEn    String   @map("body_en")
+  bodyAr    String   @map("body_ar")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("notification_templates")
+}
+
 model Referral {
   id           String   @id @default(uuid())
   referrerId   String

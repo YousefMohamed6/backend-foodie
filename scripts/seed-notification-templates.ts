@@ -1,5 +1,6 @@
 import { PrismaClient } from '@prisma/client';
 import { ORDERS_NOTIFICATIONS } from '../src/modules/orders/orders.constants';
+import { SUBSCRIPTIONS_NOTIFICATIONS } from '../src/modules/subscriptions/subscriptions.constants';
 
 const prisma = new PrismaClient();
 
@@ -148,6 +149,16 @@ async function seedNotificationTemplates() {
                 message: 'السائق {driverName} رفض الطلب #{orderId} من {vendorName}. يرجى إعادة التعيين.',
             },
         },
+        [SUBSCRIPTIONS_NOTIFICATIONS.SUBSCRIPTION_EXPIRING_SOON]: {
+            en: {
+                subject: 'Subscription Expiring Soon',
+                message: 'Your subscription is expiring soon. Please renew to avoid interruption.',
+            },
+            ar: {
+                subject: 'اشتراكك ينتهي قريباً',
+                message: 'اشتراكك ينتهي قريباً. يرجى التجديد لتجنب الانقطاع.',
+            },
+        },
     };
 
     let addedCount = 0;
@@ -155,28 +166,38 @@ async function seedNotificationTemplates() {
 
     for (const [key, template] of Object.entries(templates)) {
         try {
-            const existing = await prisma.setting.findUnique({
+            const existing = await prisma.notificationTemplate.findUnique({
                 where: { key },
             });
 
-            const value = JSON.stringify(template);
+            const data = {
+                key,
+                subjectEn: template.en.subject,
+                subjectAr: template.ar.subject,
+                bodyEn: template.en.message,
+                bodyAr: template.ar.message,
+            };
 
             if (existing) {
-                await prisma.setting.update({
+                await prisma.notificationTemplate.update({
                     where: { key },
-                    data: { value },
+                    data,
                 });
                 console.log(`✓ Updated template: ${key}`);
                 updatedCount++;
             } else {
-                await prisma.setting.create({
-                    data: {
-                        key,
-                        value,
-                    },
+                await prisma.notificationTemplate.create({
+                    data,
                 });
                 console.log(`✓ Added template: ${key}`);
                 addedCount++;
+            }
+
+            // Cleanup from settings table if exists
+            const oldSetting = await prisma.setting.findUnique({ where: { key } });
+            if (oldSetting) {
+                await prisma.setting.delete({ where: { key } });
+                console.log(`  - Cleaned up old setting: ${key}`);
             }
         } catch (error) {
             console.error(`✗ Error processing template ${key}:`, error);

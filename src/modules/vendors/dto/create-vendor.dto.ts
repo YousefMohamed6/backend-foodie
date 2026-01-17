@@ -2,11 +2,10 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
 import {
   IsArray,
-  IsBoolean,
   IsNotEmpty,
   IsNumber,
   IsOptional,
-  IsString,
+  IsString
 } from 'class-validator';
 import { normalizePhoneNumber } from '../../../common/utils/phone.utils';
 
@@ -60,10 +59,6 @@ export class CreateVendorDto {
   @Transform(({ value }) => normalizePhoneNumber(value))
   phoneNumber?: string;
 
-  @ApiPropertyOptional()
-  @IsOptional()
-  @IsBoolean()
-  restStatus?: boolean;
 
   @ApiPropertyOptional()
   @IsOptional()

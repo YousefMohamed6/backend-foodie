@@ -3,23 +3,14 @@ import { UserRole } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { FcmService } from '../../shared/services/fcm.service';
 
-interface NotificationTemplate {
-  en: {
-    subject: string;
-    message: string;
-  };
-  ar: {
-    subject: string;
-    message: string;
-  };
-}
+
 
 @Injectable()
 export class NotificationService {
   constructor(
     private prisma: PrismaService,
     private fcmService: FcmService,
-  ) {}
+  ) { }
 
   /**
    * Get user's preferred language or default to Arabic
@@ -35,6 +26,7 @@ export class NotificationService {
     return lang === 'en' ? 'en' : 'ar';
   }
 
+
   /**
    * Get notification template with user's preferred language
    */
@@ -46,12 +38,12 @@ export class NotificationService {
     // Get user's preferred language
     const language = await this.getUserLanguage(userId);
 
-    // Fetch template from settings
-    const setting = await this.prisma.setting.findUnique({
+    // Fetch template from notification templates
+    const template = await this.prisma.notificationTemplate.findUnique({
       where: { key: templateKey },
     });
 
-    if (!setting) {
+    if (!template) {
       // Fallback if template not found
       return {
         subject: 'Notification',
@@ -60,29 +52,25 @@ export class NotificationService {
     }
 
     try {
-      const template: NotificationTemplate = JSON.parse(setting.value);
+      let subject = language === 'en' ? template.subjectEn : template.subjectAr;
+      let message = language === 'en' ? template.bodyEn : template.bodyAr;
 
-      // Return the message in user's preferred language
-      // Fallback to Arabic if the language doesn't exist in template
-      const content = template[language] || template.ar || template.en;
+      // Ensure we have a string, fallback if missing in preferred language
+      subject = subject || template.subjectAr || template.subjectEn;
+      message = message || template.bodyAr || template.bodyEn;
 
       if (data) {
         Object.keys(data).forEach((key) => {
           const placeholder = `{${key}}`;
-          content.message = content.message.replace(
-            new RegExp(placeholder, 'g'),
-            data[key],
-          );
-          content.subject = content.subject.replace(
-            new RegExp(placeholder, 'g'),
-            data[key],
-          );
+          // Replace all occurrences
+          message = message.replace(new RegExp(placeholder, 'g'), data[key]);
+          subject = subject.replace(new RegExp(placeholder, 'g'), data[key]);
         });
       }
 
-      return content;
+      return { subject, message };
     } catch (error) {
-      // If JSON parse fails or structure is invalid
+      // Should not happen with direct column access, but keeping safety
       return {
         subject: 'Notification',
         message: 'You have a new notification',

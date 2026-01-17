@@ -727,15 +727,63 @@ export class VendorsService {
     });
   }
 
+  private mapSubscriptionPlan(plan: any) {
+    if (!plan) return null;
+    return {
+      id: plan.id,
+      englishName: plan.englishName,
+      arabicName: plan.arabicName,
+      description: plan.description,
+      price: plan.price ? Number(plan.price) : 0,
+      durationDays: plan.durationDays,
+      totalOrders: plan.totalOrders,
+      productsLimit: plan.productsLimit,
+      isActive: plan.isActive,
+      planPoints: plan.planPoints,
+      image: plan.image,
+      type: plan.type,
+      features: plan.features?.map((f: any) => ({
+        id: f.id,
+        key: f.key,
+        value: f.value,
+      })) || [],
+    };
+  }
+
+  private mapUser(user: any) {
+    if (!user) return null;
+    return {
+      id: user.id,
+      email: user.email,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      profilePictureURL: user.profilePictureURL,
+      fcmToken: user.fcmToken,
+      countryCode: user.countryCode,
+      phoneNumber: user.phoneNumber,
+      isActive: user.isActive,
+      role: user.role,
+      provider: user.provider,
+      isDocumentVerify: user.isDocumentVerify,
+    };
+  }
+
   private async mapVendorResponse(vendor: any | null) {
     if (!vendor) return null;
-    const { photos, restaurantMenuPhotos, schedules, categories, ...rest } = vendor;
+
+    const {
+      photos,
+      restaurantMenuPhotos,
+      categories,
+      author,
+      subscriptionPlan,
+    } = vendor;
 
     const walletAmount = await this.walletService.getBalance(vendor.authorId);
 
     const now = new Date();
     const currentDayId = now.getDay();
-    const daySchedules = schedules?.filter(
+    const daySchedules = vendor.schedules?.filter(
       (s: any) => s.dayId === currentDayId,
     );
 
@@ -758,20 +806,41 @@ export class VendorsService {
       : true;
     const isWithinLimits =
       hasValidPlan &&
-      (Number(vendor.subscriptionPlan.price) <= 0 ||
-        vendor.subscriptionPlan.totalOrders === -1 ||
+      (Number(subscriptionPlan.price) <= 0 ||
+        subscriptionPlan.totalOrders === -1 ||
         (vendor.subscriptionTotalOrders ?? 0) > 0);
 
     const isSubscriptionActive = hasValidPlan && isNotExpired && isWithinLimits;
 
     return {
-      ...rest,
-      isOpen,
-      isSubscriptionActive,
+      id: vendor.id,
+      title: vendor.title,
+      description: vendor.description,
+      photo: vendor.photo,
+      logo: vendor.logo,
+      vendorTypeId: vendor.vendorTypeId,
+      latitude: vendor.latitude ? Number(vendor.latitude) : 0,
+      longitude: vendor.longitude ? Number(vendor.longitude) : 0,
+      address: vendor.address,
+      zoneId: vendor.zoneId,
+      fcmToken: vendor.fcmToken,
       walletAmount,
+      reviewsSum: vendor.reviewsSum ? Number(vendor.reviewsSum) : 0,
+      reviewsCount: vendor.reviewsCount ? Number(vendor.reviewsCount) : 0,
+      restaurantCost: vendor.restaurantCost,
+      subscriptionPlanId: vendor.subscriptionPlanId,
+      subscriptionExpiryDate: vendor.subscriptionExpiryDate,
+      isDineInActive: vendor.isDineInActive,
+      phoneNumber: vendor.phoneNumber,
+      subscriptionTotalOrders: vendor.subscriptionTotalOrders,
+      isActive: vendor.isActive,
+      isSubscriptionActive,
+      isOpen,
       categoryIds: categories?.map((c: any) => c.id) || [],
       photos: photos?.map((p: any) => p.url) || [],
       restaurantMenuPhotos: restaurantMenuPhotos?.map((p: any) => p.url) || [],
+      author: this.mapUser(author),
+      subscriptionPlan: this.mapSubscriptionPlan(subscriptionPlan),
     };
   }
 }
