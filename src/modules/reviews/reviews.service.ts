@@ -10,26 +10,10 @@ type ReviewWithRelations = Prisma.ReviewGetPayload<{
 
 @Injectable()
 export class ReviewsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(private prisma: PrismaService) { }
 
   async create(createReviewDto: CreateReviewDto, user: User) {
-    const { images, reviewAttributes, ...rest } = createReviewDto;
-
-    // Normalize reviewAttributes
-    let ratingsData: { attributeId: string; rating: number }[] = [];
-    if (reviewAttributes) {
-      if (Array.isArray(reviewAttributes)) {
-        ratingsData = reviewAttributes.map((r) => ({
-          attributeId: r.id || r.attributeId,
-          rating: Number(r.rating),
-        }));
-      } else if (typeof reviewAttributes === 'object') {
-        ratingsData = Object.entries(reviewAttributes).map(([id, rating]) => ({
-          attributeId: id,
-          rating: Number(rating),
-        }));
-      }
-    }
+    const { images, ...rest } = createReviewDto;
 
     const savedReview = await this.prisma.review.create({
       data: {
@@ -37,15 +21,9 @@ export class ReviewsService {
         customerId: user.id,
         images: images
           ? {
-              create: images.map((url) => ({ url })),
-            }
+            create: images.map((url) => ({ url })),
+          }
           : undefined,
-        ratings:
-          ratingsData.length > 0
-            ? {
-                create: ratingsData,
-              }
-            : undefined,
       },
       include: { images: true, ratings: true, customer: true },
     });
@@ -59,7 +37,7 @@ export class ReviewsService {
       },
     });
 
-    return this.mapReviewResponse(savedReview);
+    return this.mapReviewResponse(savedReview); // ratings: true is still in include, but no data created for it, which is fine for now as table structure might still exist or be empty
   }
 
   async findAll(query: {
@@ -112,26 +90,10 @@ export class ReviewsService {
       throw new NotFoundException('REVIEW_NOT_FOUND');
     }
 
-    const { images, reviewAttributes, ...rest } = updateReviewDto;
+    const { images, ...rest } = updateReviewDto;
     const oldRating = oldReview.rating;
     const newRating = rest.rating !== undefined ? rest.rating : oldRating;
     const ratingDelta = newRating - oldRating;
-
-    // Normalize reviewAttributes
-    let ratingsData: { attributeId: string; rating: number }[] = [];
-    if (reviewAttributes) {
-      if (Array.isArray(reviewAttributes)) {
-        ratingsData = reviewAttributes.map((r) => ({
-          attributeId: r.id || r.attributeId,
-          rating: Number(r.rating),
-        }));
-      } else if (typeof reviewAttributes === 'object') {
-        ratingsData = Object.entries(reviewAttributes).map(([id, rating]) => ({
-          attributeId: id,
-          rating: Number(rating),
-        }));
-      }
-    }
 
     const savedReview = await this.prisma.review.update({
       where: { id },
@@ -139,15 +101,9 @@ export class ReviewsService {
         ...rest,
         images: images
           ? {
-              deleteMany: {},
-              create: images.map((url) => ({ url })),
-            }
-          : undefined,
-        ratings: reviewAttributes
-          ? {
-              deleteMany: {},
-              create: ratingsData,
-            }
+            deleteMany: {},
+            create: images.map((url) => ({ url })),
+          }
           : undefined,
       },
       include: { images: true, ratings: true, customer: true },
@@ -206,34 +162,10 @@ export class ReviewsService {
     return this.mapReviewResponse(review);
   }
 
-  async getVendorReviewAttributes(vendorId: string) {
-    // In a real app, this might come from a DB or vendor settings
-    // Mocking based on common attributes
-    return {
-      attributes: [
-        { id: 'cleanliness', name: 'Cleanliness' },
-        { id: 'food_quality', name: 'Food Quality' },
-        { id: 'delivery_speed', name: 'Delivery Speed' },
-        { id: 'packaging', name: 'Packaging' },
-      ],
-    };
-  }
-
   private mapReviewResponse(review: ReviewWithRelations | null) {
     if (!review) return null;
     const { images, ratings, customer, ...rest } = review;
 
-    // Map ratings back to object { [attributeId]: rating }
-    const reviewAttributes =
-      ratings?.reduce(
-        (acc, r) => {
-          acc[r.attributeId] = r.rating;
-          return acc;
-        },
-        {} as Record<string, number>,
-      ) || {};
-
-    // Map relational images back to simple string array to preserve response shape
     return {
       ...rest,
       uname: customer?.firstName
@@ -241,7 +173,7 @@ export class ReviewsService {
         : 'Anonymous',
       profile: customer?.profilePictureURL || null,
       images: images?.map((img) => img.url) || [],
-      reviewAttributes,
+      reviewAttributes: {},
     };
   }
 }

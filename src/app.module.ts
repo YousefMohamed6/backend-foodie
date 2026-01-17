@@ -50,7 +50,7 @@ import { EmailTemplatesModule } from './modules/email-templates/email-templates.
 import { OnBoardingModule } from './modules/onboarding/onboarding.module';
 
 import { AttributesModule } from './modules/attributes/attributes.module';
-import { ReviewAttributesModule } from './modules/review-attributes/review-attributes.module';
+
 
 import { APP_FILTER, APP_GUARD } from '@nestjs/core';
 import { EventEmitterModule } from '@nestjs/event-emitter';
@@ -157,7 +157,7 @@ import {
     EmailTemplatesModule,
     OnBoardingModule,
     AttributesModule,
-    ReviewAttributesModule,
+
     DocumentsModule,
     VendorTypesModule,
     PrismaModule,

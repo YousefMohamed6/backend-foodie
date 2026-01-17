@@ -32,32 +32,22 @@ export class CategoriesService {
     }
 
     // Prisma Create
-    const { reviewAttributes, ...rest } = createCategoryDto;
-
-    // Normalize reviewAttributes to IDs
-    let attributeIds: string[] = [];
-    if (reviewAttributes && Array.isArray(reviewAttributes)) {
-      attributeIds = reviewAttributes
-        .map((attr) => (typeof attr === 'string' ? attr : attr.id))
-        .filter(Boolean);
-    }
+    // const { reviewAttributes, ...rest } = createCategoryDto; 
+    // Since reviewAttributes is not in DTO anymore, we skip it or handle it if we cast. 
+    // We will assume it's not passed for now to satisfy TS.
 
     const result = await this.prisma.category.create({
       data: {
-        ...rest,
-        isActive: rest.isActive ?? true,
-        showOnHome: rest.showOnHome ?? false,
+        englishName: createCategoryDto.englishName,
+        arabicName: createCategoryDto.arabicName,
+        image: createCategoryDto.image,
+        description: createCategoryDto.description,
+        isActive: false,
+        showOnHome: false,
         vendorId,
-        reviewAttributes:
-          attributeIds.length > 0
-            ? {
-              connect: attributeIds.map((id) => ({ id })),
-            }
-            : undefined,
       },
       include: {
         products: true,
-        reviewAttributes: true,
       },
     });
     await this.redis.del(this.CACHE_KEY_HOME);
@@ -107,7 +97,6 @@ export class CategoriesService {
       take: limit,
       include: {
         products: true,
-        reviewAttributes: true,
       },
     });
 
@@ -131,10 +120,9 @@ export class CategoriesService {
           where: { isActive: true },
           include: {
             products: true,
-            reviewAttributes: true,
           },
           orderBy: {
-            name: 'asc',
+            arabicName: 'asc',
           },
         },
       },
@@ -152,7 +140,6 @@ export class CategoriesService {
       where: { id },
       include: {
         products: true,
-        reviewAttributes: true,
       },
     });
     if (!category) {
@@ -171,28 +158,19 @@ export class CategoriesService {
       }
     }
 
-    const { reviewAttributes, ...rest } = updateCategoryDto;
-
-    let attributeIds: string[] = [];
-    if (reviewAttributes && Array.isArray(reviewAttributes)) {
-      attributeIds = reviewAttributes
-        .map((attr) => (typeof attr === 'string' ? attr : attr.id))
-        .filter(Boolean);
-    }
+    // const { reviewAttributes, ...rest } = updateCategoryDto;
+    // reviewAttributes removed from DTO
 
     const result = await this.prisma.category.update({
       where: { id },
       data: {
-        ...rest,
-        reviewAttributes: reviewAttributes
-          ? {
-            set: attributeIds.map((id) => ({ id })),
-          }
-          : undefined,
+        englishName: updateCategoryDto.englishName,
+        arabicName: updateCategoryDto.arabicName,
+        image: updateCategoryDto.image,
+        description: updateCategoryDto.description,
       },
       include: {
         products: true,
-        reviewAttributes: true,
       },
     });
     await this.redis.del(this.CACHE_KEY_HOME);

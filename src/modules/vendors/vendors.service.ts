@@ -518,10 +518,6 @@ export class VendorsService {
     return this.couponsService.findAll({ vendorId });
   }
 
-  async getReviewAttributes(vendorId: string) {
-    await this.findOne(vendorId);
-    return this.reviewsService.getVendorReviewAttributes(vendorId);
-  }
 
   async getStats(vendorId: string) {
     const productsCount = await this.productsService.count({ vendorId });

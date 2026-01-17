@@ -302,7 +302,6 @@ model ProductAttribute {
 
 model Category {
   id               String            @id @default(uuid())
-  name             String            @map("title")
   englishName      String?           @map("english_name")
   arabicName       String?           @map("arabic_name")
   description      String?
@@ -315,7 +314,6 @@ model Category {
   vendorId         String?           @map("vendor_id")
   vendor           Vendor?           @relation("CategoryVendor", fields: [vendorId], references: [id])
   products         Product[]
-  reviewAttributes ReviewAttribute[] @relation("CategoryToReviewAttribute")
   vendors          Vendor[]          @relation("VendorCategories")
 
   @@map("categories")
@@ -1024,25 +1022,11 @@ model Attribute {
   @@map("attributes")
 }
 
-model ReviewAttribute {
-  id         String         @id @default(uuid())
-  title      String
-  createdAt  DateTime       @default(now())
-  updatedAt  DateTime       @updatedAt
-  ratings    ReviewRating[]
-  categories Category[]     @relation("CategoryToReviewAttribute")
-
-  @@map("review_attributes")
-}
 
 model ReviewRating {
   id          String          @id @default(uuid())
   rating      Int
   reviewId    String
-  attributeId String
-  createdAt   DateTime        @default(now())
-  updatedAt   DateTime        @updatedAt
-  attribute   ReviewAttribute @relation(fields: [attributeId], references: [id], onDelete: Cascade)
   review      Review          @relation(fields: [reviewId], references: [id], onDelete: Cascade)
 
   @@map("review_ratings")

@@ -32,7 +32,7 @@ import { VendorsService } from './vendors.service';
 @ApiBearerAuth()
 @Controller('vendors')
 export class VendorsController {
-  constructor(private readonly vendorsService: VendorsService) {}
+  constructor(private readonly vendorsService: VendorsService) { }
 
   @Post()
   @UseGuards(JwtAuthGuard, RolesGuard)
@@ -165,12 +165,6 @@ export class VendorsController {
   @ApiOperation({ summary: 'Get vendor coupons' })
   getCoupons(@Param('id') id: string) {
     return this.vendorsService.getCoupons(id);
-  }
-
-  @Get(':id/review-attributes')
-  @ApiOperation({ summary: 'Get vendor review attributes' })
-  getReviewAttributes(@Param('id') id: string) {
-    return this.vendorsService.getReviewAttributes(id);
   }
 
   @Get(':id/schedules')

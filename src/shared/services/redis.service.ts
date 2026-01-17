@@ -14,7 +14,7 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
   private pubClient: RedisClientType;
   private subClient: RedisClientType;
 
-  constructor(private configService: ConfigService) {}
+  constructor(private configService: ConfigService) { }
 
   async onModuleInit() {
     const redisConfig = this.configService.get('redis');
@@ -115,6 +115,21 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
     } catch (error) {
       this.logger.error(`Redis EXISTS error for key ${key}:`, error);
       return false;
+    }
+  }
+
+  async delPattern(pattern: string): Promise<void> {
+    if (!this.client) return;
+    try {
+      const keys = await this.client.keys(pattern);
+      if (keys.length > 0) {
+        await this.client.del(keys);
+      }
+    } catch (error) {
+      this.logger.error(
+        `Redis DEL PATTERN error for pattern ${pattern}:`,
+        error,
+      );
     }
   }
 }

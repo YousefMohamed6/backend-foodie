@@ -53,7 +53,7 @@ async function main() {
 
     for (const category of categories) {
         const existing = await prisma.category.findFirst({
-            where: { name: category.name },
+            where: { englishName: category.name },
         });
 
         if (existing) {
@@ -73,7 +73,6 @@ async function main() {
         } else {
             await prisma.category.create({
                 data: {
-                    name: category.name,
                     englishName: category.name,
                     arabicName: category.nameAr,
                     description: category.description,

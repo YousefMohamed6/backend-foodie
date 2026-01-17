@@ -42,7 +42,9 @@ export class ProductsService {
     if (productId) {
       await this.redisService.del(this.CACHE_KEYS.PRODUCT_BY_ID(productId));
     }
-    // Lists are cleared by TTL for simplicity, but we could be more aggressive if needed.
+    // Invalidate all product lists to ensure consistency
+    await this.redisService.delPattern('products:all:*');
+    await this.redisService.delPattern('products:cat:*');
   }
 
   async create(createProductDto: CreateProductDto, user: User) {

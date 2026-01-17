@@ -35,7 +35,4 @@ export class CreateReviewDto {
   @IsOptional()
   images?: string[];
 
-  @ApiPropertyOptional()
-  @IsOptional()
-  reviewAttributes?: Record<string, number>;
 }

@@ -1,51 +1,30 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsNotEmpty, IsOptional, IsString, IsUUID } from 'class-validator';
+import { IsOptional, IsString, IsUUID } from 'class-validator';
 
 export class CreateCategoryDto {
+
   @ApiProperty({ example: 'Starters' })
   @IsString()
-  @IsNotEmpty()
-  name: string;
+  englishName: string;
 
-  @ApiPropertyOptional({ example: 'Starters' })
+  @ApiProperty({ example: 'مقبلات' })
   @IsString()
-  @IsOptional()
-  englishName?: string;
-
-  @ApiPropertyOptional({ example: 'مقبلات' })
-  @IsString()
-  @IsOptional()
-  arabicName?: string;
+  arabicName: string;
 
   @ApiPropertyOptional({ example: 'image-url.jpg' })
   @IsString()
   @IsOptional()
   image?: string;
 
-  @ApiPropertyOptional({ example: 'vendor-uuid' })
+  @ApiProperty({ example: 'vendor-uuid' })
   @IsUUID()
-  @IsOptional()
-  vendorId?: string;
+  vendorId: string;
 
   @ApiPropertyOptional()
   @IsString()
   @IsOptional()
   description?: string;
 
-  @ApiPropertyOptional()
-  @IsString()
-  @IsOptional()
-  descriptionAr?: string;
-
-  @ApiPropertyOptional()
-  @IsOptional()
-  isActive?: boolean;
-
-  @ApiPropertyOptional()
-  @IsOptional()
-  showOnHome?: boolean;
-
-  @ApiPropertyOptional()
-  @IsOptional()
-  reviewAttributes?: string[] | { id: string }[];
 }
+
+
