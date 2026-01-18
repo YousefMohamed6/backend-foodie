@@ -4,7 +4,7 @@ import {
   Inject,
   Injectable,
 } from '@nestjs/common';
-import { DriverStatus, TransactionType, UserRole } from '@prisma/client';
+import { DriverStatus, TransactionType, User, UserRole } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 import { normalizePhoneNumber } from '../../common/utils/phone.utils';
 import { PrismaService } from '../../prisma/prisma.service';
@@ -30,6 +30,10 @@ export class UsersService {
   ) { }
 
   async findMe(id: string) {
+    const cacheKey = `user:${id}:me`;
+    const cached = await this.redisService.get<any>(cacheKey);
+    if (cached) return cached;
+
     const user = await this.prisma.user.findUnique({
       where: { id },
     });
@@ -47,23 +51,28 @@ export class UsersService {
       return authorData;
     };
 
+    let result;
+
     if (user.role === UserRole.VENDOR) {
       const vendor = await this.vendorsService.findByAuthor(user.id);
       if (vendor) {
         // Return vendor with author (user) embedded
-        return {
+        result = {
           ...vendor,
           author: mapUserToAuthor(user),
         };
       } else {
         // No vendor profile yet - return user data as author structure
-        return {
+        result = {
           author: mapUserToAuthor(user),
         };
       }
+    } else {
+      const { password, ...userData } = user;
+      result = userData;
     }
 
-    const { password, ...result } = user;
+    await this.redisService.set(cacheKey, result, 3600);
     return result;
   }
 
@@ -79,6 +88,14 @@ export class UsersService {
       userData.phoneNumber = normalizePhoneNumber(userData.phoneNumber);
     }
 
+    // Check if email already exists
+    const existingEmail = await this.prisma.user.findUnique({
+      where: { email: userData.email },
+    });
+    if (existingEmail) {
+      throw new BadRequestException('EMAIL_ALREADY_EXISTS');
+    }
+
     // Check if phone number already exists
     if (userData.phoneNumber) {
       const existingUser = await this.prisma.user.findFirst({
@@ -86,6 +103,16 @@ export class UsersService {
       });
       if (existingUser) {
         throw new BadRequestException('PHONE_NUMBER_ALREADY_EXISTS');
+      }
+    }
+
+    // Check if FCM token already exists
+    if (userData.fcmToken) {
+      const existingFcm = await this.prisma.user.findUnique({
+        where: { fcmToken: userData.fcmToken },
+      });
+      if (existingFcm) {
+        throw new BadRequestException('FCM_TOKEN_ALREADY_EXISTS');
       }
     }
 
@@ -224,9 +251,15 @@ export class UsersService {
   }
 
   async findOne(id: string) {
+    const cacheKey = `user:${id}:one`;
+    const cached = await this.redisService.get<Omit<User, 'password'>>(cacheKey);
+    if (cached) return cached;
+
     const user = await this.prisma.user.findUnique({ where: { id } });
     if (!user) return null;
     const { password, ...result } = user;
+
+    await this.redisService.set(cacheKey, result, 3600);
     return result;
   }
 
@@ -270,7 +303,7 @@ export class UsersService {
     });
 
     // Invalidate cached user data
-    await this.redisService.del(`user:${id}`);
+    await this.redisService.delPattern(`user:${id}:*`);
 
     const { password, ...result } = user;
     return result;
@@ -296,7 +329,7 @@ export class UsersService {
     });
 
     // Invalidate cached user data
-    await this.redisService.del(`user:${id}`);
+    await this.redisService.delPattern(`user:${id}:*`);
 
     return result;
   }
@@ -314,7 +347,7 @@ export class UsersService {
     });
 
     // Invalidate cached user data
-    await this.redisService.del(`user:${id}`);
+    await this.redisService.delPattern(`user:${id}:*`);
 
     const { password: _, ...result } = user;
     return result;
@@ -327,14 +360,14 @@ export class UsersService {
     });
 
     // Invalidate cached user data (FCM token change doesn't require immediate cache clear but good practice)
-    await this.redisService.del(`user:${id}`);
+    await this.redisService.delPattern(`user:${id}:*`);
 
     return { success: true, message: 'Token updated successfully' };
   }
 
   async remove(id: string) {
-    // Invalidate cached user data before update
-    await this.redisService.del(`user:${id}`);
+    // Invalidate cached user data
+    await this.redisService.delPattern(`user:${id}:*`);
 
     return this.prisma.user.update({
       where: { id },

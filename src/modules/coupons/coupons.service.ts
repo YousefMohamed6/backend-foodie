@@ -17,7 +17,7 @@ export class CouponsService {
     private prisma: PrismaService,
     @Inject(forwardRef(() => VendorsService))
     private vendorsService: VendorsService,
-  ) {}
+  ) { }
 
   async create(createCouponDto: CreateCouponDto, user: User) {
     let vendorId = createCouponDto.vendorId || null;
@@ -28,26 +28,60 @@ export class CouponsService {
     return this.prisma.coupon.create({
       data: {
         code: createCouponDto.code,
-        description: createCouponDto.description,
+        name: createCouponDto.name,
         discount: String(createCouponDto.discount),
         discountType: createCouponDto.discountType || 'percentage',
         expiresAt: new Date(createCouponDto.expiresAt),
-        isActive: true,
+        isActive: createCouponDto.isActive ?? true,
         image: createCouponDto.image,
         minOrderAmount: createCouponDto.minOrderAmount || 0,
-        maxDiscount: createCouponDto.maxDiscount,
+        maxDiscount: createCouponDto.maxDiscount || 0,
         isPublic: createCouponDto.isPublic || false,
         vendorId,
       },
     });
   }
 
-  findAll(query: { isPublic?: string | boolean; vendorId?: string } = {}) {
-    const where: Prisma.CouponWhereInput = { isActive: true };
+  async findAll(
+    query: { isPublic?: string | boolean; vendorId?: string } = {},
+    user?: User,
+  ) {
+    const where: Prisma.CouponWhereInput = {};
+
+    if (query.vendorId) {
+      where.vendorId = query.vendorId;
+    }
+
+    const isAdmin = user?.role === UserRole.ADMIN;
+    const isVendor = user?.role === UserRole.VENDOR;
+
+    let showAllState = false;
+
+    if (isAdmin) {
+      showAllState = true;
+    } else if (isVendor) {
+      const currentVendor = await this.vendorsService.findByAuthor(user.id);
+      if (currentVendor) {
+        if (!query.vendorId || query.vendorId === currentVendor.id) {
+          where.vendorId = currentVendor.id;
+          showAllState = true;
+        }
+      }
+    }
+
+    if (!showAllState) {
+      // For customers or anyone else looking at coupons
+      where.isActive = true;
+      where.isPublic = true;
+    }
+
     if (query.isPublic !== undefined)
       where.isPublic = query.isPublic === 'true' || query.isPublic === true;
-    if (query.vendorId) where.vendorId = query.vendorId;
-    return this.prisma.coupon.findMany({ where });
+
+    return this.prisma.coupon.findMany({
+      where,
+      orderBy: { createdAt: 'desc' },
+    });
   }
 
   async findOne(id: string) {

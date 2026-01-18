@@ -88,6 +88,18 @@ export class ProductsService {
       createProductDto.discountPrice,
     );
 
+    // Check for duplicate product name within the same vendor
+    const existingProduct = await this.prisma.product.findFirst({
+      where: {
+        vendorId: vendor.id,
+        name: createProductDto.name,
+        isActive: true,
+      },
+    });
+    if (existingProduct) {
+      throw new BadRequestException('PRODUCT_NAME_ALREADY_EXISTS');
+    }
+
     const { extras, itemAttributes, ...productData } = createProductDto;
 
     // Normalize itemAttributes string to relational objects
@@ -144,28 +156,44 @@ export class ProductsService {
     const limit = Math.min(Number(query.limit) || 20, 100); // Max 100 per page
     const skip = (page - 1) * limit;
 
+    const isVendor = user?.role === UserRole.VENDOR;
     const zoneId =
       user?.role === UserRole.CUSTOMER && user.zoneId ? user.zoneId : undefined;
-    const cacheKey = this.CACHE_KEYS.ALL_PRODUCTS(query, zoneId);
 
-    const cached = await this.redisService.get<any[]>(cacheKey);
-    if (cached) return cached;
+    // Don't use cache for vendor requests - they need real-time data
+    if (!isVendor) {
+      const cacheKey = this.CACHE_KEYS.ALL_PRODUCTS(query, zoneId);
+      const cached = await this.redisService.get<any[]>(cacheKey);
+      if (cached) return cached;
+    }
 
     const where: Prisma.ProductWhereInput = {
       isActive: true,
       vendor: { isActive: true },
     };
 
-    // Vendors see all active products. Customers see only published products.
-    if (user?.role === UserRole.VENDOR) {
-      if (query.publish !== 'all' && query.publish !== undefined) {
-        where.isPublish = query.publish === 'true' || query.publish === true;
+    // Vendors see all their products (published and unpublished).
+    // Customers see only published products.
+    if (isVendor) {
+      // Get vendor's ID to filter only their products
+      const vendor = await this.prisma.vendor.findUnique({
+        where: { authorId: user.id },
+        select: { id: true },
+      });
+      if (vendor) {
+        where.vendorId = vendor.id;
+        // Only apply publish filter if explicitly requested
+        if (query.publish !== undefined && query.publish !== 'all') {
+          where.isPublish = query.publish === 'true' || query.publish === true;
+        }
+        // If publish is undefined or 'all', return all products (published and unpublished)
       }
     } else {
+      // Non-vendors (customers, guests) only see published products
       where.isPublish = true;
+      if (query.vendorId) where.vendorId = query.vendorId;
     }
 
-    if (query.vendorId) where.vendorId = query.vendorId;
     if (query.categoryId) where.categoryId = query.categoryId;
 
     if (zoneId) {
@@ -190,8 +218,13 @@ export class ProductsService {
     });
 
     const response = products.map((p) => this.mapProductResponse(p));
-    // Cache for 5 minutes
-    await this.redisService.set(cacheKey, response, 300);
+
+    // Only cache for non-vendor requests
+    if (!isVendor) {
+      const cacheKey = this.CACHE_KEYS.ALL_PRODUCTS(query, zoneId);
+      await this.redisService.set(cacheKey, response, 300);
+    }
+
     return response;
   }
 
@@ -285,6 +318,21 @@ export class ProductsService {
             : undefined;
 
       await this.validateProductPrice(newPrice, newDiscountPrice);
+    }
+
+    // Check for duplicate product name within the same vendor (excluding current product)
+    if (updateProductDto.name) {
+      const existingProduct = await this.prisma.product.findFirst({
+        where: {
+          vendorId: vendor.id,
+          name: updateProductDto.name,
+          isActive: true,
+          id: { not: id },
+        },
+      });
+      if (existingProduct) {
+        throw new BadRequestException('PRODUCT_NAME_ALREADY_EXISTS');
+      }
     }
 
     const { extras, itemAttributes, ...updateData } = updateProductDto;

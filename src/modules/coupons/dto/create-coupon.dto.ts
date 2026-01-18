@@ -14,23 +14,21 @@ export class CreateCouponDto {
   @IsString()
   code: string;
 
-  @ApiPropertyOptional()
-  @IsOptional()
+  @ApiProperty()
+  @IsNotEmpty()
   @IsString()
-  description?: string;
+  name: string;
 
   @ApiProperty()
   @IsNotEmpty()
   @IsNumber()
   discount: number;
 
-  @ApiPropertyOptional()
-  @IsOptional()
+  @ApiProperty()
   @IsString()
-  discountType?: string;
+  discountType: string;
 
   @ApiPropertyOptional()
-  @IsOptional()
   @IsNumber()
   maxDiscount?: number;
 
@@ -44,10 +42,9 @@ export class CreateCouponDto {
   @IsDateString()
   expiresAt: string;
 
-  @ApiPropertyOptional()
-  @IsOptional()
+  @ApiProperty()
   @IsBoolean()
-  isPublic?: boolean;
+  isPublic: boolean;
 
   @ApiPropertyOptional()
   @IsOptional()
@@ -58,4 +55,9 @@ export class CreateCouponDto {
   @IsOptional()
   @IsString()
   vendorId?: string;
+
+  @ApiProperty()
+  @IsBoolean()
+  isActive: boolean;
 }
+

@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ForbiddenException,
   forwardRef,
   Inject,
@@ -100,6 +101,17 @@ export class VendorsService {
       });
       if (existingVendor) {
         throw new ForbiddenException('USER_ALREADY_HAS_VENDOR');
+      }
+
+      // Check for duplicate vendor name
+      const existingVendorByName = await tx.vendor.findFirst({
+        where: {
+          title: cleanRest.title,
+          isActive: true,
+        },
+      });
+      if (existingVendorByName) {
+        throw new BadRequestException('VENDOR_NAME_ALREADY_EXISTS');
       }
 
       // Check if VendorType exists
@@ -215,6 +227,9 @@ export class VendorsService {
           },
           author: true,
           categories: true,
+          specialDiscounts: {
+            where: { isActive: true },
+          },
         },
       });
     });
@@ -266,6 +281,7 @@ export class VendorsService {
         },
         author: true,
         categories: true,
+        specialDiscounts: { where: { isActive: true, ...(user?.role !== UserRole.VENDOR ? { isPublish: true } : {}) } },
       },
       orderBy: { createdAt: 'desc' },
     });
@@ -280,7 +296,7 @@ export class VendorsService {
     return response;
   }
 
-  async findOne(id: string) {
+  async findOne(id: string, user?: User) {
     const cacheKey = this.CACHE_KEYS.VENDOR_BY_ID(id);
     const cached = await this.redisService.get(cacheKey);
     if (cached) return cached;
@@ -298,6 +314,7 @@ export class VendorsService {
         },
         author: true,
         categories: true,
+        specialDiscounts: { where: { isActive: true, ...(user?.role !== UserRole.VENDOR ? { isPublish: true } : {}) } },
       },
     });
     if (!vendor) {
@@ -331,6 +348,20 @@ export class VendorsService {
 
     if (cleanRest.phoneNumber) {
       cleanRest.phoneNumber = normalizePhoneNumber(cleanRest.phoneNumber);
+    }
+
+    // Check for duplicate vendor name (excluding current vendor)
+    if (cleanRest.title) {
+      const existingVendorByName = await this.prisma.vendor.findFirst({
+        where: {
+          title: cleanRest.title,
+          isActive: true,
+          id: { not: id },
+        },
+      });
+      if (existingVendorByName) {
+        throw new BadRequestException('VENDOR_NAME_ALREADY_EXISTS');
+      }
     }
 
     const vendor = await this.prisma.vendor.update({
@@ -368,6 +399,7 @@ export class VendorsService {
         },
         author: true,
         categories: true,
+        specialDiscounts: { where: { isActive: true } },
       },
     });
 
@@ -399,6 +431,7 @@ export class VendorsService {
         },
         author: true,
         categories: true,
+        specialDiscounts: { where: { isActive: true } },
       },
     });
     return await this.mapVendorResponse(vendor as any);
@@ -480,6 +513,7 @@ export class VendorsService {
         },
         author: true,
         categories: true,
+        specialDiscounts: true,
       },
     });
 
@@ -513,9 +547,9 @@ export class VendorsService {
     );
   }
 
-  async getCoupons(vendorId: string) {
+  async getCoupons(vendorId: string, user?: User) {
     await this.findOne(vendorId);
-    return this.couponsService.findAll({ vendorId });
+    return this.couponsService.findAll({ vendorId }, user);
   }
 
 
@@ -581,6 +615,7 @@ export class VendorsService {
         },
         author: true,
         categories: true,
+        specialDiscounts: true,
       },
       skip,
       take: l,
@@ -773,6 +808,7 @@ export class VendorsService {
       categories,
       author,
       subscriptionPlan,
+      specialDiscounts,
     } = vendor;
 
     const walletAmount = await this.walletService.getBalance(vendor.authorId);
@@ -832,6 +868,8 @@ export class VendorsService {
       isActive: vendor.isActive,
       isSubscriptionActive,
       isOpen,
+      specialDiscountIds: specialDiscounts?.map((sd: any) => sd.id) || [],
+      specialDiscountEnable: vendor.specialDiscountEnable,
       categoryIds: categories?.map((c: any) => c.id) || [],
       photos: photos?.map((p: any) => p.url) || [],
       restaurantMenuPhotos: restaurantMenuPhotos?.map((p: any) => p.url) || [],

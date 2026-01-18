@@ -8,7 +8,7 @@ import { WithdrawService } from './withdraw.service';
 
 @Module({
   imports: [PrismaModule, WalletModule],
-  controllers: [WithdrawController, PayoutAccountController],
+  controllers: [PayoutAccountController, WithdrawController],
   providers: [WithdrawService, PayoutAccountService],
 })
-export class WithdrawModule {}
+export class WithdrawModule { }

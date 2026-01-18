@@ -11,6 +11,7 @@
     "DUPLICATE_ENTRY": "This entry already exists",
     "EMAIL_ALREADY_EXISTS": "This email is already registered",
     "PHONE_NUMBER_ALREADY_EXISTS": "This phone number is already registered",
+    "FCM_TOKEN_ALREADY_EXISTS": "This device is already associated with another account",
     "INVALID_CREDENTIALS": "Invalid email or password",
     "USER_INACTIVE": "Your account is disabled. Please contact support.",
     "INVALID_OTP": "Invalid or expired verification code",
@@ -160,5 +161,7 @@
     "NOT_A_WALLET_ORDER": "This order does not require an OTP as it is not a wallet order",
     "ROLE_NOT_ALLOWED": "You are not allowed to register with this role",
     "INVALID_COUPON_CODE": "Invalid Coupon Code",
-    "INSUFFICIENT_STOCK": "The requested quantity is not available in stock"
+    "INSUFFICIENT_STOCK": "The requested quantity is not available in stock",
+    "VENDOR_NAME_ALREADY_EXISTS": "A vendor with this name already exists",
+    "PRODUCT_NAME_ALREADY_EXISTS": "A product with this name already exists for this vendor"
 }

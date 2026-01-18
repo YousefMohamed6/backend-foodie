@@ -9,7 +9,7 @@ export class BannersService {
   constructor(
     private prisma: PrismaService,
     private redisService: RedisService,
-  ) {}
+  ) { }
 
   private readonly CACHE_KEY_PREFIX = 'banners:';
 
@@ -59,13 +59,6 @@ export class BannersService {
   }
 
   private async invalidateBannersCache() {
-    // Simplified validation: in production, one might use Redis keys pattern Or a versioning key.
-    // For now, we'll let TTL handle the list clearing OR we could del key by index if we track them.
-    // Since banners are relatively few, we can clear the common global and main positions.
-    const positions = ['home_top', 'home_middle', 'home_bottom', 'global'];
-    for (const pos of positions) {
-      await this.redisService.del(`${this.CACHE_KEY_PREFIX}all:${pos}`);
-    }
-    await this.redisService.del(`${this.CACHE_KEY_PREFIX}all:global`);
+    await this.redisService.delPattern(`${this.CACHE_KEY_PREFIX}all:*`);
   }
 }

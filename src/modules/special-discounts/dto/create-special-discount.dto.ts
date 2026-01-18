@@ -24,13 +24,19 @@ export class SpecialDiscountDto {
     @IsOptional()
     discountType?: string;
 
-    @ApiProperty()
-    @IsBoolean()
-    enable: boolean;
+    @ApiProperty({ required: false })
+    @IsString()
+    @IsOptional()
+    id?: string;
 
     @ApiProperty()
     @IsBoolean()
-    public: boolean;
+    isPublish: boolean;
+
+    @ApiProperty({ required: false })
+    @IsBoolean()
+    @IsOptional()
+    isActive?: boolean;
 }
 
 export class CreateSpecialDiscountDto {

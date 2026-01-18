@@ -9,6 +9,8 @@ import {
   Query,
   UseGuards,
 } from '@nestjs/common';
+import { OptionalJwtAuthGuard } from '../../common/guards/optional-jwt-auth.guard';
+
 import {
   ApiBearerAuth,
   ApiOperation,
@@ -30,7 +32,7 @@ import { ValidateCouponDto } from './dto/validate-coupon.dto';
 @ApiBearerAuth()
 @Controller('coupons')
 export class CouponsController {
-  constructor(private readonly couponsService: CouponsService) {}
+  constructor(private readonly couponsService: CouponsService) { }
 
   @Post()
   @UseGuards(JwtAuthGuard, RolesGuard)
@@ -47,11 +49,15 @@ export class CouponsController {
   }
 
   @Get()
+  @UseGuards(OptionalJwtAuthGuard)
   @ApiOperation({ summary: 'Get all coupons' })
   @ApiQuery({ name: 'isPublic', required: false, type: Boolean })
   @ApiQuery({ name: 'vendorId', required: false })
-  findAll(@Query() query: FindAllCouponsQueryDto) {
-    return this.couponsService.findAll(query);
+  findAll(
+    @Query() query: FindAllCouponsQueryDto,
+    @CurrentUser() user?: User,
+  ) {
+    return this.couponsService.findAll(query, user);
   }
 
   @Get(':id')

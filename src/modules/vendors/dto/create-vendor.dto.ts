@@ -2,6 +2,7 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
 import {
   IsArray,
+  IsBoolean,
   IsNotEmpty,
   IsNumber,
   IsOptional,
@@ -76,4 +77,13 @@ export class CreateVendorDto {
   @IsArray()
   @IsString({ each: true })
   categoryIds: string[];
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  specialDiscount?: any;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsBoolean()
+  specialDiscountEnable?: boolean;
 }

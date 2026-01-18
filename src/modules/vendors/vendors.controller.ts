@@ -15,10 +15,11 @@ import {
   ApiQuery,
   ApiTags,
 } from '@nestjs/swagger';
-import * as Prisma from '@prisma/client';
+import { UserRole, type User } from '@prisma/client';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
+import { OptionalJwtAuthGuard } from '../../common/guards/optional-jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { CreateVendorDto } from './dto/create-vendor.dto';
 import { FindNearestVendorsDto } from './dto/find-nearest-vendors.dto';
@@ -36,11 +37,11 @@ export class VendorsController {
 
   @Post()
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Prisma.UserRole.VENDOR, Prisma.UserRole.ADMIN)
+  @Roles(UserRole.VENDOR, UserRole.ADMIN)
   @ApiOperation({ summary: 'Create a new vendor profile' })
   create(
     @Body() createVendorDto: CreateVendorDto,
-    @CurrentUser() user: Prisma.User,
+    @CurrentUser() user: User,
   ) {
     return this.vendorsService.create(createVendorDto, user);
   }
@@ -54,7 +55,7 @@ export class VendorsController {
     @Query('page') page?: number,
     @Query('limit') limit?: number,
     @Query('zoneId') zoneId?: string,
-    @CurrentUser() user?: Prisma.User,
+    @CurrentUser() user?: User,
   ) {
     return this.vendorsService.findAll({ page, limit, zoneId }, user);
   }
@@ -68,7 +69,7 @@ export class VendorsController {
     @Query('q') query: string,
     @Query('page') page?: string,
     @Query('limit') limit?: string,
-    @CurrentUser() user?: Prisma.User,
+    @CurrentUser() user?: User,
   ) {
     return this.vendorsService.search(query, page, limit, user);
   }
@@ -96,7 +97,7 @@ export class VendorsController {
   })
   findNearest(
     @Query() dto: FindNearestVendorsDto,
-    @CurrentUser() user?: Prisma.User,
+    @CurrentUser() user?: User,
   ) {
     return this.vendorsService.findNearest(
       dto.latitude,
@@ -110,35 +111,36 @@ export class VendorsController {
 
   @Get('documents')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Prisma.UserRole.VENDOR)
+  @Roles(UserRole.VENDOR)
   @ApiOperation({ summary: 'Get vendor documents' })
-  getDocuments(@CurrentUser() user: Prisma.User) {
+  getDocuments(@CurrentUser() user: User) {
     return this.vendorsService.getDocuments(user);
   }
 
   @Post('documents')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Prisma.UserRole.VENDOR)
+  @Roles(UserRole.VENDOR)
   @ApiOperation({ summary: 'Update or upload vendor documents' })
   updateDocument(
     @Body() dto: UpdateVendorDocumentDto,
-    @CurrentUser() user: Prisma.User,
+    @CurrentUser() user: User,
   ) {
     return this.vendorsService.updateDocument(user, dto);
   }
 
   @Post('documents/verify')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Prisma.UserRole.ADMIN)
+  @Roles(UserRole.ADMIN)
   @ApiOperation({ summary: 'Verify vendor document (Admin only)' })
   verifyDocument(@Body() dto: VerifyVendorDocumentDto) {
     return this.vendorsService.verifyDocument(dto);
   }
 
   @Get(':id')
+  @UseGuards(OptionalJwtAuthGuard)
   @ApiOperation({ summary: 'Get a vendor by ID' })
-  findOne(@Param('id') id: string) {
-    return this.vendorsService.findOne(id);
+  findOne(@Param('id') id: string, @CurrentUser() user?: User) {
+    return this.vendorsService.findOne(id, user);
   }
 
   @Get(':id/products')
@@ -155,16 +157,17 @@ export class VendorsController {
 
   @Get(':id/orders')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Prisma.UserRole.VENDOR, Prisma.UserRole.ADMIN)
+  @Roles(UserRole.VENDOR, UserRole.ADMIN)
   @ApiOperation({ summary: 'Get vendor orders' })
   getOrders(@Param('id') id: string, @Query() query) {
     return this.vendorsService.getOrders(id, query);
   }
 
   @Get(':id/coupons')
+  @UseGuards(OptionalJwtAuthGuard)
   @ApiOperation({ summary: 'Get vendor coupons' })
-  getCoupons(@Param('id') id: string) {
-    return this.vendorsService.getCoupons(id);
+  getCoupons(@Param('id') id: string, @CurrentUser() user?: User) {
+    return this.vendorsService.getCoupons(id, user);
   }
 
   @Get(':id/schedules')
@@ -175,19 +178,19 @@ export class VendorsController {
 
   @Patch(':id/schedule')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Prisma.UserRole.VENDOR, Prisma.UserRole.ADMIN)
+  @Roles(UserRole.VENDOR, UserRole.ADMIN)
   @ApiOperation({ summary: 'Update vendor working hours' })
   updateSchedule(
     @Param('id') id: string,
     @Body() dto: UpdateVendorScheduleDto,
-    @CurrentUser() user: Prisma.User,
+    @CurrentUser() user: User,
   ) {
     return this.vendorsService.updateSchedule(id, dto, user);
   }
 
   @Patch(':id')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Prisma.UserRole.VENDOR, Prisma.UserRole.ADMIN)
+  @Roles(UserRole.VENDOR, UserRole.ADMIN)
   @ApiOperation({ summary: 'Update a vendor profile' })
   update(@Param('id') id: string, @Body() updateVendorDto: UpdateVendorDto) {
     return this.vendorsService.update(id, updateVendorDto);
@@ -195,7 +198,7 @@ export class VendorsController {
 
   @Delete(':id')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Prisma.UserRole.ADMIN)
+  @Roles(UserRole.ADMIN)
   @ApiOperation({ summary: 'Delete a vendor' })
   remove(@Param('id') id: string) {
     return this.vendorsService.remove(id);

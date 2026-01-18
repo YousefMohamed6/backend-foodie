@@ -18,7 +18,7 @@ export class CategoriesService {
     private redis: RedisService,
   ) { }
 
-  private readonly CACHE_KEY_HOME = 'categories:home';
+
 
   async create(createCategoryDto: CreateCategoryDto, user: User) {
     let vendorId = createCategoryDto.vendorId;
@@ -50,7 +50,7 @@ export class CategoriesService {
         products: true,
       },
     });
-    await this.redis.del(this.CACHE_KEY_HOME);
+    await this.redis.delPattern('categories:all:*');
     return result;
   }
 
@@ -77,19 +77,11 @@ export class CategoriesService {
       where.showOnHome =
         query.showInHomepage === 'true' || query.showInHomepage === true;
     }
-    const cacheKey = `categories:all:${query.vendorId || 'global'}:${query.home}:${query.showInHomepage}`;
+    const cacheKey = `categories:all:${query.vendorId || 'global'}:${query.home}:${query.showInHomepage}:p${page}:l${limit}`;
 
-    // Only cache home categories for now as they are most hit
-    const isHomeQuery =
-      query.home === 'true' ||
-      query.home === true ||
-      query.showInHomepage === 'true' ||
-      query.showInHomepage === true;
-
-    if (isHomeQuery && !query.page && !query.limit) {
-      const cached = await this.redis.get<any[]>(this.CACHE_KEY_HOME);
-      if (cached) return cached;
-    }
+    // Try to get from cache
+    const cached = await this.redis.get<any[]>(cacheKey);
+    if (cached) return cached;
 
     const categories = await this.prisma.category.findMany({
       where,
@@ -100,9 +92,8 @@ export class CategoriesService {
       },
     });
 
-    if (isHomeQuery && !query.page && !query.limit) {
-      await this.redis.set(this.CACHE_KEY_HOME, categories, 1800); // 30 mins
-    }
+    // Cache the result
+    await this.redis.set(cacheKey, categories, 1800); // 30 mins
 
     return categories;
   }
@@ -173,7 +164,7 @@ export class CategoriesService {
         products: true,
       },
     });
-    await this.redis.del(this.CACHE_KEY_HOME);
+    await this.redis.delPattern('categories:all:*');
     return result;
   }
 
@@ -191,7 +182,7 @@ export class CategoriesService {
       where: { id },
       data: { isActive: false },
     });
-    await this.redis.del(this.CACHE_KEY_HOME);
+    await this.redis.delPattern('categories:all:*');
     return result;
   }
 }

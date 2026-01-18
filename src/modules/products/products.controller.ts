@@ -19,6 +19,7 @@ import * as Prisma from '@prisma/client';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
+import { OptionalJwtAuthGuard } from '../../common/guards/optional-jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { CreateProductDto } from './dto/create-product.dto';
 import { FindAllProductsQueryDto } from './dto/find-all-products-query.dto';
@@ -44,6 +45,7 @@ export class ProductsController {
   }
 
   @Get()
+  @UseGuards(OptionalJwtAuthGuard)
   @ApiOperation({ summary: 'Get all products' })
   @ApiQuery({ name: 'vendorId', required: false })
   @ApiQuery({ name: 'categoryId', required: false })

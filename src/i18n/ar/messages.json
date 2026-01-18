@@ -11,6 +11,7 @@
     "DUPLICATE_ENTRY": "هذا السجل موجود بالفعل",
     "EMAIL_ALREADY_EXISTS": "هذا البريد الإلكتروني مسجل بالفعل",
     "PHONE_NUMBER_ALREADY_EXISTS": "رقم الهاتف مسجل بالفعل",
+    "FCM_TOKEN_ALREADY_EXISTS": "هذا الجهاز مرتبط بالفعل بحساب آخر",
     "INVALID_CREDENTIALS": "البريد الإلكتروني أو كلمة المرور غير صحيحة",
     "USER_INACTIVE": "حسابك معطل. يرجى الاتصال بالدعم.",
     "INVALID_OTP": "رمز التحقق غير صالح أو انتهت صلاحيته",
@@ -160,5 +161,7 @@
     "NOT_A_WALLET_ORDER": "هذا الطلب لا يتطلب رمز تحقق لأنه ليس طلب محفظة",
     "ROLE_NOT_ALLOWED": "غير مسموح لك بالتسجيل بهذا الدور",
     "INVALID_COUPON_CODE": "كود القسيمة غير صالح",
-    "INSUFFICIENT_STOCK": "الكمية المطلوبة غير متوفرة في المخزون"
+    "INSUFFICIENT_STOCK": "الكمية المطلوبة غير متوفرة في المخزون",
+    "VENDOR_NAME_ALREADY_EXISTS": "يوجد مورد بهذا الاسم بالفعل",
+    "PRODUCT_NAME_ALREADY_EXISTS": "يوجد منتج بهذا الاسم بالفعل لهذا المورد"
 }

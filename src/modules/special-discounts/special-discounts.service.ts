@@ -1,7 +1,7 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { DiscountType } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
-import { CreateSpecialDiscountDto } from './dto/create-special-discount.dto';
+import { CreateSpecialDiscountDto, SpecialDiscountDto } from './dto/create-special-discount.dto';
 import { ValidateSpecialDiscountDto } from './dto/validate-coupon.dto';
 
 @Injectable()
@@ -18,33 +18,50 @@ export class SpecialDiscountsService {
         }
 
         return this.prisma.$transaction(async (tx) => {
-            // If discounts are provided, overwrite existing ones
             if (createDto.discount) {
-                // Delete all existing discounts for this vendor
-                await tx.specialDiscount.deleteMany({
-                    where: { vendorId: vendor.id },
+                const incomingIds = createDto.discount
+                    .map(d => d.id)
+                    .filter((id): id is string => !!id);
+
+                // Soft delete (set isActive: false) for those NOT in the new list
+                await tx.specialDiscount.updateMany({
+                    where: {
+                        vendorId: vendor.id,
+                        id: { notIn: incomingIds },
+                        isActive: true,
+                    },
+                    data: { isActive: false },
                 });
 
-                // Create new discounts
-                for (const discountDto of createDto.discount) {
+                // Upsert/Create the incoming list
+                for (const dto of createDto.discount) {
                     let type: DiscountType = DiscountType.PERCENTAGE;
-                    const inputType = discountDto.discountType?.toLowerCase();
+                    const inputType = dto.discountType?.toLowerCase();
                     if (inputType === 'amount' || inputType === 'fixed' || inputType === 'flat') {
                         type = DiscountType.FIXED;
                     }
 
-                    await tx.specialDiscount.create({
-                        data: {
-                            vendorId: vendor.id,
-                            endDate: new Date(discountDto.endDate),
-                            discount: Number(discountDto.discount),
-                            couponCode: discountDto.couponCode,
-                            photo: discountDto.photo,
-                            discountType: type,
-                            enable: discountDto.enable,
-                            public: discountDto.public,
-                        },
-                    });
+                    const data = {
+                        vendorId: vendor.id,
+                        endDate: new Date(dto.endDate),
+                        discount: Number(dto.discount),
+                        couponCode: dto.couponCode,
+                        photo: dto.photo,
+                        discountType: type,
+                        isPublish: dto.isPublish,
+                        isActive: true,
+                    };
+
+                    if (dto.id) {
+                        await tx.specialDiscount.update({
+                            where: { id: dto.id },
+                            data,
+                        });
+                    } else {
+                        await tx.specialDiscount.create({
+                            data,
+                        });
+                    }
                 }
             }
 
@@ -56,7 +73,9 @@ export class SpecialDiscountsService {
         const vendor = await this.prisma.vendor.findUnique({
             where: { authorId: userId },
             include: {
-                specialDiscounts: true,
+                specialDiscounts: {
+                    where: { isActive: true },
+                },
             },
         });
 
@@ -67,15 +86,81 @@ export class SpecialDiscountsService {
         // Map to DTO structure
         return {
             discount: vendor.specialDiscounts.map((sd) => ({
+                id: sd.id,
                 endDate: sd.endDate.toISOString(),
                 discount: Number(sd.discount),
                 couponCode: sd.couponCode,
                 photo: sd.photo,
                 discountType: sd.discountType,
-                enable: sd.enable,
-                public: sd.public,
+                isPublish: sd.isPublish,
+                isActive: sd.isActive,
             })),
         };
+    }
+
+    async update(userId: string, id: string, dto: Partial<SpecialDiscountDto>) {
+        const vendor = await this.prisma.vendor.findUnique({
+            where: { authorId: userId },
+        });
+
+        if (!vendor) {
+            throw new NotFoundException('Vendor not found');
+        }
+
+        const discount = await this.prisma.specialDiscount.findUnique({
+            where: { id, vendorId: vendor.id },
+        });
+
+        if (!discount) {
+            throw new NotFoundException('Special discount not found');
+        }
+
+        let type: DiscountType | undefined;
+        if (dto.discountType) {
+            const inputType = dto.discountType.toLowerCase();
+            type = (inputType === 'amount' || inputType === 'fixed' || inputType === 'flat')
+                ? DiscountType.FIXED
+                : DiscountType.PERCENTAGE;
+        }
+
+        return this.prisma.specialDiscount.update({
+            where: { id },
+            data: {
+                endDate: dto.endDate ? new Date(dto.endDate) : undefined,
+                discount: dto.discount ? Number(dto.discount) : undefined,
+                couponCode: dto.couponCode,
+                photo: dto.photo,
+                discountType: type,
+                isPublish: dto.isPublish,
+                isActive: dto.isActive,
+            },
+        });
+    }
+
+    async remove(userId: string, id: string) {
+        const vendor = await this.prisma.vendor.findUnique({
+            where: { authorId: userId },
+        });
+
+        if (!vendor) {
+            throw new NotFoundException('Vendor not found');
+        }
+
+        const discount = await this.prisma.specialDiscount.findUnique({
+            where: { id, vendorId: vendor.id },
+        });
+
+        if (!discount) {
+            throw new NotFoundException('Special discount not found');
+        }
+
+        // Soft delete
+        await this.prisma.specialDiscount.update({
+            where: { id },
+            data: { isActive: false },
+        });
+
+        return { success: true };
     }
 
     async validateCoupon(dto: ValidateSpecialDiscountDto) {
@@ -83,7 +168,8 @@ export class SpecialDiscountsService {
             where: {
                 vendorId: dto.vendorId,
                 couponCode: dto.couponCode,
-                enable: true,
+                isPublish: true,
+                isActive: true,
             },
         });
 

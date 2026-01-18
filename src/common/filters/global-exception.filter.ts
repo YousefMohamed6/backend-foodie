@@ -13,7 +13,7 @@ import { I18nService } from 'nestjs-i18n';
 export class GlobalExceptionFilter implements ExceptionFilter {
   private readonly logger = new Logger(GlobalExceptionFilter.name);
 
-  constructor(private readonly i18n: I18nService) {}
+  constructor(private readonly i18n: I18nService) { }
 
   async catch(exception: any, host: ArgumentsHost) {
     const ctx = host.switchToHttp();
@@ -59,8 +59,20 @@ export class GlobalExceptionFilter implements ExceptionFilter {
       errorCode = 'ERR_DATABASE';
 
       if (exception.code === 'P2002') {
-        messageKey = 'messages.DUPLICATE_ENTRY';
-        errorCode = 'ERR_DUPLICATE_ENTRY';
+        const target = exception.meta?.target;
+        if (Array.isArray(target) && target.includes('email')) {
+          messageKey = 'messages.EMAIL_ALREADY_EXISTS';
+          errorCode = 'ERR_EMAIL_ALREADY_EXISTS';
+        } else if (Array.isArray(target) && target.includes('phoneNumber')) {
+          messageKey = 'messages.PHONE_NUMBER_ALREADY_EXISTS';
+          errorCode = 'ERR_PHONE_NUMBER_ALREADY_EXISTS';
+        } else if (Array.isArray(target) && target.includes('fcmToken')) {
+          messageKey = 'messages.FCM_TOKEN_ALREADY_EXISTS';
+          errorCode = 'ERR_FCM_TOKEN_ALREADY_EXISTS';
+        } else {
+          messageKey = 'messages.DUPLICATE_ENTRY';
+          errorCode = 'ERR_DUPLICATE_ENTRY';
+        }
       }
     } else if (exception instanceof Error) {
       messageKey = 'messages.GENERIC_ERROR';
