@@ -21,7 +21,7 @@ import { StoriesService } from './stories.service';
 @ApiTags('Stories')
 @Controller('stories')
 export class StoriesController {
-  constructor(private readonly storiesService: StoriesService) {}
+  constructor(private readonly storiesService: StoriesService) { }
 
   @Get()
   @ApiOperation({ summary: 'Get all stories' })
@@ -30,6 +30,15 @@ export class StoriesController {
     @CurrentUser() user?: Prisma.User,
   ) {
     return this.storiesService.findAll(vendorId, user);
+  }
+
+  @Get('me')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Prisma.UserRole.VENDOR)
+  @ApiOperation({ summary: 'Get stories for authenticated vendor' })
+  findMyStories(@Request() req) {
+    return this.storiesService.findMyStories(req.user);
   }
 
   @Get(':id')

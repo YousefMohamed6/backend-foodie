@@ -1,8 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
-  IsBoolean,
+  IsArray,
   IsNotEmpty,
-  IsNumber,
   IsOptional,
   IsString,
 } from 'class-validator';
@@ -10,18 +9,9 @@ import {
 export class CreateStoryDto {
   @ApiProperty()
   @IsNotEmpty()
-  @IsString()
-  mediaUrl: string;
-
-  @ApiProperty()
-  @IsNotEmpty()
-  @IsString()
-  mediaType: string;
-
-  @ApiPropertyOptional()
-  @IsOptional()
-  @IsNumber()
-  duration?: number;
+  @IsArray()
+  @IsString({ each: true })
+  videoUrl: string[];
 
   @ApiPropertyOptional()
   @IsOptional()
@@ -30,6 +20,10 @@ export class CreateStoryDto {
 
   @ApiPropertyOptional()
   @IsOptional()
-  @IsBoolean()
-  isActive?: boolean;
+  @IsString()
+  vendorID?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  createdAt?: any;
 }

@@ -268,7 +268,7 @@ model Product {
   itemAttributes   ProductAttribute[]
   extras           ProductExtra[]
   category         Category?          @relation(fields: [categoryId], references: [id])
-  vendor           Vendor             @relation(fields: [vendorId], references: [id])
+  vendor           Vendor             @relation(fields: [vendorId], references: [id], onDelete: Cascade)
   reviewsSum       Decimal            @default(0) @db.Decimal(10, 2)
   reviewsCount     Int                @default(0)
   reviews          Review[]
@@ -499,7 +499,7 @@ model Subscription {
   updatedAt          DateTime               @updatedAt
   eventLogs          SubscriptionEventLog[]
   plan               SubscriptionPlan       @relation(fields: [planId], references: [id])
-  user               User                   @relation(fields: [userId], references: [id])
+  user               User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
   vendors            Vendor[]               @relation("VendorSubscription")
   walletTransactions WalletTransaction[]
 
@@ -659,7 +659,7 @@ model Coupon {
   updatedAt      DateTime @updatedAt
   isActive       Boolean  @default(true) @map("is_active")
   vendorId       String?  @map("vendor_id")
-  vendor         Vendor?  @relation(fields: [vendorId], references: [id])
+  vendor         Vendor?  @relation(fields: [vendorId], references: [id], onDelete: Cascade)
 
   @@map("coupons")
 }
@@ -681,7 +681,7 @@ model Review {
   driver     User?          @relation("ReviewDriver", fields: [driverId], references: [id])
   order      Order?         @relation(fields: [orderId], references: [id])
   product    Product?       @relation(fields: [productId], references: [id])
-  vendor     Vendor         @relation(fields: [vendorId], references: [id])
+  vendor     Vendor         @relation(fields: [vendorId], references: [id], onDelete: Cascade)
 
   @@map("reviews")
 }
@@ -1659,7 +1659,7 @@ enum DocumentStatus {
 model SpecialDiscount {
   id                String          @id @default(uuid())
   vendorId          String          @map("vendor_id")
-  vendor            Vendor          @relation(fields: [vendorId], references: [id])
+  vendor            Vendor          @relation(fields: [vendorId], references: [id], onDelete: Cascade)
   endDate           DateTime
   discount          Decimal         @db.Decimal(10, 2)
   couponCode        String          @map("coupon_code")

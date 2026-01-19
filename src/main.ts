@@ -7,6 +7,7 @@ import helmet from 'helmet';
 import { AppModule } from './app.module';
 import { SecureLoggingInterceptor } from './common/interceptors/secure-logging.interceptor';
 import { securityHeadersConfig } from './config/security-headers.config';
+import { RedisIoAdapter } from './common/adapters/redis-io.adapter';
 const cookieParser = require('cookie-parser');
 
 process.on('unhandledRejection', (reason, promise) => {

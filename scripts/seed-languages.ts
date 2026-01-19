@@ -1,9 +1,9 @@
 import { Injectable, OnModuleInit } from '@nestjs/common';
-import { PrismaService } from '../../prisma/prisma.service';
+import { PrismaService } from '../src/prisma/prisma.service';
 
 @Injectable()
 export class LanguagesSeederService implements OnModuleInit {
-  constructor(private prisma: PrismaService) {}
+  constructor(private prisma: PrismaService) { }
 
   async onModuleInit() {
     await this.seed();
@@ -28,23 +28,7 @@ export class LanguagesSeederService implements OnModuleInit {
         isActive: true,
         isRtl: true,
         isDefault: true,
-        image: 'https://flagcdn.com/w320/sa.png',
-      },
-      {
-        code: 'es',
-        name: 'Spanish',
-        isActive: true,
-        isRtl: false,
-        isDefault: false,
-        image: 'https://flagcdn.com/w320/es.png',
-      },
-      {
-        code: 'fr',
-        name: 'French',
-        isActive: true,
-        isRtl: false,
-        isDefault: false,
-        image: 'https://flagcdn.com/w320/fr.png',
+        image: 'https://flagcdn.com/w320/eg.png',
       },
     ];
 

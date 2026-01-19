@@ -1,6 +1,6 @@
 import { Module } from '@nestjs/common';
+import { LanguagesSeederService } from '../../../scripts/seed-languages';
 import { PrismaModule } from '../../prisma/prisma.module';
-import { LanguagesSeederService } from './languages-seeder.service';
 import { LanguagesController } from './languages.controller';
 import { LanguagesService } from './languages.service';
 
@@ -10,4 +10,4 @@ import { LanguagesService } from './languages.service';
   providers: [LanguagesService, LanguagesSeederService],
   exports: [LanguagesService],
 })
-export class LanguagesModule {}
+export class LanguagesModule { }

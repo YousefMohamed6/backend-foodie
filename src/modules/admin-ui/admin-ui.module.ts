@@ -61,6 +61,12 @@ AdminJS.registerAdapter({ Database, Resource });
               name: 'Database',
               icon: 'Database',
             },
+            actions: {
+              bulkDelete: {
+                actionType: 'bulk',
+                method: 'post',
+              },
+            },
           },
         }));
 
@@ -82,4 +88,4 @@ AdminJS.registerAdapter({ Database, Resource });
     }),
   ],
 })
-export class AdminUIModule {}
+export class AdminUIModule { }

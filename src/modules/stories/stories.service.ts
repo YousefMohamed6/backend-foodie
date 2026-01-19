@@ -13,7 +13,7 @@ export class StoriesService {
   constructor(
     private prisma: PrismaService,
     private readonly vendorsService: VendorsService,
-  ) {}
+  ) { }
 
   async findAll(vendorId?: string, user?: User) {
     const where: Prisma.StoryWhereInput = { isActive: true };
@@ -25,6 +25,23 @@ export class StoriesService {
 
     return this.prisma.story.findMany({
       where,
+      include: { vendor: true },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  /**
+   * Get all stories for the authenticated vendor.
+   * Returns empty array if no vendor found or no stories exist.
+   */
+  async findMyStories(user: User) {
+    const vendor = await this.vendorsService.findByAuthor(user.id);
+    if (!vendor) {
+      return [];
+    }
+
+    return this.prisma.story.findMany({
+      where: { vendorId: vendor.id, isActive: true },
       include: { vendor: true },
       orderBy: { createdAt: 'desc' },
     });
@@ -46,12 +63,19 @@ export class StoriesService {
     if (!vendor) {
       throw new ForbiddenException('FORBIDDEN');
     }
-    return this.prisma.story.create({
-      data: {
-        ...data,
-        vendorId: vendor.id,
-      },
-    });
+    return Promise.all(
+      data.videoUrl.map((url) =>
+        this.prisma.story.create({
+          data: {
+            vendorId: vendor.id,
+            mediaUrl: url,
+            videoThumbnail: data.videoThumbnail,
+            mediaType: 'video',
+            isActive: true,
+          },
+        }),
+      ),
+    );
   }
 
   async remove(id: string, user: User) {
