@@ -3,6 +3,7 @@ import {
   forwardRef,
   Inject,
   Injectable,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { DriverStatus, TransactionType, User, UserRole } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
@@ -29,7 +30,11 @@ export class UsersService {
     private vendorsService: VendorsService,
   ) { }
 
-  async findMe(id: string) {
+  async findMe(id?: string) {
+    if (!id) {
+      throw new UnauthorizedException('PLEASE_LOG_IN');
+    }
+
     const cacheKey = `user:${id}:me`;
     const cached = await this.redisService.get<any>(cacheKey);
     if (cached) return cached;
@@ -37,7 +42,14 @@ export class UsersService {
     const user = await this.prisma.user.findUnique({
       where: { id },
     });
-    if (!user) return null;
+
+    if (!user) {
+      throw new BadRequestException('USER_NOT_FOUND');
+    }
+
+    if (user.isActive === false) {
+      throw new BadRequestException('USER_INACTIVE');
+    }
 
     // Map user to author (exclude password and subscription-related fields)
     const mapUserToAuthor = (u: typeof user) => {

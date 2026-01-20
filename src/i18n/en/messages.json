@@ -167,5 +167,6 @@
     "WALLET_TX_ADVERTISEMENT_PAYMENT": "Payment for advertisement: {title}",
     "DOCUMENT_NOT_FOUND": "Document not found",
     "COUPON_NOT_FOUND": "Coupon not found",
-    "UNAUTHORIZED_COUPON_DELETE": "You are not authorized to delete this coupon"
+    "UNAUTHORIZED_COUPON_DELETE": "You are not authorized to delete this coupon",
+    "PLEASE_LOG_IN": "Please log in"
 }

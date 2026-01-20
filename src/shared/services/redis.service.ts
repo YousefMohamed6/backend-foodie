@@ -41,13 +41,13 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
 
   async onModuleDestroy() {
     if (this.client) {
-      await this.client.quit();
+      await this.client.close();
     }
     if (this.pubClient) {
-      await this.pubClient.quit();
+      await this.pubClient.close();
     }
     if (this.subClient) {
-      await this.subClient.quit();
+      await this.subClient.close();
     }
   }
 
@@ -122,26 +122,26 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
     if (!this.client) return;
     try {
       let count = 0;
-      const keysToDelete: string[] = [];
+      const promises: Promise<any>[] = [];
 
       // Use scanIterator for non-blocking key scanning
       for await (const key of this.client.scanIterator({
         MATCH: pattern,
         COUNT: 100,
       })) {
-        keysToDelete.push(key as unknown as string);
+        promises.push(this.client.del(key));
         count++;
 
-        // Delete in batches of 100 to avoid memory issues with large arrays
-        if (keysToDelete.length >= 100) {
-          await this.client.del(keysToDelete);
-          keysToDelete.length = 0;
+        // Process in batches of 100 for pipelining and memory safety
+        if (promises.length >= 100) {
+          await Promise.all(promises);
+          promises.length = 0;
         }
       }
 
-      // Delete remaining keys
-      if (keysToDelete.length > 0) {
-        await this.client.del(keysToDelete);
+      // Process remaining
+      if (promises.length > 0) {
+        await Promise.all(promises);
       }
 
       this.logger.log(`Deleted ${count} keys matching pattern: ${pattern}`);

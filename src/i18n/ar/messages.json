@@ -167,5 +167,6 @@
     "WALLET_TX_ADVERTISEMENT_PAYMENT": "دفع مقابل إعلان: {title}",
     "DOCUMENT_NOT_FOUND": "المستند غير موجود",
     "COUPON_NOT_FOUND": "القسيمة غير موجودة",
-    "UNAUTHORIZED_COUPON_DELETE": "ليس لديك صلاحية حذف هذه القسيمة"
+    "UNAUTHORIZED_COUPON_DELETE": "ليس لديك صلاحية حذف هذه القسيمة",
+    "PLEASE_LOG_IN": "يجب تسجيل الدخول"
 }

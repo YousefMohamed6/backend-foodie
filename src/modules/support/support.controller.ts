@@ -25,6 +25,7 @@ import { memoryStorage } from 'multer';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
+import { VendorsService } from '../vendors/vendors.service';
 import { ComplaintDto } from './dto/complaint.dto';
 import { ContactDto } from './dto/contact.dto';
 import { SendSupportMessageDto } from './dto/send-support-message.dto';
@@ -38,7 +39,8 @@ export class SupportController {
   constructor(
     private readonly supportService: SupportService,
     private readonly supportGateway: SupportGateway,
-  ) {}
+    private readonly vendorsService: VendorsService,
+  ) { }
 
   @Post('contact')
   @ApiOperation({ summary: 'Send contact message (public)' })
@@ -121,10 +123,20 @@ export class SupportController {
       videoThumbnail?: Express.Multer.File[];
     },
   ) {
+    // Get user profile image - for vendors, fetch from vendor profile if not in user
+    let userImage = req.user.profilePictureURL;
+    if (!userImage && req.user.role === UserRole.VENDOR) {
+      const vendor = await this.vendorsService.findByAuthor(req.user.id);
+      if (vendor) {
+        userImage = vendor.photo;
+      }
+    }
+
     const userInfo: SupportUserInfo = {
       userId: req.user.id,
       userName: `${req.user.firstName} ${req.user.lastName}`,
-      userImage: req.user.profilePictureURL,
+      userImage: userImage,
+      userRole: req.user.role,
     };
 
     const file = files?.file?.[0];

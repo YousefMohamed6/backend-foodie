@@ -15,13 +15,14 @@ export interface SupportUserInfo {
   userId: string;
   userName: string;
   userImage?: string;
+  userRole: string;
 }
 
 @Injectable()
 export class SupportService {
   private readonly logger = new Logger(SupportService.name);
 
-  constructor(private prisma: PrismaService) {}
+  constructor(private prisma: PrismaService) { }
 
   async sendMessage(
     userInfo: SupportUserInfo,
@@ -78,7 +79,7 @@ export class SupportService {
         inboxId: inbox.id,
         senderId: userInfo.userId,
         senderName: userInfo.userName,
-        senderRole: 'USER',
+        senderRole: userInfo.userRole,
         type: dto.type,
         message: dto.message,
         filePath: filePath,
@@ -86,7 +87,7 @@ export class SupportService {
       },
     });
 
-    // Update inbox with last message info
+    // Update inbox with last message info and profile image if missing
     await this.prisma.supportInbox.update({
       where: { id: inbox.id },
       data: {
@@ -95,6 +96,10 @@ export class SupportService {
         lastSenderId: userInfo.userId,
         isRead: false,
         updatedAt: new Date(),
+        // Update profile image if it was missing
+        ...(userInfo.userImage && !inbox.userProfileImage
+          ? { userProfileImage: userInfo.userImage }
+          : {}),
       },
     });
 
