@@ -12,4 +12,8 @@ export class UpdateVendorDocumentDto {
   @IsString()
   @IsOptional()
   backImage?: string;
+
+  @IsString()
+  @IsOptional()
+  expireAt?: string;
 }

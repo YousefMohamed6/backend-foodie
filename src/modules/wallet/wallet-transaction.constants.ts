@@ -55,6 +55,7 @@ export const WalletTransactionKeys = {
   CASH_COLLECTED_DEBT: 'WALLET_TX_CASH_COLLECTED_DEBT' as MessageKey,
   DELIVERY_CONFIRMED_REASON: 'DELIVERY_CONFIRMED_REASON' as MessageKey,
   ORDER_CANCELLED_BY_USER: 'ORDER_CANCELLED_BY_USER' as MessageKey,
+  ADVERTISEMENT_PAYMENT: 'WALLET_TX_ADVERTISEMENT_PAYMENT' as MessageKey,
 } as const;
 
 /**
@@ -151,5 +152,11 @@ export const WalletTransactionDescriptions = {
   orderCancelledByUser: () =>
     getWalletTransactionDescription(
       WalletTransactionKeys.ORDER_CANCELLED_BY_USER,
+    ),
+
+  advertisementPayment: (title: string) =>
+    getWalletTransactionDescription(
+      WalletTransactionKeys.ADVERTISEMENT_PAYMENT,
+      { title },
     ),
 } as const;

@@ -21,12 +21,13 @@ import { CreateDriverDto } from './dto/create-driver.dto';
 import { UpdateDriverStatusDto } from './dto/update-driver-status.dto';
 import { UpdateDriverDto } from './dto/update-driver.dto';
 import { UploadDriverDocumentDto } from './dto/upload-driver-document.dto';
+import { VerifyDriverDocumentDto } from './dto/verify-driver-document.dto';
 
 @ApiTags('Drivers')
 @ApiBearerAuth()
 @Controller('drivers')
 export class DriversController {
-  constructor(private readonly driversService: DriversService) {}
+  constructor(private readonly driversService: DriversService) { }
 
   @Post()
   @UseGuards(JwtAuthGuard, RolesGuard)
@@ -160,5 +161,13 @@ export class DriversController {
   ) {
     const date = new Date(startDate);
     return this.driversService.getEarnings(user.id, period, date);
+  }
+
+  @Post('documents/verify')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN)
+  @ApiOperation({ summary: 'Verify driver document (Admin only)' })
+  verifyDocument(@Body() dto: VerifyDriverDocumentDto) {
+    return this.driversService.verifyDocument(dto);
   }
 }

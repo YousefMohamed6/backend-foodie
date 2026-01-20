@@ -1,12 +1,30 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { DiscountType } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
+import { RedisService } from '../../shared/services/redis.service';
 import { CreateSpecialDiscountDto, SpecialDiscountDto } from './dto/create-special-discount.dto';
 import { ValidateSpecialDiscountDto } from './dto/validate-coupon.dto';
 
 @Injectable()
 export class SpecialDiscountsService {
-    constructor(private prisma: PrismaService) { }
+    constructor(
+        private prisma: PrismaService,
+        private redisService: RedisService,
+    ) { }
+
+    private readonly CACHE_KEYS = {
+        VENDOR_BY_ID: (id: string) => `vendors:id:${id}`,
+        ALL_VENDORS: () => 'vendors:all:*',
+        NEAREST_VENDORS: () => 'vendors:nearest:*',
+    };
+
+    private async invalidateVendorCache(vendorId: string, zoneId?: string) {
+        // Invalidate specific vendor cache
+        await this.redisService.del(this.CACHE_KEYS.VENDOR_BY_ID(vendorId));
+        // Invalidate all vendor lists (since they include special discounts)
+        await this.redisService.delPattern(this.CACHE_KEYS.ALL_VENDORS());
+        await this.redisService.delPattern(this.CACHE_KEYS.NEAREST_VENDORS());
+    }
 
     async createOrUpdate(userId: string, createDto: CreateSpecialDiscountDto) {
         const vendor = await this.prisma.vendor.findUnique({
@@ -17,7 +35,7 @@ export class SpecialDiscountsService {
             throw new NotFoundException('Vendor not found');
         }
 
-        return this.prisma.$transaction(async (tx) => {
+        const result = await this.prisma.$transaction(async (tx) => {
             if (createDto.discount) {
                 const incomingIds = createDto.discount
                     .map(d => d.id)
@@ -67,6 +85,11 @@ export class SpecialDiscountsService {
 
             return { success: true };
         });
+
+        // Invalidate vendor cache after successful modification
+        await this.invalidateVendorCache(vendor.id, vendor.zoneId);
+
+        return result;
     }
 
     async findOne(userId: string) {
@@ -123,7 +146,7 @@ export class SpecialDiscountsService {
                 : DiscountType.PERCENTAGE;
         }
 
-        return this.prisma.specialDiscount.update({
+        const result = await this.prisma.specialDiscount.update({
             where: { id },
             data: {
                 endDate: dto.endDate ? new Date(dto.endDate) : undefined,
@@ -135,6 +158,11 @@ export class SpecialDiscountsService {
                 isActive: dto.isActive,
             },
         });
+
+        // Invalidate vendor cache after successful update
+        await this.invalidateVendorCache(vendor.id, vendor.zoneId);
+
+        return result;
     }
 
     async remove(userId: string, id: string) {
@@ -159,6 +187,9 @@ export class SpecialDiscountsService {
             where: { id },
             data: { isActive: false },
         });
+
+        // Invalidate vendor cache after successful removal
+        await this.invalidateVendorCache(vendor.id, vendor.zoneId);
 
         return { success: true };
     }
@@ -191,3 +222,4 @@ export class SpecialDiscountsService {
         };
     }
 }
+

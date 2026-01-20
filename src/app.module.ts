@@ -14,7 +14,6 @@ import storageConfig from './config/storage.config';
 import { AddressesModule } from './modules/addresses/addresses.module';
 import { AdminUIModule } from './modules/admin-ui/admin-ui.module';
 import { AdminModule } from './modules/admin/admin.module';
-import { AdvertisementsModule } from './modules/advertisements/advertisements.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { BannersModule } from './modules/banners/banners.module';
 import { CashbackModule } from './modules/cashback/cashback.module';
@@ -144,7 +143,6 @@ import {
     FavouritesModule,
     CashbackModule,
     StoriesModule,
-    AdvertisementsModule,
     BannersModule,
     SearchModule,
     AdminModule,

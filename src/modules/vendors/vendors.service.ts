@@ -6,7 +6,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { Prisma, User, UserRole } from '@prisma/client';
+import { DocumentStatus, Prisma, User, UserRole } from '@prisma/client';
 import { VendorStatusMessages } from '../../common/constants/vendor.constants';
 import { normalizePhoneNumber } from '../../common/utils/phone.utils';
 import { PrismaService } from '../../prisma/prisma.service';
@@ -23,8 +23,7 @@ import { UpdateVendorDto } from './dto/update-vendor.dto';
 import { VerifyVendorDocumentDto } from './dto/verify-vendor-document.dto';
 import {
   VendorDefaults,
-  VendorDocumentStatus,
-  VendorScheduleDefaults,
+  VendorScheduleDefaults
 } from './vendor.constants';
 
 @Injectable()
@@ -513,7 +512,7 @@ export class VendorsService {
         },
         author: true,
         categories: true,
-        specialDiscounts: true,
+        specialDiscounts: { where: { isActive: true, ...(user?.role !== UserRole.VENDOR ? { isPublish: true } : {}) } },
       },
     });
 
@@ -615,7 +614,7 @@ export class VendorsService {
         },
         author: true,
         categories: true,
-        specialDiscounts: true,
+        specialDiscounts: { where: { isActive: true, ...(user?.role !== UserRole.VENDOR && user?.role !== UserRole.ADMIN ? { isPublish: true } : {}) } },
       },
       skip,
       take: l,
@@ -688,7 +687,7 @@ export class VendorsService {
       throw new NotFoundException(VendorStatusMessages.VENDOR_NOT_FOUND);
     }
 
-    const { documentId, frontImage, backImage } = updateVendorDocumentDto;
+    const { documentId, frontImage, backImage, expireAt } = updateVendorDocumentDto;
 
     return (this.prisma as any).vendorDocument.upsert({
       where: {
@@ -700,14 +699,16 @@ export class VendorsService {
       update: {
         frontImage,
         backImage,
-        status: VendorDocumentStatus.PENDING, // Reset status to pending so admin must review again
+        expireAt: expireAt ? new Date(expireAt) : undefined,
+        status: DocumentStatus.PENDING, // Reset status to pending so admin must review again
       },
       create: {
         vendorId: vendor.id,
         documentId,
         frontImage,
         backImage,
-        status: VendorDocumentStatus.PENDING,
+        expireAt: expireAt ? new Date(expireAt) : undefined,
+        status: DocumentStatus.PENDING,
       },
     });
   }
@@ -721,7 +722,7 @@ export class VendorsService {
       throw new NotFoundException(VendorStatusMessages.VENDOR_NOT_FOUND);
     }
 
-    const docs = await (this.prisma as any).vendorDocument.findMany({
+    const docs = await this.prisma.vendorDocument.findMany({
       where: { vendorId: vendor.id },
     });
 
@@ -731,7 +732,9 @@ export class VendorsService {
         // Ensure fields match frontend expectations
         frontImage: doc.frontImage,
         backImage: doc.backImage,
+        expireAt: doc.expireAt,
         documentId: doc.documentId,
+        status: doc.status.toLowerCase(),
       })),
       id: vendor.id,
       type: 'vendor',
@@ -741,7 +744,7 @@ export class VendorsService {
   async verifyDocument(dto: VerifyVendorDocumentDto) {
     const { vendorId, documentId, isApproved, rejectionReason } = dto;
 
-    return (this.prisma as any).vendorDocument.update({
+    return this.prisma.vendorDocument.update({
       where: {
         vendorId_documentId: {
           vendorId,
@@ -750,10 +753,9 @@ export class VendorsService {
       },
       data: {
         status: isApproved
-          ? VendorDocumentStatus.ACCEPTED
-          : VendorDocumentStatus.REJECTED,
-        // In a real app, we might store rejectionReason in a metadata JSON field
-        // or a new column if the schema supports it.
+          ? DocumentStatus.ACCEPTED
+          : DocumentStatus.REJECTED,
+        rejectionReason: isApproved ? null : rejectionReason,
       },
     });
   }

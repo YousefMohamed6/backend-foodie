@@ -148,6 +148,7 @@ Wallet balance is NEVER released immediately upon driver confirmation alone for 
 | Multi-Vendor Chat | ✅ Implemented |
 | Business Analytics Reports | ✅ Implemented |
 | Product Visibility (Soft Delete) | ✅ Implemented |
+| Advertisement System | [/] In Progress |
 
 ---
 
@@ -268,4 +269,38 @@ Comprehensive data aggregation for Admin and Vendors:
 - **Order Analytics**: Success vs. Cancellation rates.
 - **Product Performance**: Top selling items and low-performing categories.
 
-**Last Updated**: 2026-01-17
+---
+
+## 18. Advertisement System
+
+### 18.1 Core Principle
+A paid promotional tool that allows vendors to increase visibility through targeted displays and video content. 
+
+### 18.2 Advertisement Types
+- **Vendor Promotion**: Focuses on restaurant brand awareness. Requires a profile image and high-quality cover image.
+- **Video Promotion**: Engaging video content for immersive promotion. Requires a landscape video (2:1 ratio).
+
+### 18.3 Ad Lifecycle & Statuses
+The system uses a strict lifecycle managed by both Vendor actions and Admin oversight:
+
+| Status | Description |
+|--------|-------------|
+| `PENDING` | Newly created ad awaiting initial admin review. |
+| `UPDATED` | Ad modified by vendor after submission, requiring re-review. |
+| `APPROVED` | Content verified by Admin. Ready for payment/activation. |
+| `RUNNING` | Live and visible to customers (within the validity dates). |
+| `PAUSED` | Temporarily hidden by the Vendor or Admin. |
+| `CANCELED` | Rejected by Admin or canceled by Vendor. Usually accompanied by a note. |
+| `EXPIRED` | Automatically reached when the `endDate` passes. |
+
+### 18.4 Business Rules
+- **Wallet-Only Payment**: Advertisements can ONLY be paid for using the vendor's digital wallet balance.
+- **Activation**: Ads only reach the `RUNNING` status after successful wallet deduction (`paymentStatus = true`).
+- **Visibility**: Advertisements are only visible to authenticated users (role-based access). Unauthenticated guest users cannot view advertisements.
+- **Targeting**: Ads are displayed to customers based on their active `Zone` to ensure relevance.
+- **Validation**: Video promotions must adhere to specific aspect ratios (Landscape 2:1) for optimal UI display.
+- **Priority**: Admin can assign priority levels to control ad rotation and placement frequency.
+
+---
+
+**Last Updated**: 2026-01-19

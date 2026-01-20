@@ -4,10 +4,11 @@ import {
   Delete,
   Get,
   Param,
+  Patch,
   Post,
   Query,
   Request,
-  UseGuards,
+  UseGuards
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import * as Prisma from '@prisma/client';
@@ -16,6 +17,7 @@ import { Roles } from '../../common/decorators/roles.decorator';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { CreateStoryDto } from './dto/create-story.dto';
+import { UpdateStoryDto } from './dto/update-story.dto';
 import { StoriesService } from './stories.service';
 
 @ApiTags('Stories')
@@ -41,11 +43,6 @@ export class StoriesController {
     return this.storiesService.findMyStories(req.user);
   }
 
-  @Get(':id')
-  @ApiOperation({ summary: 'Get a story by ID' })
-  findOne(@Param('id') id: string) {
-    return this.storiesService.findOne(id);
-  }
 
   @Post()
   @ApiBearerAuth()
@@ -54,6 +51,19 @@ export class StoriesController {
   @ApiOperation({ summary: 'Create a new story' })
   create(@Body() createStoryDto: CreateStoryDto, @Request() req) {
     return this.storiesService.create(req.user, createStoryDto);
+  }
+
+  @Patch(':id')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Prisma.UserRole.VENDOR)
+  @ApiOperation({ summary: 'Update a story' })
+  update(
+    @Param('id') id: string,
+    @Body() updateStoryDto: UpdateStoryDto,
+    @Request() req,
+  ) {
+    return this.storiesService.update(id, req.user, updateStoryDto);
   }
 
   @Delete(':id')

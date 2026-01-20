@@ -21,4 +21,9 @@ export class UploadDriverDocumentDto {
   @IsOptional()
   @IsString()
   documentNumber?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  expireAt?: string;
 }

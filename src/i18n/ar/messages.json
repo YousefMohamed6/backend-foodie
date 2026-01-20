@@ -163,5 +163,9 @@
     "INVALID_COUPON_CODE": "كود القسيمة غير صالح",
     "INSUFFICIENT_STOCK": "الكمية المطلوبة غير متوفرة في المخزون",
     "VENDOR_NAME_ALREADY_EXISTS": "يوجد مورد بهذا الاسم بالفعل",
-    "PRODUCT_NAME_ALREADY_EXISTS": "يوجد منتج بهذا الاسم بالفعل لهذا المورد"
+    "PRODUCT_NAME_ALREADY_EXISTS": "يوجد منتج بهذا الاسم بالفعل لهذا المورد",
+    "WALLET_TX_ADVERTISEMENT_PAYMENT": "دفع مقابل إعلان: {title}",
+    "DOCUMENT_NOT_FOUND": "المستند غير موجود",
+    "COUPON_NOT_FOUND": "القسيمة غير موجودة",
+    "UNAUTHORIZED_COUPON_DELETE": "ليس لديك صلاحية حذف هذه القسيمة"
 }

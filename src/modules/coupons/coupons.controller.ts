@@ -76,10 +76,10 @@ export class CouponsController {
 
   @Delete(':id')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.ADMIN)
+  @Roles(UserRole.ADMIN, UserRole.VENDOR)
   @ApiOperation({ summary: 'Delete a coupon' })
-  remove(@Param('id') id: string) {
-    return this.couponsService.remove(id);
+  remove(@Param('id') id: string, @CurrentUser() user: User) {
+    return this.couponsService.remove(id, user);
   }
 
   @Post('validate')

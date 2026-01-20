@@ -92,6 +92,16 @@ export class SettingsService {
     }
   }
 
+  async getAdvertisementPrice(): Promise<number> {
+    try {
+      const value = await this.findOne(APP_SETTINGS.ADVERTISEMENT_PRICE);
+      const price = parseFloat(value);
+      return isNaN(price) ? 100 : price;
+    } catch {
+      return 100;
+    }
+  }
+
   async getPublicSettings() {
     const publicKeys = [
       APP_SETTINGS.WALLET_ENABLED,

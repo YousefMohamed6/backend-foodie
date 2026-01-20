@@ -3,15 +3,19 @@ import { ConfigService } from '@nestjs/config';
 
 @Injectable()
 export class UploadService {
-  constructor(private configService: ConfigService) {}
+  constructor(private configService: ConfigService) { }
 
-  uploadFile(file: Express.Multer.File) {
+  /**
+   * Uploads a file and returns its metadata with URL.
+   * @param file - The uploaded file
+   * @param baseUrl - The base URL derived from the request (protocol + host)
+   * @returns File metadata including URL and path
+   */
+  uploadFile(file: Express.Multer.File, baseUrl: string) {
     if (!file) {
       throw new BadRequestException('FILE_EMPTY');
     }
 
-    const host =
-      process.env.APP_URL || `http://localhost:${process.env.PORT || 3000}`;
     const isVideo = file.mimetype.match(/\/(mp4|mov|avi|wmv)$/);
     const folder = isVideo ? 'videos' : 'images';
     const filePath = `/uploads/${folder}/${file.filename}`;
@@ -21,18 +25,22 @@ export class UploadService {
       filename: file.filename,
       mimetype: file.mimetype,
       size: file.size,
-      url: `${host}${filePath}`,
+      url: `${baseUrl}${filePath}`,
       path: filePath,
     };
   }
 
-  uploadDriverDocument(file: Express.Multer.File) {
+  /**
+   * Uploads a driver document and returns its metadata with URL.
+   * @param file - The uploaded file
+   * @param baseUrl - The base URL derived from the request (protocol + host)
+   * @returns File metadata including URL and path
+   */
+  uploadDriverDocument(file: Express.Multer.File, baseUrl: string) {
     if (!file) {
       throw new BadRequestException('FILE_EMPTY');
     }
 
-    const host =
-      process.env.APP_URL || `http://localhost:${process.env.PORT || 3000}`;
     const filePath = `/uploads/documents/${file.filename}`;
 
     return {
@@ -40,7 +48,7 @@ export class UploadService {
       filename: file.filename,
       mimetype: file.mimetype,
       size: file.size,
-      url: `${host}${filePath}`,
+      url: `${baseUrl}${filePath}`,
       path: filePath,
     };
   }

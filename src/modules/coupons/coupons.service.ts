@@ -48,35 +48,37 @@ export class CouponsService {
   ) {
     const where: Prisma.CouponWhereInput = {};
 
-    if (query.vendorId) {
-      where.vendorId = query.vendorId;
-    }
-
     const isAdmin = user?.role === UserRole.ADMIN;
     const isVendor = user?.role === UserRole.VENDOR;
 
-    let showAllState = false;
-
     if (isAdmin) {
-      showAllState = true;
+      // Admin sees all coupons, optionally filtered by vendorId
+      if (query.vendorId) {
+        where.vendorId = query.vendorId;
+      }
     } else if (isVendor) {
+      // Vendor sees only their own active coupons
       const currentVendor = await this.vendorsService.findByAuthor(user.id);
       if (currentVendor) {
-        if (!query.vendorId || query.vendorId === currentVendor.id) {
-          where.vendorId = currentVendor.id;
-          showAllState = true;
-        }
+        where.vendorId = currentVendor.id;
+        where.isActive = true;
+      } else {
+        // Vendor without a vendor profile sees nothing
+        return [];
+      }
+    } else {
+      // Customer or unauthenticated user sees only public and active coupons
+      where.isActive = true;
+      where.isPublic = true;
+      if (query.vendorId) {
+        where.vendorId = query.vendorId;
       }
     }
 
-    if (!showAllState) {
-      // For customers or anyone else looking at coupons
-      where.isActive = true;
-      where.isPublic = true;
-    }
-
-    if (query.isPublic !== undefined)
+    // Allow admin to filter by isPublic if specified
+    if (isAdmin && query.isPublic !== undefined) {
       where.isPublic = query.isPublic === 'true' || query.isPublic === true;
+    }
 
     return this.prisma.coupon.findMany({
       where,
@@ -109,8 +111,21 @@ export class CouponsService {
     });
   }
 
-  async remove(id: string) {
-    await this.findOne(id);
+  async remove(id: string, user: User) {
+    const coupon = await this.findOne(id);
+
+    if (!coupon) {
+      throw new NotFoundException('COUPON_NOT_FOUND');
+    }
+
+    // Vendors can only delete their own coupons
+    if (user.role === UserRole.VENDOR) {
+      const vendor = await this.vendorsService.findByAuthor(user.id);
+      if (!vendor || coupon.vendorId !== vendor.id) {
+        throw new BadRequestException('UNAUTHORIZED_COUPON_DELETE');
+      }
+    }
+
     return this.prisma.coupon.update({
       where: { id },
       data: { isActive: false },

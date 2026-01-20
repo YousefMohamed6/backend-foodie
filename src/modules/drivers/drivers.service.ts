@@ -5,12 +5,13 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { DriverStatus, OrderStatus, Prisma, UserRole } from '@prisma/client';
+import { DocumentStatus, DriverStatus, OrderStatus, Prisma, UserRole } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { OrdersService } from '../orders/orders.service';
 import { CreateDriverDto } from './dto/create-driver.dto';
 import { UpdateDriverDto } from './dto/update-driver.dto';
 import { UploadDriverDocumentDto } from './dto/upload-driver-document.dto';
+import { VerifyDriverDocumentDto } from './dto/verify-driver-document.dto';
 
 @Injectable()
 export class DriversService {
@@ -18,7 +19,7 @@ export class DriversService {
     private prisma: PrismaService,
     @Inject(forwardRef(() => OrdersService))
     private ordersService: OrdersService,
-  ) {}
+  ) { }
 
   async create(createDriverDto: CreateDriverDto, userId: string) {
     const existingDriver = await this.prisma.driverProfile.findUnique({
@@ -137,10 +138,14 @@ export class DriversService {
     if (!driver) {
       throw new NotFoundException('DRIVER_NOT_FOUND');
     }
-    return this.prisma.driverDocument.findMany({
+    const docs = await this.prisma.driverDocument.findMany({
       where: { driverId: driver.id },
       orderBy: { createdAt: 'desc' },
     });
+    return docs.map((doc) => ({
+      ...doc,
+      status: doc.status.toLowerCase(),
+    }));
   }
 
   async uploadDocument(userId: string, data: UploadDriverDocumentDto) {
@@ -148,11 +153,13 @@ export class DriversService {
     if (!driver) {
       throw new NotFoundException('DRIVER_NOT_FOUND');
     }
+    const { expireAt, ...rest } = data;
     return this.prisma.driverDocument.create({
       data: {
-        ...data,
+        ...rest,
+        expireAt: expireAt ? new Date(expireAt) : undefined,
         driver: { connect: { id: driver.id } },
-        status: 'pending',
+        status: DocumentStatus.PENDING,
       } as Prisma.DriverDocumentCreateInput,
     });
   }
@@ -163,6 +170,20 @@ export class DriversService {
         driver: {
           include: { user: true },
         },
+      },
+    });
+  }
+
+  async verifyDocument(dto: VerifyDriverDocumentDto) {
+    const { documentId, isApproved } = dto;
+
+    return this.prisma.driverDocument.update({
+      where: { id: documentId },
+      data: {
+        status: isApproved
+          ? DocumentStatus.ACCEPTED
+          : DocumentStatus.REJECTED,
+        rejectionReason: isApproved ? null : dto.rejectionReason,
       },
     });
   }

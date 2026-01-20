@@ -61,6 +61,7 @@ export const APP_SETTINGS = {
   ORDER_RINGTONE_URL: 'order_ringtone_url',
   LANGUAGE: 'language',
   ADMIN_COMMISSION: 'admin_commission',
+  ADVERTISEMENT_PRICE: 'advertisement_price',
 } as const;
 
 export const DEFAULT_APP_SETTINGS = {
@@ -126,4 +127,5 @@ export const DEFAULT_APP_SETTINGS = {
   [APP_SETTINGS.ORDER_RINGTONE_URL]: '',
   [APP_SETTINGS.LANGUAGE]: 'ar',
   [APP_SETTINGS.ADMIN_COMMISSION]: '2',
+  [APP_SETTINGS.ADVERTISEMENT_PRICE]: '100',
 };

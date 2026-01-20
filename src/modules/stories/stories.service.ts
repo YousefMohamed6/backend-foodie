@@ -7,6 +7,7 @@ import { Prisma, type User, UserRole } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { VendorsService } from '../vendors/vendors.service';
 import { CreateStoryDto } from './dto/create-story.dto';
+import { UpdateStoryDto } from './dto/update-story.dto';
 
 @Injectable()
 export class StoriesService {
@@ -90,6 +91,30 @@ export class StoriesService {
     return this.prisma.story.update({
       where: { id },
       data: { isActive: false },
+    });
+  }
+
+  async update(id: string, user: User, data: UpdateStoryDto) {
+    const story = await this.findOne(id);
+    const vendor = await this.vendorsService.findByAuthor(user.id);
+
+    if (!vendor || story.vendorId !== vendor.id) {
+      throw new ForbiddenException('STORY_UPDATE_PERMISSION');
+    }
+
+    const updateData: Prisma.StoryUpdateInput = {
+      videoThumbnail: data.videoThumbnail,
+    };
+
+    if (data.mediaUrl) {
+      updateData.mediaUrl = data.mediaUrl;
+    } else if (data.videoUrl && data.videoUrl.length > 0) {
+      updateData.mediaUrl = data.videoUrl[0];
+    }
+
+    return this.prisma.story.update({
+      where: { id },
+      data: updateData,
     });
   }
 }

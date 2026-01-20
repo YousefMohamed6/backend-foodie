@@ -163,5 +163,9 @@
     "INVALID_COUPON_CODE": "Invalid Coupon Code",
     "INSUFFICIENT_STOCK": "The requested quantity is not available in stock",
     "VENDOR_NAME_ALREADY_EXISTS": "A vendor with this name already exists",
-    "PRODUCT_NAME_ALREADY_EXISTS": "A product with this name already exists for this vendor"
+    "PRODUCT_NAME_ALREADY_EXISTS": "A product with this name already exists for this vendor",
+    "WALLET_TX_ADVERTISEMENT_PAYMENT": "Payment for advertisement: {title}",
+    "DOCUMENT_NOT_FOUND": "Document not found",
+    "COUPON_NOT_FOUND": "Coupon not found",
+    "UNAUTHORIZED_COUPON_DELETE": "You are not authorized to delete this coupon"
 }
