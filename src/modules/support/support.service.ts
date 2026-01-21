@@ -27,6 +27,7 @@ export class SupportService {
   async sendMessage(
     userInfo: SupportUserInfo,
     dto: SendSupportMessageDto,
+    baseUrl: string,
     file?: Express.Multer.File,
     videoThumbnail?: Express.Multer.File,
   ) {
@@ -42,7 +43,7 @@ export class SupportService {
 
     // Handle file upload if present
     if (file) {
-      filePath = await this.saveFile(userInfo.userId, file);
+      filePath = await this.saveFile(userInfo.userId, file, baseUrl);
     }
 
     // Handle video thumbnail if present
@@ -50,6 +51,7 @@ export class SupportService {
       thumbnailPath = await this.saveFile(
         userInfo.userId,
         videoThumbnail,
+        baseUrl,
         'thumbnails',
       );
     }
@@ -124,6 +126,7 @@ export class SupportService {
     adminName: string,
     inboxId: string,
     dto: SendSupportMessageDto,
+    baseUrl: string,
     file?: Express.Multer.File,
     videoThumbnail?: Express.Multer.File,
   ) {
@@ -148,7 +151,7 @@ export class SupportService {
 
     // Handle file upload if present
     if (file) {
-      filePath = await this.saveFile(inbox.userId, file, 'admin');
+      filePath = await this.saveFile(inbox.userId, file, baseUrl, 'admin');
     }
 
     // Handle video thumbnail if present
@@ -156,6 +159,7 @@ export class SupportService {
       thumbnailPath = await this.saveFile(
         inbox.userId,
         videoThumbnail,
+        baseUrl,
         'admin/thumbnails',
       );
     }
@@ -334,6 +338,7 @@ export class SupportService {
   private async saveFile(
     userId: string,
     file: Express.Multer.File,
+    baseUrl: string,
     subFolder: string = '',
   ): Promise<string> {
     const timestamp = Date.now();
@@ -365,9 +370,12 @@ export class SupportService {
       filename,
     ).replace(/\\/g, '/');
 
-    this.logger.debug(`File saved to: ${relativePath}`);
+    // Return full URL
+    const fullUrl = `${baseUrl}/${relativePath}`;
 
-    return `/${relativePath}`;
+    this.logger.debug(`File saved to: ${fullUrl}`);
+
+    return fullUrl;
   }
 
   private getLastMessagePreview(

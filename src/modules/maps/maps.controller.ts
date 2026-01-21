@@ -19,6 +19,7 @@ export class MapsController {
   constructor(private readonly mapsService: MapsService) { }
 
   @Get('route')
+  @Roles(UserRole.CUSTOMER, UserRole.VENDOR, UserRole.DRIVER, UserRole.ADMIN, UserRole.MANAGER)
   @ApiOperation({ summary: 'Get route directions from Google Maps' })
   @ApiQuery({ name: 'sourceLat', required: true, type: Number })
   @ApiQuery({ name: 'sourceLng', required: true, type: Number })

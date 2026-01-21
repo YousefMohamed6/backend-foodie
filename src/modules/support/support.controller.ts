@@ -141,10 +141,12 @@ export class SupportController {
 
     const file = files?.file?.[0];
     const videoThumbnail = files?.videoThumbnail?.[0];
+    const baseUrl = this.getBaseUrl(req);
 
     const result = await this.supportService.sendMessage(
       userInfo,
       dto,
+      baseUrl,
       file,
       videoThumbnail,
     );
@@ -228,12 +230,14 @@ export class SupportController {
   ) {
     const file = files?.file?.[0];
     const videoThumbnail = files?.videoThumbnail?.[0];
+    const baseUrl = this.getBaseUrl(req);
 
     const result = await this.supportService.sendAdminReply(
       req.user.id,
       `${req.user.firstName} ${req.user.lastName}`,
       inboxId,
       dto,
+      baseUrl,
       file,
       videoThumbnail,
     );
@@ -292,5 +296,9 @@ export class SupportController {
   @ApiOperation({ summary: 'Get current user support inbox and messages' })
   async getMyInbox(@Request() req: any) {
     return this.supportService.getUserInbox(req.user.id);
+  }
+
+  private getBaseUrl(req: any): string {
+    return `${req.protocol}://${req.get('host')}`;
   }
 }

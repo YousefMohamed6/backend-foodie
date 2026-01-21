@@ -112,7 +112,7 @@ export class DriversService {
 
   async updateStatus(
     userId: string,
-    status: DriverStatus,
+    status?: DriverStatus,
     isOnline?: boolean,
     latitude?: number,
     longitude?: number,
@@ -122,14 +122,27 @@ export class DriversService {
       throw new NotFoundException('DRIVER_NOT_FOUND');
     }
 
+    const data: Prisma.DriverProfileUpdateInput = {
+      currentLat: latitude !== undefined ? latitude : undefined,
+      currentLng: longitude !== undefined ? longitude : undefined,
+    };
+
+    if (isOnline !== undefined) {
+      data.isOnline = isOnline;
+      if (!isOnline) {
+        data.status = DriverStatus.OFFLINE;
+      } else if (!status && driver.status === DriverStatus.OFFLINE) {
+        data.status = DriverStatus.AVAILABLE;
+      }
+    }
+
+    if (status) {
+      data.status = status;
+    }
+
     return this.prisma.driverProfile.update({
       where: { userId },
-      data: {
-        status: status || undefined,
-        isOnline: isOnline !== undefined ? isOnline : undefined,
-        currentLat: latitude !== undefined ? latitude : undefined,
-        currentLng: longitude !== undefined ? longitude : undefined,
-      },
+      data,
     });
   }
 
@@ -153,14 +166,25 @@ export class DriversService {
     if (!driver) {
       throw new NotFoundException('DRIVER_NOT_FOUND');
     }
-    const { expireAt, ...rest } = data;
-    return this.prisma.driverDocument.create({
-      data: {
+    const { documentId, ...rest } = data;
+    return this.prisma.driverDocument.upsert({
+      where: {
+        driverId_documentId: {
+          driverId: driver.id,
+          documentId: documentId,
+        },
+      },
+      update: {
         ...rest,
-        expireAt: expireAt ? new Date(expireAt) : undefined,
+        status: DocumentStatus.PENDING,
+        rejectionReason: null,
+      },
+      create: {
+        ...rest,
+        document: { connect: { id: documentId } },
         driver: { connect: { id: driver.id } },
         status: DocumentStatus.PENDING,
-      } as Prisma.DriverDocumentCreateInput,
+      },
     });
   }
 

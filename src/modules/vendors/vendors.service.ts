@@ -689,7 +689,7 @@ export class VendorsService {
 
     const { documentId, frontImage, backImage, expireAt } = updateVendorDocumentDto;
 
-    return (this.prisma as any).vendorDocument.upsert({
+    return this.prisma.vendorDocument.upsert({
       where: {
         vendorId_documentId: {
           vendorId: vendor.id,
@@ -703,8 +703,8 @@ export class VendorsService {
         status: DocumentStatus.PENDING, // Reset status to pending so admin must review again
       },
       create: {
-        vendorId: vendor.id,
-        documentId,
+        vendor: { connect: { id: vendor.id } },
+        document: { connect: { id: documentId } },
         frontImage,
         backImage,
         expireAt: expireAt ? new Date(expireAt) : undefined,

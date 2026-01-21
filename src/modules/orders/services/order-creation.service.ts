@@ -169,6 +169,7 @@ export class OrderCreationService {
                     adminCommissionPercentage: calcs.adminCommissionPercentage,
                     adminCommissionAmount: calcs.adminCommissionAmount,
                     vendorEarnings: calcs.vendorEarnings,
+                    specialDiscountId: calcs.specialDiscountId,
                 },
                 include: orderInclude,
             });

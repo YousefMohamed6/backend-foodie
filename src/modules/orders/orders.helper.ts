@@ -8,6 +8,7 @@ export const orderInclude = {
   vendor: true,
   driver: true,
   address: true,
+  specialDiscount: true,
   items: {
     include: {
       extras: true,

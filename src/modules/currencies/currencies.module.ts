@@ -1,6 +1,6 @@
 import { Module } from '@nestjs/common';
+import { CurrenciesSeederService } from '../../../scripts/seed-currencies';
 import { PrismaModule } from '../../prisma/prisma.module';
-import { CurrenciesSeederService } from './currencies-seeder.service';
 import { CurrenciesController } from './currencies.controller';
 import { CurrenciesService } from './currencies.service';
 
@@ -10,4 +10,4 @@ import { CurrenciesService } from './currencies.service';
   providers: [CurrenciesService, CurrenciesSeederService],
   exports: [CurrenciesService],
 })
-export class CurrenciesModule {}
+export class CurrenciesModule { }

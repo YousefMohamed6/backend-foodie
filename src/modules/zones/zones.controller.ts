@@ -12,6 +12,7 @@ import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { UserRole } from '@prisma/client';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
+import { OptionalJwtAuthGuard } from '../../common/guards/optional-jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { CreateZoneDto } from './dto/create-zone.dto';
 import { UpdateZoneDto } from './dto/update-zone.dto';
@@ -20,7 +21,7 @@ import { ZonesService } from './zones.service';
 @ApiTags('Zones')
 @Controller('zones')
 export class ZonesController {
-  constructor(private readonly zonesService: ZonesService) {}
+  constructor(private readonly zonesService: ZonesService) { }
 
   @Post()
   @ApiBearerAuth()
@@ -32,6 +33,9 @@ export class ZonesController {
   }
 
   @Get()
+  @ApiBearerAuth()
+  @UseGuards(OptionalJwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.DRIVER)
   @ApiOperation({ summary: 'Get all zones' })
   findAll() {
     return this.zonesService.findAll();

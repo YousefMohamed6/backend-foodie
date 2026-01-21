@@ -119,7 +119,32 @@ export class OrderQueryService {
         }
 
         if (query.status) {
-            where.status = query.status as OrderStatus;
+            const statusMap: Record<string, OrderStatus> = {
+                'PLACED': OrderStatus.PLACED,
+                'VENDOR_ACCEPTED': OrderStatus.VENDOR_ACCEPTED,
+                'VENDOR_REJECTED': OrderStatus.VENDOR_REJECTED,
+                'DRIVER_PENDING': OrderStatus.DRIVER_PENDING,
+                'DRIVER_ACCEPTED': OrderStatus.DRIVER_ACCEPTED,
+                'DRIVER_REJECTED': OrderStatus.DRIVER_REJECTED,
+                'SHIPPED': OrderStatus.SHIPPED,
+                'IN_TRANSIT': OrderStatus.IN_TRANSIT,
+                'COMPLETED': OrderStatus.COMPLETED,
+                'CANCELLED': OrderStatus.CANCELLED,
+            };
+
+            const statusArray = typeof query.status === 'string'
+                ? query.status.split(',').map((s) => s.trim())
+                : [query.status];
+
+            const mappedStatuses = statusArray
+                .map((s) => statusMap[s] || (Object.values(OrderStatus).includes(s as OrderStatus) ? s as OrderStatus : null))
+                .filter((s): s is OrderStatus => s !== null);
+
+            if (mappedStatuses.length > 1) {
+                where.status = { in: mappedStatuses };
+            } else if (mappedStatuses.length === 1) {
+                where.status = mappedStatuses[0];
+            }
         }
         return where;
     }

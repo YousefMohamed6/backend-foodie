@@ -373,6 +373,8 @@ model Order {
   vendor                    Vendor                    @relation(fields: [vendorId], references: [id])
   reviews                   Review[]
   walletTransactions        WalletTransaction[]
+  specialDiscountId         String?                   @map("special_discount_id")
+  specialDiscount           SpecialDiscount?          @relation(fields: [specialDiscountId], references: [id])
 
   @@map("orders")
 }
@@ -698,19 +700,19 @@ model ReviewImage {
 }
 
 model DriverDocument {
-  id             String        @id @default(uuid())
-  status         String        @default("pending")
-  createdAt      DateTime      @default(now())
-  updatedAt      DateTime      @updatedAt
-  backImage      String?       @map("back_image")
-  documentNumber String?       @map("document_number")
-  documentType   String        @map("document_type")
-  driverId       String        @map("driver_id")
-  frontImage     String        @map("front_image")
-  expireAt       DateTime?     @map("expire_at")
-  rejectionReason String?      @map("rejection_reason")
-  driver         DriverProfile @relation(fields: [driverId], references: [id])
+  id              String         @id @default(uuid())
+  status          DocumentStatus @default(PENDING)
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+  documentId      String         @map("document_id")
+  backImage       String?        @map("back_image")
+  driverId        String         @map("driver_id")
+  frontImage      String         @map("front_image")
+  rejectionReason String?        @map("rejection_reason")
+  document        Document       @relation("DocumentToDriver", fields: [documentId], references: [id], onDelete: Cascade)
+  driver          DriverProfile  @relation(fields: [driverId], references: [id], onDelete: Cascade)
 
+  @@unique([driverId, documentId])
   @@map("driver_documents")
 }
 
@@ -1017,15 +1019,17 @@ model OnBoarding {
 }
 
 model Document {
-  id        String   @id @default(uuid())
-  title     String   @unique
-  type      String   @default("vendor")
-  frontSide Boolean  @default(false) @map("front_side")
-  backSide  Boolean  @default(false) @map("back_side")
-  expireAt  Boolean  @default(false) @map("expire_at")
-  enable    Boolean  @default(true)
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  id              String           @id @default(uuid())
+  title           String           @unique
+  type            String           @default("vendor")
+  frontSide       Boolean          @default(false) @map("front_side")
+  backSide        Boolean          @default(false) @map("back_side")
+  expireAt        Boolean          @default(false) @map("expire_at")
+  enable          Boolean          @default(true)
+  createdAt       DateTime         @default(now()) @map("created_at")
+  updatedAt       DateTime         @updatedAt @map("updated_at")
+  vendorDocuments VendorDocument[] @relation("DocumentToVendor")
+  driverDocuments DriverDocument[] @relation("DocumentToDriver")
 
   @@map("documents")
 }
@@ -1651,17 +1655,18 @@ model PayoutAccount {
 }
 
 model VendorDocument {
-  id             String   @id @default(uuid())
-  vendorId       String   @map("vendor_id")
-  documentId     String   @map("document_id")
-  frontImage     String?  @map("front_image")
-  backImage      String?  @map("back_image")
-  expireAt       DateTime? @map("expire_at")
-  status         DocumentStatus @default(PENDING)
-  rejectionReason String?  @map("rejection_reason")
-  createdAt      DateTime       @default(now()) @map("created_at")
-  updatedAt      DateTime       @updatedAt @map("updated_at")
-  vendor         Vendor         @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  id              String         @id @default(uuid())
+  vendorId        String         @map("vendor_id")
+  documentId      String         @map("document_id")
+  frontImage      String?        @map("front_image")
+  backImage       String?        @map("back_image")
+  expireAt        DateTime?      @map("expire_at")
+  status          DocumentStatus @default(PENDING)
+  rejectionReason String?        @map("rejection_reason")
+  createdAt       DateTime       @default(now()) @map("created_at")
+  updatedAt       DateTime       @updatedAt @map("updated_at")
+  document        Document       @relation("DocumentToVendor", fields: [documentId], references: [id], onDelete: Cascade)
+  vendor          Vendor         @relation(fields: [vendorId], references: [id], onDelete: Cascade)
 
   @@unique([vendorId, documentId])
   @@map("vendor_documents")
@@ -1688,6 +1693,7 @@ model SpecialDiscount {
   createdAt         DateTime        @default(now()) @map("created_at")
   updatedAt         DateTime        @updatedAt @map("updated_at")
 
+  orders            Order[]
   @@map("special_discounts")
 }
 

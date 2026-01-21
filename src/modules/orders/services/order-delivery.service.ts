@@ -7,6 +7,7 @@ import {
     NotFoundException,
 } from '@nestjs/common';
 import {
+    DriverStatus,
     OrderStatus,
     PaymentMethod,
     PaymentStatus,
@@ -69,6 +70,8 @@ export class OrderDeliveryService {
             user,
             WalletTransactionDescriptions.orderCancelledByUser().en,
         );
+
+        if (!savedOrder) throw new NotFoundException(ORDERS_ERRORS.ORDER_NOT_FOUND);
 
         await this.notificationService.sendOrderNotification(
             savedOrder.authorId,
@@ -140,6 +143,13 @@ export class OrderDeliveryService {
                 },
                 include: orderInclude,
             });
+
+            if (currentOrder.driverId) {
+                await tx.driverProfile.update({
+                    where: { userId: currentOrder.driverId },
+                    data: { status: DriverStatus.AVAILABLE },
+                });
+            }
 
             if (currentOrder.paymentMethod === PaymentMethod.cash) {
                 await this.walletService.addVendorEarnings(
@@ -267,6 +277,13 @@ export class OrderDeliveryService {
                 },
                 include: orderInclude,
             });
+
+            if (order.driverId) {
+                await tx.driverProfile.update({
+                    where: { userId: order.driverId },
+                    data: { status: DriverStatus.AVAILABLE },
+                });
+            }
 
             if (order.paymentMethod === PaymentMethod.wallet) {
                 if (order.paymentStatus === PaymentStatus.PAID) {

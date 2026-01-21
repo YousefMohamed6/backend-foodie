@@ -129,6 +129,11 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
         MATCH: pattern,
         COUNT: 100,
       })) {
+        // Skip empty or invalid keys to prevent DEL command errors
+        if (!key || key.length === 0) {
+          continue;
+        }
+
         promises.push(this.client.del(key));
         count++;
 
@@ -144,7 +149,9 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
         await Promise.all(promises);
       }
 
-      this.logger.log(`Deleted ${count} keys matching pattern: ${pattern}`);
+      if (count > 0) {
+        this.logger.log(`Deleted ${count} keys matching pattern: ${pattern}`);
+      }
     } catch (error) {
       this.logger.error(
         `Redis DEL PATTERN error for pattern ${pattern}:`,

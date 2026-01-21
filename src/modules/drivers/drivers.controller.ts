@@ -91,6 +91,43 @@ export class DriversController {
     );
   }
 
+  @Get('earnings')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.DRIVER)
+  @ApiOperation({ summary: 'Get driver earnings' })
+  getEarnings(
+    @CurrentUser() user: User,
+    @Query('period') period?: 'daily' | 'monthly' | 'yearly',
+    @Query('type') type?: 'daily' | 'monthly' | 'yearly',
+    @Query('startDate') startDate?: string,
+    @Query('date') date?: string,
+  ) {
+    const finalPeriod = period || type || 'daily';
+    const finalDateStr = startDate || date || new Date().toISOString();
+    const finalDate = new Date(finalDateStr);
+
+    return this.driversService.getEarnings(user.id, finalPeriod, finalDate);
+  }
+
+  @Get('me/documents')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.DRIVER)
+  @ApiOperation({ summary: 'Get current driver documents' })
+  getDocuments(@CurrentUser() user: User) {
+    return this.driversService.getDocuments(user.id);
+  }
+
+  @Post('me/documents')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.DRIVER)
+  @ApiOperation({ summary: 'Upload driver document' })
+  uploadDocument(
+    @CurrentUser() user: User,
+    @Body() data: UploadDriverDocumentDto,
+  ) {
+    return this.driversService.uploadDocument(user.id, data);
+  }
+
   @Get(':id')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.ADMIN)
@@ -129,38 +166,6 @@ export class DriversController {
   @ApiOperation({ summary: 'Delete driver' })
   remove(@Param('id') id: string) {
     return this.driversService.remove(id);
-  }
-
-  @Get('me/documents')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.DRIVER)
-  @ApiOperation({ summary: 'Get current driver documents' })
-  getDocuments(@CurrentUser() user: User) {
-    return this.driversService.getDocuments(user.id);
-  }
-
-  @Post('me/documents')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.DRIVER)
-  @ApiOperation({ summary: 'Upload driver document' })
-  uploadDocument(
-    @CurrentUser() user: User,
-    @Body() data: UploadDriverDocumentDto,
-  ) {
-    return this.driversService.uploadDocument(user.id, data);
-  }
-
-  @Get('earnings')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.DRIVER)
-  @ApiOperation({ summary: 'Get driver earnings' })
-  getEarnings(
-    @CurrentUser() user: User,
-    @Query('period') period: 'daily' | 'monthly' | 'yearly',
-    @Query('startDate') startDate: string,
-  ) {
-    const date = new Date(startDate);
-    return this.driversService.getEarnings(user.id, period, date);
   }
 
   @Post('documents/verify')

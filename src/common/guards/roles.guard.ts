@@ -18,8 +18,16 @@ export class RolesGuard implements CanActivate {
       return true;
     }
     const { user } = context.switchToHttp().getRequest();
-    if (!user || !user.role) {
-      this.logger.warn('User or user.role is missing');
+    // If user is not present but RolesGuard is active, it means either:
+    // 1. JwtAuthGuard failed (but then RolesGuard wouldn't run if it was synchronous/pipelined correctly,
+    //    however OptionalJwtAuthGuard allows null user).
+    // 2. We want to allow guest access but restrict the roles if they ARE logged in.
+    if (!user) {
+      return true;
+    }
+
+    if (!user.role) {
+      this.logger.warn('User role is missing');
       return false;
     }
 

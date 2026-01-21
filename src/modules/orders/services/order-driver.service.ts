@@ -9,6 +9,7 @@ import {
 } from '@nestjs/common';
 import {
     CommissionSource,
+    DriverStatus,
     OrderStatus,
     PaymentMethod,
     User,
@@ -19,6 +20,7 @@ import { PrismaService } from '../../../prisma/prisma.service';
 import { NotificationService } from '../../../shared/services/notification.service';
 import { RedisService } from '../../../shared/services/redis.service';
 import { AnalyticsTrackingService } from '../../analytics/analytics-tracking.service';
+import { DriversService } from '../../drivers/drivers.service';
 import { CommissionService } from '../commission.service';
 import { AssignDriverDto } from '../dto/assign-driver.dto';
 import { DriverReportProblemDto } from '../dto/driver-report-problem.dto';
@@ -50,6 +52,8 @@ export class OrderDriverService {
         private deliveryService: OrderDeliveryService,
         @Inject(forwardRef(() => OrderQueryService))
         private queryService: OrderQueryService,
+        @Inject(forwardRef(() => DriversService))
+        private driversService: DriversService,
     ) { }
 
     async reportDeliveryProblem(
@@ -86,6 +90,8 @@ export class OrderDriverService {
             `Delivery reported problem: ${dto.reason}`,
             AnalyticsEventType.DELIVERY_FAILED,
         );
+
+        if (!savedOrder) throw new NotFoundException(ORDERS_ERRORS.ORDER_NOT_FOUND);
 
         await this.notificationService.sendOrderNotification(
             savedOrder.authorId,
@@ -179,7 +185,11 @@ export class OrderDriverService {
                     zoneId: true,
                     role: true,
                     driverProfile: {
-                        select: { walletAmount: true },
+                        select: {
+                            walletAmount: true,
+                            status: true,
+                            isOnline: true,
+                        },
                     },
                 },
             });
@@ -188,14 +198,22 @@ export class OrderDriverService {
                 throw new NotFoundException(ORDERS_ERRORS.DRIVER_NOT_FOUND);
             }
 
-            if (driver.zoneId !== managerZoneId) {
-                throw new ForbiddenException(ORDERS_ERRORS.ACCESS_DENIED);
-            }
-
             if (!driver.driverProfile) {
                 throw new BadRequestException(
                     ORDERS_ERRORS.DRIVER_PROFILE_NOT_INITIALIZED,
                 );
+            }
+
+            if (!driver.driverProfile.isOnline) {
+                throw new BadRequestException(ORDERS_ERRORS.DRIVER_OFFLINE);
+            }
+
+            if (driver.driverProfile.status === DriverStatus.BUSY) {
+                throw new BadRequestException(ORDERS_ERRORS.DRIVER_BUSY);
+            }
+
+            if (driver.zoneId !== managerZoneId) {
+                throw new ForbiddenException(ORDERS_ERRORS.ACCESS_DENIED);
             }
 
             const lockKey = `${OrderConstants.REDIS_LOCK_ASSIGN_ORDER_PREFIX}${assignDriverDto.driverId}`;
@@ -238,13 +256,20 @@ export class OrderDriverService {
             });
         }
 
-        const savedOrder = await this.prisma.order.update({
-            where: { id },
-            data: {
-                driverId: assignDriverDto.driverId,
-                status: OrderStatus.DRIVER_PENDING,
-            },
-            include: orderInclude,
+        const savedOrder = await this.prisma.$transaction(async (tx) => {
+            await tx.driverProfile.update({
+                where: { userId: assignDriverDto.driverId },
+                data: { status: DriverStatus.BUSY },
+            });
+
+            return tx.order.update({
+                where: { id },
+                data: {
+                    driverId: assignDriverDto.driverId,
+                    status: OrderStatus.DRIVER_PENDING,
+                },
+                include: orderInclude,
+            });
         });
 
         this.analyticsTrackingService.trackOrderLifecycle({
@@ -270,13 +295,20 @@ export class OrderDriverService {
             throw new ForbiddenException(ORDERS_ERRORS.DRIVER_NOT_ASSIGNED);
         }
 
-        const savedOrder = await this.prisma.order.update({
-            where: { id },
-            data: {
-                driverId: null,
-                status: OrderStatus.DRIVER_REJECTED,
-            },
-            include: { ...orderInclude, vendor: true },
+        const savedOrder = await this.prisma.$transaction(async (tx) => {
+            await tx.driverProfile.update({
+                where: { userId: user.id },
+                data: { status: DriverStatus.AVAILABLE },
+            });
+
+            return tx.order.update({
+                where: { id },
+                data: {
+                    driverId: null,
+                    status: OrderStatus.DRIVER_REJECTED,
+                },
+                include: { ...orderInclude, vendor: true },
+            });
         });
 
         this.analyticsTrackingService.trackOrderLifecycle({

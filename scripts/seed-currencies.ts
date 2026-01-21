@@ -1,9 +1,9 @@
 import { Injectable, OnModuleInit } from '@nestjs/common';
-import { PrismaService } from '../../prisma/prisma.service';
+import { PrismaService } from '../src/prisma/prisma.service';
 
 @Injectable()
 export class CurrenciesSeederService implements OnModuleInit {
-  constructor(private prisma: PrismaService) {}
+  constructor(private prisma: PrismaService) { }
 
   async onModuleInit() {
     await this.seed();
@@ -19,14 +19,6 @@ export class CurrenciesSeederService implements OnModuleInit {
         symbol: '$',
         isActive: true,
         isAfter: false,
-        decimal: 2,
-        isDefault: false,
-      },
-      {
-        code: 'EUR',
-        symbol: '€',
-        isActive: true,
-        isAfter: true,
         decimal: 2,
         isDefault: false,
       },

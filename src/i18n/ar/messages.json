@@ -168,5 +168,8 @@
     "DOCUMENT_NOT_FOUND": "المستند غير موجود",
     "COUPON_NOT_FOUND": "القسيمة غير موجودة",
     "UNAUTHORIZED_COUPON_DELETE": "ليس لديك صلاحية حذف هذه القسيمة",
-    "PLEASE_LOG_IN": "يجب تسجيل الدخول"
+    "PLEASE_LOG_IN": "يجب تسجيل الدخول",
+    "SPECIAL_DISCOUNT_INVALID": "الخصم الخاص غير صالح",
+    "DRIVER_BUSY": "السائق مشغول حالياً بطلب آخر",
+    "DRIVER_OFFLINE": "السائق غير متصل حالياً أو غير متاح"
 }

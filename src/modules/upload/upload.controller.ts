@@ -141,7 +141,6 @@ export class UploadController {
       type: 'object',
       properties: {
         file: { type: 'string', format: 'binary' },
-        documentType: { type: 'string' },
       },
     },
   })

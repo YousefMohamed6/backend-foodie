@@ -168,5 +168,8 @@
     "DOCUMENT_NOT_FOUND": "Document not found",
     "COUPON_NOT_FOUND": "Coupon not found",
     "UNAUTHORIZED_COUPON_DELETE": "You are not authorized to delete this coupon",
-    "PLEASE_LOG_IN": "Please log in"
+    "PLEASE_LOG_IN": "Please log in",
+    "SPECIAL_DISCOUNT_INVALID": "Special discount is not valid",
+    "DRIVER_BUSY": "Driver is currently busy with another order",
+    "DRIVER_OFFLINE": "Driver is currently offline or unavailable"
 }

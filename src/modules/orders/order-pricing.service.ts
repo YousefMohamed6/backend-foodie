@@ -132,6 +132,7 @@ export class OrderPricingService {
 
     const adminCommissionAmount = subtotal * (adminCommissionPercentage / 100);
     let discountAmount = 0;
+    let specialDiscountId: string | null = null;
     if (createOrderDto.couponCode) {
       try {
         // 1. Try Special Discounts (Vendor Specific)
@@ -142,6 +143,7 @@ export class OrderPricingService {
           });
 
         if (specialDiscount.success) {
+          specialDiscountId = specialDiscount.id;
           if (specialDiscount.discountType === DiscountType.PERCENTAGE) {
             discountAmount = subtotal * (specialDiscount.discount / 100);
           } else {
@@ -182,6 +184,7 @@ export class OrderPricingService {
       vendorEarnings,
       totalAmount,
       deliveryCharge,
+      specialDiscountId,
     };
   }
 }

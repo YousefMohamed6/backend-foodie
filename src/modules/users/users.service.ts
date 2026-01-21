@@ -79,6 +79,18 @@ export class UsersService {
           author: mapUserToAuthor(user),
         };
       }
+    } else if (user.role === UserRole.DRIVER) {
+      const driver = await this.prisma.driverProfile.findUnique({
+        where: { userId: user.id },
+      });
+      const { password, ...userData } = user;
+      result = {
+        ...userData,
+        isOnline: driver?.isOnline ?? false,
+        walletAmount: driver?.walletAmount ?? 0,
+        lat: driver?.currentLat,
+        lng: driver?.currentLng,
+      };
     } else {
       const { password, ...userData } = user;
       result = userData;

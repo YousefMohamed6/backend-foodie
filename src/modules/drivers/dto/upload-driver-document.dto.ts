@@ -2,10 +2,6 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { IsNotEmpty, IsOptional, IsString } from 'class-validator';
 
 export class UploadDriverDocumentDto {
-  @ApiProperty()
-  @IsNotEmpty()
-  @IsString()
-  documentType: string;
 
   @ApiProperty()
   @IsNotEmpty()
@@ -17,13 +13,9 @@ export class UploadDriverDocumentDto {
   @IsString()
   backImage?: string;
 
-  @ApiPropertyOptional()
-  @IsOptional()
+  @ApiProperty()
+  @IsNotEmpty()
   @IsString()
-  documentNumber?: string;
+  documentId: string;
 
-  @ApiPropertyOptional()
-  @IsOptional()
-  @IsString()
-  expireAt?: string;
 }
