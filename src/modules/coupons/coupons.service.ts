@@ -82,6 +82,32 @@ export class CouponsService {
 
     return this.prisma.coupon.findMany({
       where,
+      include: {
+        vendor: true,
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  async findByZone(user: User) {
+    if (!user.zoneId) return [];
+    return this.prisma.coupon.findMany({
+      where: {
+        isActive: true,
+        isPublic: true,
+        vendor: {
+          zoneId: user.zoneId,
+          isActive: true,
+          subscriptionExpiryDate: { gt: new Date() },
+        },
+      },
+      include: {
+        vendor: {
+          include: {
+            vendorType: true,
+          },
+        },
+      },
       orderBy: { createdAt: 'desc' },
     });
   }

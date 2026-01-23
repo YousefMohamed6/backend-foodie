@@ -23,7 +23,7 @@ export class RegisterDto {
   lastName: string;
 
   @ApiProperty()
-  @IsEmail()
+  @IsEmail({}, { message: 'INVALID_EMAIL' })
   email: string;
 
   @ApiProperty()

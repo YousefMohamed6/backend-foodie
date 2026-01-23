@@ -21,6 +21,7 @@ import { Roles } from '../../common/decorators/roles.decorator';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { OptionalJwtAuthGuard } from '../../common/guards/optional-jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
+import { CategoryViewQueryDto } from './dto/category-view-query.dto';
 import { CreateProductDto } from './dto/create-product.dto';
 import { FindAllProductsQueryDto } from './dto/find-all-products-query.dto';
 import { UpdateProductRatingsDto } from './dto/update-product-ratings.dto';
@@ -77,21 +78,68 @@ export class ProductsController {
     return this.productsService.search(query, page, limit, user);
   }
 
+
+  @Get('customer/filter')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Prisma.UserRole.CUSTOMER)
+  @ApiOperation({
+    summary: 'Get products by category filtered by customer zone',
+  })
+  @ApiQuery({ name: 'categoryId', required: true })
+  @ApiQuery({ name: 'page', required: false })
+  @ApiQuery({ name: 'limit', required: false })
+  getFilteredProducts(
+    @Query('categoryId') categoryId: string,
+    @CurrentUser() user: Prisma.User,
+    @Query() query: CategoryViewQueryDto,
+  ) {
+    return this.productsService.findByCategoryAndZone(
+      categoryId,
+      user,
+      query.page,
+      query.limit,
+      query.search,
+    );
+  }
+
+  @Get('category/:categoryId/discovery')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Prisma.UserRole.CUSTOMER)
+  @ApiOperation({
+    summary: 'Get products and available categories in the user zone',
+  })
+  getCategoryDiscovery(
+    @Param('categoryId') categoryId: string,
+    @CurrentUser() user: Prisma.User,
+    @Query() query: CategoryViewQueryDto,
+  ) {
+    return this.productsService.getCategoryViewData(
+      categoryId,
+      user,
+      query.page,
+      query.limit,
+      query.search,
+    );
+  }
+
+  @Get('offers')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Prisma.UserRole.CUSTOMER)
+  @ApiOperation({
+    summary:
+      'Get product offers (>= 20% discount and has reviews) in customer zone',
+  })
+  getOffers(@CurrentUser() user: Prisma.User) {
+    return this.productsService.findOffers(user);
+  }
+
   @Get(':id')
   @ApiOperation({ summary: 'Get a product by ID' })
   findOne(@Param('id') id: string) {
     return this.productsService.findOne(id);
-  }
-
-  @Get('category/:categoryId/zone-filtered')
-  @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard)
-  @ApiOperation({ summary: 'Get products by category filtered by user zone' })
-  getByCategoryAndZone(
-    @Param('categoryId') categoryId: string,
-    @CurrentUser() user: Prisma.User,
-  ) {
-    return this.productsService.findByCategoryAndZone(categoryId, user);
   }
 
   @Patch(':id')

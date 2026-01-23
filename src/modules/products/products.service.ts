@@ -228,28 +228,48 @@ export class ProductsService {
     return response;
   }
 
-  async findByCategoryAndZone(categoryId: string, user: User) {
+  async findByCategoryAndZone(
+    categoryId: string,
+    user: User,
+    page: number = 1,
+    limit: number = 20,
+    search?: string,
+  ) {
     if (!user.zoneId) {
       return [];
     }
 
-    const cacheKey = this.CACHE_KEYS.BY_CATEGORY_ZONE(categoryId, user.zoneId);
+    const skip = (page - 1) * limit;
+
+    const cacheKey = `${this.CACHE_KEYS.BY_CATEGORY_ZONE(categoryId, user.zoneId)}:p${page}:l${limit}:s${search || ''}`;
     const cached = await this.redisService.get<any[]>(cacheKey);
     if (cached) return cached;
 
-    const products = await this.prisma.product.findMany({
-      where: {
-        categoryId,
+    const where: Prisma.ProductWhereInput = {
+      categoryId,
+      isActive: true,
+      isPublish: true,
+      vendor: {
+        zoneId: user.zoneId,
         isActive: true,
-        isPublish: true, // Only show published products to customers
-        vendor: {
-          zoneId: user.zoneId,
-          isActive: true,
-        },
       },
+    };
+
+    if (search) {
+      where.OR = [
+        { name: { contains: search, mode: 'insensitive' } },
+        { description: { contains: search, mode: 'insensitive' } },
+      ];
+    }
+
+    const products = await this.prisma.product.findMany({
+      where,
+      skip,
+      take: limit,
       include: {
         extras: true,
         itemAttributes: true,
+        vendor: true,
       },
       orderBy: { createdAt: 'desc' },
     });
@@ -464,6 +484,51 @@ export class ProductsService {
     );
   }
 
+  async findOffers(user: User) {
+    if (!user.zoneId) {
+      return [];
+    }
+
+    const products = await this.prisma.product.findMany({
+      where: {
+        isActive: true,
+        isPublish: true,
+        vendor: {
+          zoneId: user.zoneId,
+          isActive: true,
+        },
+        discountPrice: { not: null },
+      },
+      include: {
+        extras: true,
+        itemAttributes: true,
+        vendor: true,
+        _count: {
+          select: { orderItems: true },
+        },
+      },
+      orderBy: [
+        { reviewsCount: 'desc' },
+        { createdAt: 'desc' },
+      ],
+    });
+
+    const offers = products.filter((product) => {
+      const price = Number(product.price);
+      const discountPrice = Number(product.discountPrice);
+      if (price <= 0 || !discountPrice) return false;
+      const discountPercentage = ((price - discountPrice) / price) * 100;
+      return discountPercentage >= 20;
+    });
+
+    // Optionally sort by top sell (order items count)
+    const sortedOffers = offers.sort((a, b) =>
+      (b as any)._count.orderItems - (a as any)._count.orderItems
+    );
+
+    return sortedOffers.map((p) => this.mapProductResponse(p as any));
+  }
+
   private async validateProductPrice(price: number, discountPrice?: number) {
     if (price <= 0) {
       throw new BadRequestException('PRICE_NON_POSITIVE');
@@ -546,6 +611,43 @@ export class ProductsService {
         Object.keys(attributesObj).length > 0
           ? JSON.stringify(attributesObj)
           : null,
+    };
+  }
+
+  async getCategoryViewData(
+    categoryId: string,
+    user: User,
+    page: number = 1,
+    limit: number = 20,
+    search?: string,
+  ) {
+    if (!user.zoneId) {
+      throw new BadRequestException('USER_ZONE_REQUIRED');
+    }
+
+    const [products, categories] = await Promise.all([
+      this.findByCategoryAndZone(categoryId, user, page, limit, search),
+      this.prisma.category.findMany({
+        where: {
+          isActive: true,
+          products: {
+            some: {
+              isActive: true,
+              isPublish: true,
+              vendor: {
+                zoneId: user.zoneId,
+                isActive: true,
+              },
+            },
+          },
+        },
+        orderBy: { arabicName: 'asc' },
+      }),
+    ]);
+
+    return {
+      products,
+      categories,
     };
   }
 }

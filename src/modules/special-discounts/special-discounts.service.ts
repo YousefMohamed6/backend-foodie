@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { DiscountType } from '@prisma/client';
+import { DiscountType, User } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { RedisService } from '../../shared/services/redis.service';
 import { CreateSpecialDiscountDto, SpecialDiscountDto } from './dto/create-special-discount.dto';
@@ -220,6 +220,29 @@ export class SpecialDiscountsService {
             couponCode: discount.couponCode,
             photo: discount.photo,
         };
+    }
+
+    async findByZone(user: User) {
+        if (!user.zoneId) return [];
+        return this.prisma.specialDiscount.findMany({
+            where: {
+                isActive: true,
+                isPublish: true,
+                vendor: {
+                    zoneId: user.zoneId,
+                    isActive: true,
+                    subscriptionExpiryDate: { gt: new Date() },
+                },
+            },
+            include: {
+                vendor: {
+                    include: {
+                        vendorType: true,
+                    },
+                },
+            },
+            orderBy: { createdAt: 'desc' },
+        });
     }
 }
 

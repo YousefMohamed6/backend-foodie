@@ -60,6 +60,14 @@ export class CouponsController {
     return this.couponsService.findAll(query, user);
   }
 
+  @Get('customer/zone')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.CUSTOMER)
+  @ApiOperation({ summary: 'Get coupons from vendors in the customer zone' })
+  findInMyZone(@CurrentUser() user: User) {
+    return this.couponsService.findByZone(user);
+  }
+
   @Get(':id')
   @ApiOperation({ summary: 'Get coupon by ID' })
   findOne(@Param('id') id: string) {

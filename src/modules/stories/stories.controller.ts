@@ -34,6 +34,15 @@ export class StoriesController {
     return this.storiesService.findAll(vendorId, user);
   }
 
+  @Get('customer/zone')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Prisma.UserRole.CUSTOMER)
+  @ApiOperation({ summary: 'Get stories from vendors in the customer zone' })
+  findInMyZone(@CurrentUser() user: Prisma.User) {
+    return this.storiesService.findAll(undefined, user);
+  }
+
   @Get('me')
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, RolesGuard)

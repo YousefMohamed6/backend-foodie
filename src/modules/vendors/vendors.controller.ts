@@ -60,6 +60,27 @@ export class VendorsController {
     return this.vendorsService.findAll({ page, limit, zoneId }, user);
   }
 
+  @Get('customer/filter')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.CUSTOMER)
+  @ApiOperation({
+    summary: 'Get vendors by type filtered by customer zone (Customer only)',
+  })
+  @ApiQuery({ name: 'vendorTypeId', required: true, type: String })
+  @ApiQuery({ name: 'page', required: false, type: Number })
+  @ApiQuery({ name: 'limit', required: false, type: Number })
+  customerFilter(
+    @Query('vendorTypeId') vendorTypeId: string,
+    @Query('page') page?: number,
+    @Query('limit') limit?: number,
+    @CurrentUser() user?: User,
+  ) {
+    return this.vendorsService.findAll(
+      { vendorTypeId, page, limit },
+      user,
+    );
+  }
+
   @Get('search')
   @ApiOperation({ summary: 'Search vendors' })
   @ApiQuery({ name: 'q', required: true })

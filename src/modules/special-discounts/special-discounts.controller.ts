@@ -1,6 +1,7 @@
 import { Body, Controller, Delete, Get, Param, Patch, Post, Request, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiBody, ApiOperation, ApiTags } from '@nestjs/swagger';
-import { UserRole } from '@prisma/client';
+import * as client from '@prisma/client';
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
@@ -16,16 +17,25 @@ export class SpecialDiscountsController {
     @Post()
     @ApiBearerAuth()
     @UseGuards(JwtAuthGuard, RolesGuard)
-    @Roles(UserRole.VENDOR)
+    @Roles(client.UserRole.VENDOR)
     @ApiOperation({ summary: 'Create or update special discount' })
     createOrUpdate(@Body() createDto: CreateSpecialDiscountDto, @Request() req) {
         return this.specialDiscountsService.createOrUpdate(req.user.id, createDto);
     }
 
+    @Get('customer/zone')
+    @ApiBearerAuth()
+    @UseGuards(JwtAuthGuard, RolesGuard)
+    @Roles(client.UserRole.CUSTOMER)
+    @ApiOperation({ summary: 'Get special discounts from vendors in the customer zone' })
+    findInMyZone(@CurrentUser() user: client.User) {
+        return this.specialDiscountsService.findByZone(user);
+    }
+
     @Get()
     @ApiBearerAuth()
     @UseGuards(JwtAuthGuard, RolesGuard)
-    @Roles(UserRole.VENDOR)
+    @Roles(client.UserRole.VENDOR)
     @ApiOperation({ summary: 'Get special discount' })
     findOne(@Request() req) {
         return this.specialDiscountsService.findOne(req.user.id);
@@ -34,7 +44,7 @@ export class SpecialDiscountsController {
     @Patch(':id')
     @ApiBearerAuth()
     @UseGuards(JwtAuthGuard, RolesGuard)
-    @Roles(UserRole.VENDOR)
+    @Roles(client.UserRole.VENDOR)
     @ApiOperation({ summary: 'Update specific special discount' })
     update(@Param('id') id: string, @Body() dto: Partial<CreateSpecialDiscountDto['discount'][0]>, @Request() req) {
         return this.specialDiscountsService.update(req.user.id, id, dto);
@@ -43,7 +53,7 @@ export class SpecialDiscountsController {
     @Delete(':id')
     @ApiBearerAuth()
     @UseGuards(JwtAuthGuard, RolesGuard)
-    @Roles(UserRole.VENDOR)
+    @Roles(client.UserRole.VENDOR)
     @ApiOperation({ summary: 'Delete specific special discount' })
     remove(@Param('id') id: string, @Request() req) {
         return this.specialDiscountsService.remove(req.user.id, id);
@@ -52,7 +62,7 @@ export class SpecialDiscountsController {
     @Post('validate')
     @ApiBearerAuth()
     @UseGuards(JwtAuthGuard, RolesGuard)
-    @Roles(UserRole.CUSTOMER)
+    @Roles(client.UserRole.CUSTOMER)
     @ApiOperation({ summary: 'Validate a coupon code (Customer only)' })
     @ApiBody({ type: ValidateSpecialDiscountDto })
     validate(@Body() dto: ValidateSpecialDiscountDto) {

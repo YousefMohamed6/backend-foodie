@@ -7,29 +7,27 @@ import {
   WebSocketGateway,
   WebSocketServer,
 } from '@nestjs/websockets';
+import { Vendor } from '@prisma/client';
 import { Server, Socket } from 'socket.io';
 import { VendorsService } from './vendors.service';
-import { Vendor } from '@prisma/client';
 
 @WebSocketGateway({
   cors: {
     origin: '*',
   },
-  namespace: 'vendors',
 })
 export class VendorsGateway
-  implements OnGatewayConnection, OnGatewayDisconnect
-{
+  implements OnGatewayConnection, OnGatewayDisconnect {
   @WebSocketServer()
   server: Server;
 
-  constructor(private readonly vendorsService: VendorsService) {}
+  constructor(private readonly vendorsService: VendorsService) { }
 
-  handleConnection(client: Socket) {}
+  handleConnection(client: Socket) { }
 
-  handleDisconnect(client: Socket) {}
+  handleDisconnect(client: Socket) { }
 
-  @SubscribeMessage('requestNearbyVendors')
+  @SubscribeMessage('vendors:nearest')
   async handleRequestNearbyVendors(
     @MessageBody()
     data: {
@@ -41,7 +39,6 @@ export class VendorsGateway
     },
     @ConnectedSocket() client: Socket,
   ) {
-    // This is a one-time request over socket, but could be polled or pushed
     const vendors = await this.vendorsService.findNearest(
       data.latitude,
       data.longitude,
@@ -49,10 +46,11 @@ export class VendorsGateway
       data.isDining,
       data.categoryId,
     );
-    return { event: 'nearby_vendors', vendors };
+    client.emit('vendors:nearest:update', vendors);
+    return vendors;
   }
 
-  @SubscribeMessage('watchNearestVendors')
+  @SubscribeMessage('vendors:watch')
   handleWatchNearestVendors(
     @MessageBody()
     data: {
@@ -69,7 +67,7 @@ export class VendorsGateway
     return { event: 'watching_vendors', data };
   }
 
-  @SubscribeMessage('stopWatchNearestVendors')
+  @SubscribeMessage('vendors:stop_watch')
   handleStopWatchNearestVendors(
     @MessageBody()
     data: {

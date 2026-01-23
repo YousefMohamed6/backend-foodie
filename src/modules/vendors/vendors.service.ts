@@ -241,6 +241,7 @@ export class VendorsService {
       page?: number | string;
       limit?: number | string;
       zoneId?: string;
+      vendorTypeId?: string;
     } = {},
     user?: User,
   ) {
@@ -252,7 +253,9 @@ export class VendorsService {
       user?.role === UserRole.CUSTOMER && user.zoneId
         ? user.zoneId
         : query.zoneId;
-    const cacheKey = this.CACHE_KEYS.ALL_VENDORS(zoneId, page, limit);
+
+    // Update cache key to include vendorTypeId
+    const cacheKey = `${this.CACHE_KEYS.ALL_VENDORS(zoneId, page, limit)}:${query.vendorTypeId || 'all'}`;
 
     const cached = await this.redisService.get<any[]>(cacheKey);
     if (cached) return cached;
@@ -263,6 +266,10 @@ export class VendorsService {
 
     if (zoneId) {
       where.zoneId = zoneId;
+    }
+
+    if (query.vendorTypeId) {
+      where.vendorTypeId = query.vendorTypeId;
     }
 
     const vendors = await this.prisma.vendor.findMany({

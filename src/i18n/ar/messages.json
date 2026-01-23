@@ -171,5 +171,7 @@
     "PLEASE_LOG_IN": "يجب تسجيل الدخول",
     "SPECIAL_DISCOUNT_INVALID": "الخصم الخاص غير صالح",
     "DRIVER_BUSY": "السائق مشغول حالياً بطلب آخر",
-    "DRIVER_OFFLINE": "السائق غير متصل حالياً أو غير متاح"
+    "DRIVER_OFFLINE": "السائق غير متصل حالياً أو غير متاح",
+    "INVALID_EMAIL": "البريد الإلكتروني غير صالح",
+    "VENDOR_TYPE_NOT_FOUND": "نوع المتجر غير موجود"
 }

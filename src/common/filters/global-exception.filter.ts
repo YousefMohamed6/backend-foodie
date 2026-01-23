@@ -36,7 +36,19 @@ export class GlobalExceptionFilter implements ExceptionFilter {
         // This is likely a validation error from ValidationPipe
         messageKey = 'messages.VALIDATION_ERROR';
         errorCode = 'ERR_VALIDATION';
-        details = exceptionResponse.message; // Array of field validation messages
+        // Translate each validation message
+        const lang = request.headers['x-lang']?.toString() || 'ar';
+        const translatedDetails = await Promise.all(
+          exceptionResponse.message.map(async (msg: string) => {
+            // Check if message is an i18n key (uppercase with underscores)
+            if (/^[A-Z][A-Z0-9_]*$/.test(msg)) {
+              const translated = await this.i18n.translate(`messages.${msg}`, { lang });
+              return translated !== `messages.${msg}` ? translated : msg;
+            }
+            return msg;
+          })
+        );
+        details = translatedDetails;
       } else {
         const rawMessage =
           typeof exceptionResponse === 'string'

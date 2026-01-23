@@ -179,7 +179,7 @@ model Vendor {
   author                  User                    @relation("VendorAuthor", fields: [authorId], references: [id])
   subscription            Subscription?           @relation("VendorSubscription", fields: [subscriptionId], references: [id])
   subscriptionPlan        SubscriptionPlan?       @relation(fields: [subscriptionPlanId], references: [id])
-  vendorType              VendorType              @relation(fields: [vendorTypeId], references: [id])
+  vendorType              VendorType              @relation(fields: [vendorTypeId], references: [id], onDelete: Restrict)
   zone                    Zone                    @relation(fields: [zoneId], references: [id])
   categories              Category[]              @relation("VendorCategories")
   documents               VendorDocument[]
@@ -429,6 +429,9 @@ model VendorType {
   id          String   @id @default(uuid())
   englishName String
   arabicName  String
+  photo       String?
+  isActive    Boolean  @default(true) @map("is_active")
+  showOnHome  Boolean  @default(false) @map("show_on_homepage")
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
   vendors     Vendor[]

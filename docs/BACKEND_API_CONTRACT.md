@@ -731,7 +731,7 @@ Response: {
 GET /api/v1/favourites/items
 Headers: Authorization: Bearer {token}
 Response: {
-  "favourites": FavouriteItemModel[]
+  "favourites": FavouriteVendorModel[]
 }
 ```
 
@@ -742,7 +742,7 @@ Headers: Authorization: Bearer {token}
 Body: {
   "productId": "string"
 }
-Response: FavouriteItemModel
+Response: FavouriteVendorModel
 ```
 
 #### Remove Favourite Item
