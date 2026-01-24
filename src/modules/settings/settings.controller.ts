@@ -9,7 +9,7 @@ import { SettingsService } from './settings.service';
 @ApiTags('Settings')
 @Controller('settings')
 export class SettingsController {
-  constructor(private readonly settingsService: SettingsService) {}
+  constructor(private readonly settingsService: SettingsService) { }
 
   // Specific routes must come BEFORE generic routes
   @Get('app')
@@ -19,66 +19,14 @@ export class SettingsController {
     return settings;
   }
 
-  @Get('about')
-  @ApiOperation({ summary: 'Get about us content' })
-  getAbout() {
-    return this.settingsService.findOne('about_us');
-  }
-
-  @Get('terms')
-  @ApiOperation({ summary: 'Get terms and conditions' })
-  getTerms() {
-    return this.settingsService.findOne('terms_and_conditions');
-  }
-
-  @Get('privacy')
-  @ApiOperation({ summary: 'Get privacy policy' })
-  getPrivacy() {
-    return this.settingsService.findOne('privacy_policy');
-  }
-
-  @Get('wallet')
-  @ApiOperation({ summary: 'Get wallet settings' })
-  async getWalletSettings() {
-    try {
-      const setting = await this.settingsService.findOne('walletSettings');
-      return JSON.parse(setting);
-    } catch {
-      return {};
-    }
-  }
-
-  @Get('cod')
-  @ApiOperation({ summary: 'Get COD settings' })
-  async getCODSettings() {
-    try {
-      const setting = await this.settingsService.findOne('CODSettings');
-      return JSON.parse(setting);
-    } catch {
-      return {};
-    }
-  }
-
   @Get('delivery')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.CUSTOMER)
   @ApiOperation({ summary: 'Get delivery charge settings' })
   async getDeliveryCharge() {
-    try {
-      const setting = await this.settingsService.findOne('DeliveryCharge');
-      return JSON.parse(setting);
-    } catch {
-      return {};
-    }
-  }
-
-  @Get('restaurant')
-  @ApiOperation({ summary: 'Get restaurant settings' })
-  async getRestaurantSettings() {
-    try {
-      const setting = await this.settingsService.findOne('restaurant');
-      return JSON.parse(setting);
-    } catch {
-      return {};
-    }
+    const settings = await this.settingsService.getDeliverySettings();
+    return settings;
   }
 
   // Generic routes come AFTER specific routes

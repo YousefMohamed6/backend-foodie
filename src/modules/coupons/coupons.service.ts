@@ -23,7 +23,10 @@ export class CouponsService {
     let vendorId = createCouponDto.vendorId || null;
     if (user.role === UserRole.VENDOR) {
       const vendor = await this.vendorsService.findByAuthor(user.id);
-      vendorId = vendor?.id || null;
+      if (!vendor) {
+        throw new BadRequestException('VENDOR_PROFILE_NOT_FOUND');
+      }
+      vendorId = vendor.id;
     }
     return this.prisma.coupon.create({
       data: {
@@ -51,20 +54,19 @@ export class CouponsService {
     const isAdmin = user?.role === UserRole.ADMIN;
     const isVendor = user?.role === UserRole.VENDOR;
 
-    if (isAdmin) {
-      // Admin sees all coupons, optionally filtered by vendorId
-      if (query.vendorId) {
-        where.vendorId = query.vendorId;
-      }
-    } else if (isVendor) {
+    if (isVendor) {
       // Vendor sees only their own active coupons
       const currentVendor = await this.vendorsService.findByAuthor(user.id);
       if (currentVendor) {
         where.vendorId = currentVendor.id;
-        where.isActive = true;
       } else {
         // Vendor without a vendor profile sees nothing
         return [];
+      }
+    } else if (isAdmin) {
+      // Admin sees all coupons, optionally filtered by vendorId
+      if (query.vendorId) {
+        where.vendorId = query.vendorId;
       }
     } else {
       // Customer or unauthenticated user sees only public and active coupons
@@ -98,7 +100,11 @@ export class CouponsService {
         vendor: {
           zoneId: user.zoneId,
           isActive: true,
-          subscriptionExpiryDate: { gt: new Date() },
+          // Allow vendors without subscription or with valid subscription
+          OR: [
+            { subscriptionExpiryDate: null },
+            { subscriptionExpiryDate: { gt: new Date() } },
+          ],
         },
       },
       include: {
@@ -114,11 +120,23 @@ export class CouponsService {
 
   async findOne(id: string) {
     const coupon = await this.prisma.coupon.findUnique({ where: { id } });
+    if (!coupon) {
+      throw new NotFoundException('COUPON_NOT_FOUND');
+    }
     return coupon;
   }
 
-  async update(id: string, updateCouponDto: UpdateCouponDto) {
-    await this.findOne(id); // Check existence
+  async update(id: string, updateCouponDto: UpdateCouponDto, user: User) {
+    const coupon = await this.findOne(id);
+
+    if (user.role === UserRole.VENDOR) {
+      const vendor = await this.vendorsService.findByAuthor(user.id);
+      if (!vendor || coupon.vendorId !== vendor.id) {
+        throw new BadRequestException('UNAUTHORIZED_COUPON_UPDATE');
+      }
+      // Strictly prevent changing vendorId
+      delete updateCouponDto.vendorId;
+    }
 
     // transform dto dates/types if needed
     const data: Prisma.CouponUpdateInput = {
@@ -140,11 +158,7 @@ export class CouponsService {
   async remove(id: string, user: User) {
     const coupon = await this.findOne(id);
 
-    if (!coupon) {
-      throw new NotFoundException('COUPON_NOT_FOUND');
-    }
-
-    // Vendors can only delete their own coupons
+    // Vendors can only deactivate their own coupons
     if (user.role === UserRole.VENDOR) {
       const vendor = await this.vendorsService.findByAuthor(user.id);
       if (!vendor || coupon.vendorId !== vendor.id) {

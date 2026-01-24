@@ -5,8 +5,7 @@ import {
   Get,
   Param,
   Post,
-  Query,
-  UseGuards,
+  UseGuards
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { UserRole } from '@prisma/client';
@@ -19,12 +18,12 @@ import { CreateBannerDto } from './dto/create-banner.dto';
 @ApiTags('Banners')
 @Controller('banners')
 export class BannersController {
-  constructor(private readonly bannersService: BannersService) {}
+  constructor(private readonly bannersService: BannersService) { }
 
   @Get()
   @ApiOperation({ summary: 'Get all banners' })
-  findAll(@Query('position') position?: string) {
-    return this.bannersService.findAll(position);
+  findAll() {
+    return this.bannersService.findAll();
   }
 
   @Post()

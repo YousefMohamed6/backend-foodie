@@ -8,7 +8,7 @@ import {
 import { DiscountType } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CouponsService } from '../coupons/coupons.service';
-import { APP_SETTINGS } from '../settings/settings.constants';
+import { APP_SETTINGS, DEFAULT_APP_SETTINGS } from '../settings/settings.constants';
 import { SpecialDiscountsService } from '../special-discounts/special-discounts.service';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { ORDERS_ERRORS } from './orders.constants';
@@ -42,21 +42,15 @@ export class OrderPricingService {
       },
     });
 
-    const commissionPercentSetting = Number(
-      settings.find((s) => s.key === APP_SETTINGS.VENDOR_COMMISSION_RATE)
-        ?.value || 0,
-    );
-    const minDeliveryFee = Number(
-      settings.find((s) => s.key === APP_SETTINGS.MIN_DELIVERY_FEE)?.value || 0,
-    );
-    const deliveryFeePerKm = Number(
-      settings.find((s) => s.key === APP_SETTINGS.DELIVERY_FEE_PER_KM)?.value ||
-      0,
-    );
-    const firstOrderFreeDeliveryEnabled =
-      settings.find(
-        (s) => s.key === APP_SETTINGS.FIRST_ORDER_FREE_DELIVERY_ENABLED,
-      )?.value === 'true';
+    const getSetting = (key: string) => {
+      const setting = settings.find((s) => s.key === key);
+      return setting ? setting.value : DEFAULT_APP_SETTINGS[key];
+    };
+
+    const commissionPercentSetting = Number(getSetting(APP_SETTINGS.VENDOR_COMMISSION_RATE) || 0);
+    const minDeliveryFee = Number(getSetting(APP_SETTINGS.MIN_DELIVERY_FEE) || 0);
+    const deliveryFeePerKm = Number(getSetting(APP_SETTINGS.DELIVERY_FEE_PER_KM) || 0);
+    const firstOrderFreeDeliveryEnabled = getSetting(APP_SETTINGS.FIRST_ORDER_FREE_DELIVERY_ENABLED) === 'true';
 
     const vendor = await this.prisma.vendor.findUnique({
       where: { id: createOrderDto.vendorId },
@@ -184,6 +178,7 @@ export class OrderPricingService {
       vendorEarnings,
       totalAmount,
       deliveryCharge,
+      deliveryFeePerKm,
       specialDiscountId,
     };
   }

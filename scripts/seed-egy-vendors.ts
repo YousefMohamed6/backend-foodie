@@ -4,7 +4,7 @@ import * as bcrypt from 'bcrypt';
 const prisma = new PrismaClient();
 
 async function main() {
-    console.log('Seeding Egyptian vendors in Dekernes zone...');
+    console.log('Updating Egyptian vendors in Dekernes zone...');
 
     const zone = await prisma.zone.findFirst({
         where: { englishName: 'Dekernes' },
@@ -66,6 +66,38 @@ async function main() {
 
     const hashedPassword = await bcrypt.hash('password123', 10);
 
+    const categoryImages: Record<string, string[]> = {
+        'Fast Food': [
+            'https://images.unsplash.com/photo-1561758033-d89a9ad46330?q=80&w=600',
+            'https://images.unsplash.com/photo-1563379091339-03b21bc4a6f8?q=80&w=600',
+            'https://images.unsplash.com/photo-1594212699903-ec8a3eca50f5?q=80&w=600',
+            'https://images.unsplash.com/photo-1562967914-608f82629710?q=80&w=600',
+        ],
+        'Pizza': [
+            'https://images.unsplash.com/photo-1513104890138-7c749659a591?q=80&w=600',
+            'https://images.unsplash.com/photo-1604382354936-07c5d9983bd3?q=80&w=600',
+            'https://images.unsplash.com/photo-1574123853664-6ec568858348?q=80&w=600',
+            'https://images.unsplash.com/photo-1571997478779-2adcbbe9bb2f?q=80&w=600',
+        ],
+        'Burgers': [
+            'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?q=80&w=600',
+            'https://images.unsplash.com/photo-1571091718767-18b5b1457add?q=80&w=600',
+            'https://images.unsplash.com/photo-1550547660-d9450f859349?q=80&w=600',
+        ],
+        'Desserts': [
+            'https://images.unsplash.com/photo-1551024506-0bccd828d307?q=80&w=600',
+            'https://images.unsplash.com/photo-1495147466023-ac5c588e2e94?q=80&w=600',
+            'https://images.unsplash.com/photo-1563729784474-d77dbb933a9e?q=80&w=600',
+            'https://images.unsplash.com/photo-1587314168485-3236d6710814?q=80&w=600',
+        ],
+        'Grills': [
+            'https://images.unsplash.com/photo-1555939594-58d7cb561ad1?q=80&w=600',
+            'https://images.unsplash.com/photo-1544025162-d76694265947?q=80&w=600',
+            'https://images.unsplash.com/photo-1529193591184-b1d58069ecdd?q=80&w=600',
+            'https://images.unsplash.com/photo-1598103442097-8b74394b95c6?q=80&w=600',
+        ]
+    };
+
     for (const vData of egyptianVendors) {
         // 1. Create or Find User for vendor
         let user = await prisma.user.findUnique({ where: { email: vData.email } });
@@ -83,7 +115,7 @@ async function main() {
             });
         }
 
-        // 2. Create Vendor
+        // 2. Create/Update Vendor
         const vendor = await prisma.vendor.upsert({
             where: { authorId: user.id },
             update: {
@@ -112,42 +144,91 @@ async function main() {
 
         console.log(`Processing vendor: ${vendor.title}`);
 
-        // 3. Add 1 Product for every category
+        // 3. Add or Update Product for every category
         for (const cat of categories) {
             const productName = `${cat.arabicName} من ${vendor.title}`;
-            await prisma.product.create({
-                data: {
+
+            // Randomize quantity: -1 (unlimited) or 10-100
+            const randomQty = Math.random() > 0.3 ? -1 : 10 + Math.floor(Math.random() * 91);
+
+            // Get a random real image for this category
+            const images = categoryImages[cat.englishName || 'Fast Food'] || categoryImages['Fast Food'];
+            const randomImage = images[Math.floor(Math.random() * images.length)];
+
+            const existingProduct = await prisma.product.findFirst({
+                where: {
                     name: productName,
-                    description: `وصف لذيذ لـ ${productName} - جودة ممتازة وسعر مناسب`,
-                    price: 50 + Math.floor(Math.random() * 200),
-                    discountPrice: 40 + Math.floor(Math.random() * 150),
-                    image: vData.photo,
-                    categoryId: cat.id,
                     vendorId: vendor.id,
-                    isActive: true,
+                },
+            });
+
+            if (existingProduct) {
+                await prisma.product.update({
+                    where: { id: existingProduct.id },
+                    data: {
+                        image: randomImage,
+                        quantity: randomQty,
+                        isActive: true,
+                        isPublish: true,
+                    },
+                });
+            } else {
+                await prisma.product.create({
+                    data: {
+                        name: productName,
+                        description: `وصف لذيذ لـ ${productName} - جودة ممتازة وسعر مناسب`,
+                        price: 50 + Math.floor(Math.random() * 200),
+                        discountPrice: 40 + Math.floor(Math.random() * 150),
+                        image: randomImage,
+                        quantity: randomQty,
+                        categoryId: cat.id,
+                        vendorId: vendor.id,
+                        isActive: true,
+                        isPublish: true,
+                    },
+                });
+            }
+        }
+
+        // 4. Upsert Discount (SpecialDiscount)
+        const existingDiscount = await prisma.specialDiscount.findFirst({
+            where: { vendorId: vendor.id }
+        });
+
+        if (existingDiscount) {
+            await prisma.specialDiscount.update({
+                where: { id: existingDiscount.id },
+                data: {
+                    photo: vData.photo,
                     isPublish: true,
+                    isActive: true,
+                }
+            });
+        } else {
+            await prisma.specialDiscount.create({
+                data: {
+                    vendorId: vendor.id,
+                    discount: 25,
+                    discountType: DiscountType.PERCENTAGE,
+                    couponCode: `SAVE25_${vendor.id.substring(0, 4)}`,
+                    photo: vData.photo,
+                    endDate: new Date(Date.now() + 1000 * 60 * 60 * 24 * 30), // 30 days
+                    isPublish: true,
+                    isActive: true,
                 },
             });
         }
 
-        // 4. Add 1 Discount (SpecialDiscount)
-        await prisma.specialDiscount.create({
-            data: {
-                vendorId: vendor.id,
-                discount: 25,
-                discountType: DiscountType.PERCENTAGE,
-                couponCode: `SAVE25_${vendor.id.substring(0, 4)}`,
-                photo: vData.photo,
-                endDate: new Date(Date.now() + 1000 * 60 * 60 * 24 * 30), // 30 days
-                isPublish: true,
+        // 5. Upsert Coupon
+        const couponCode = `WELCOME_${vendor.id.substring(0, 4)}`;
+        await prisma.coupon.upsert({
+            where: { code: couponCode },
+            update: {
                 isActive: true,
+                isPublic: true,
             },
-        });
-
-        // 5. Add 1 Coupon
-        await prisma.coupon.create({
-            data: {
-                code: `WELCOME_${vendor.id.substring(0, 4)}`,
+            create: {
+                code: couponCode,
                 name: `خصم ترحيبي من ${vendor.title}`,
                 discount: "20",
                 discountType: 'percentage',
@@ -160,19 +241,53 @@ async function main() {
             },
         });
 
-        // 6. Add 1 Story
-        await prisma.story.create({
-            data: {
-                vendorId: vendor.id,
-                mediaUrl: vData.photo,
+        // 6. Add/Update Stories (mix of videos and images)
+        // Using reliable sample video sources
+        const storyMedia = [
+            {
+                url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4',
+                type: 'video',
                 duration: 15,
-                mediaType: 'image',
-                isActive: true,
             },
+            {
+                url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4',
+                type: 'video',
+                duration: 12,
+            },
+            {
+                url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerFun.mp4',
+                type: 'video',
+                duration: 10,
+            },
+            {
+                url: vData.photo,
+                type: 'image',
+                duration: 5,
+            },
+        ];
+
+        // Delete existing stories for this vendor
+        await prisma.story.deleteMany({
+            where: { vendorId: vendor.id }
         });
+
+        // Create new stories with real videos
+        for (let i = 0; i < storyMedia.length; i++) {
+            const media = storyMedia[i];
+            await prisma.story.create({
+                data: {
+                    vendorId: vendor.id,
+                    mediaUrl: media.url,
+                    duration: media.duration,
+                    mediaType: media.type,
+                    isActive: true,
+                },
+            });
+        }
+        console.log(`Added ${storyMedia.length} stories for ${vendor.title}`);
     }
 
-    console.log('Seeding completed successfully!');
+    console.log('Update completed successfully!');
 }
 
 main()

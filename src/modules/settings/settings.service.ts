@@ -151,4 +151,22 @@ export class SettingsService {
     }
     return result;
   }
+
+  async getDeliverySettings() {
+    const deliveryKeys = [
+      APP_SETTINGS.MIN_DELIVERY_FEE,
+      APP_SETTINGS.DELIVERY_FEE_PER_KM,
+      APP_SETTINGS.MIN_DELIVERY_PAY,
+    ];
+
+    const allSettings = await this.findAll();
+    const result: Record<string, number> = {};
+
+    for (const key of deliveryKeys) {
+      if (allSettings[key]) {
+        result[key] = parseFloat(allSettings[key]) || 0;
+      }
+    }
+    return result;
+  }
 }

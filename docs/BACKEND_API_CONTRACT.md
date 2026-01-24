@@ -345,7 +345,7 @@ Body: {
     "price": number
   }],
   "address": ShippingAddress,
-  "paymentMethod": "cod" | "wallet" | "card" | "other",
+  "paymentMethod": "cash" | "wallet" | "card" | "other",
   "couponId": "string",
   "cashbackId": "string",
   "deliveryCharge": number,

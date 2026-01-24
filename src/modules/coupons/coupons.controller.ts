@@ -12,10 +12,10 @@ import {
 import { OptionalJwtAuthGuard } from '../../common/guards/optional-jwt-auth.guard';
 
 import {
+  ApiBasicAuth,
   ApiBearerAuth,
   ApiOperation,
-  ApiQuery,
-  ApiTags,
+  ApiTags
 } from '@nestjs/swagger';
 import { UserRole, type User } from '@prisma/client';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
@@ -42,25 +42,27 @@ export class CouponsController {
     return this.couponsService.create(createCouponDto, user);
   }
 
+  @Get()
+  @UseGuards(OptionalJwtAuthGuard)
+  @ApiOperation({ summary: 'Find all coupons' })
+  findAll(
+    @Query() query: FindAllCouponsQueryDto,
+    @CurrentUser() user: User,
+  ) {
+    return this.couponsService.findAll(query, user);
+  }
+
   @Get('home')
+  @ApiBasicAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.CUSTOMER)
   @ApiOperation({ summary: 'Get all public coupons for home' })
   findHome() {
     return this.couponsService.findAll({ isPublic: true });
   }
 
-  @Get()
-  @UseGuards(OptionalJwtAuthGuard)
-  @ApiOperation({ summary: 'Get all coupons' })
-  @ApiQuery({ name: 'isPublic', required: false, type: Boolean })
-  @ApiQuery({ name: 'vendorId', required: false })
-  findAll(
-    @Query() query: FindAllCouponsQueryDto,
-    @CurrentUser() user?: User,
-  ) {
-    return this.couponsService.findAll(query, user);
-  }
-
   @Get('customer/zone')
+  @ApiBasicAuth()
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.CUSTOMER)
   @ApiOperation({ summary: 'Get coupons from vendors in the customer zone' })
@@ -78,8 +80,12 @@ export class CouponsController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.ADMIN, UserRole.VENDOR)
   @ApiOperation({ summary: 'Update a coupon' })
-  update(@Param('id') id: string, @Body() updateCouponDto: UpdateCouponDto) {
-    return this.couponsService.update(id, updateCouponDto);
+  update(
+    @Param('id') id: string,
+    @Body() updateCouponDto: UpdateCouponDto,
+    @CurrentUser() user: User,
+  ) {
+    return this.couponsService.update(id, updateCouponDto, user);
   }
 
   @Delete(':id')

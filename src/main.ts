@@ -7,7 +7,6 @@ import helmet from 'helmet';
 import { AppModule } from './app.module';
 import { SecureLoggingInterceptor } from './common/interceptors/secure-logging.interceptor';
 import { securityHeadersConfig } from './config/security-headers.config';
-import { RedisIoAdapter } from './common/adapters/redis-io.adapter';
 const cookieParser = require('cookie-parser');
 
 process.on('unhandledRejection', (reason, promise) => {
@@ -36,7 +35,7 @@ async function bootstrap() {
   app.use(helmet(securityHeadersConfig));
   app.use(cookieParser());
   app.setGlobalPrefix('api/v1', {
-    exclude: ['/api', '/api/*path'],
+    exclude: ['/api', '/api/*path', 'favicon.ico'],
   });
 
   const allowedOrigins = configService.get<string>('ALLOWED_ORIGINS');

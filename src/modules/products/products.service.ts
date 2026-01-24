@@ -189,8 +189,9 @@ export class ProductsService {
         // If publish is undefined or 'all', return all products (published and unpublished)
       }
     } else {
-      // Non-vendors (customers, guests) only see published products
+      // Non-vendors (customers, guests) only see published products with available quantity
       where.isPublish = true;
+      where.quantity = { not: 0 };
       if (query.vendorId) where.vendorId = query.vendorId;
     }
 
@@ -249,6 +250,7 @@ export class ProductsService {
       categoryId,
       isActive: true,
       isPublish: true,
+      quantity: { not: 0 },
       vendor: {
         zoneId: user.zoneId,
         isActive: true,
@@ -464,6 +466,7 @@ export class ProductsService {
 
     if (user?.role !== UserRole.VENDOR) {
       where.isPublish = true;
+      where.quantity = { not: 0 };
     }
 
     if (user?.role === UserRole.CUSTOMER && user.zoneId) {
@@ -493,6 +496,7 @@ export class ProductsService {
       where: {
         isActive: true,
         isPublish: true,
+        quantity: { not: 0 },
         vendor: {
           zoneId: user.zoneId,
           isActive: true,
@@ -634,6 +638,7 @@ export class ProductsService {
             some: {
               isActive: true,
               isPublish: true,
+              quantity: { not: 0 },
               vendor: {
                 zoneId: user.zoneId,
                 isActive: true,

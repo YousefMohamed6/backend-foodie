@@ -165,7 +165,7 @@ export class OrderCreationService {
                     orderTotal: calcs.totalAmount,
                     discountAmount: calcs.discountAmount,
                     distanceInKm: calcs.distance,
-                    deliveryPricePerKm: 0,
+                    deliveryPricePerKm: calcs.deliveryFeePerKm,
                     adminCommissionPercentage: calcs.adminCommissionPercentage,
                     adminCommissionAmount: calcs.adminCommissionAmount,
                     vendorEarnings: calcs.vendorEarnings,
