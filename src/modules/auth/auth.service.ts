@@ -18,6 +18,7 @@ import { normalizePhoneNumber } from '../../common/utils/phone.utils';
 import { PrismaService } from '../../prisma/prisma.service';
 import { RedisService } from '../../shared/services/redis.service';
 import { SmsService } from '../../shared/services/sms.service';
+import { TimeService } from '../../shared/services/time.service';
 import { UsersService } from '../users/users.service';
 import { VendorsService } from '../vendors/vendors.service';
 import { AUTH_ERRORS } from './auth.constants';
@@ -48,6 +49,7 @@ export class AuthService {
     private firebaseAuthService: FirebaseAuthService,
     private smsService: SmsService,
     private redisService: RedisService,
+    private timeService: TimeService,
     @Inject(forwardRef(() => VendorsService))
     private vendorsService: VendorsService,
   ) { }
@@ -401,7 +403,7 @@ export class AuthService {
         await this.revokeAllRefreshTokens(user.id);
         throw new ForbiddenException(AUTH_ERRORS.REFRESH_TOKEN_REUSE_DETECTED);
       }
-      if (storedToken.expiresAt < new Date()) {
+      if (storedToken.expiresAt < this.timeService.now()) {
         throw new ForbiddenException(AUTH_ERRORS.REFRESH_TOKEN_EXPIRED);
       }
 
@@ -480,7 +482,7 @@ export class AuthService {
     context?: { ip: string; userAgent: string; deviceId?: string },
   ) {
     const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
-    const expiryDate = new Date();
+    const expiryDate = this.timeService.now();
     expiryDate.setDate(expiryDate.getDate() + 7); // Should match config
 
     await this.prisma.refreshToken.create({

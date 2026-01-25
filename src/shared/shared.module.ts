@@ -16,6 +16,7 @@ import { NotificationService } from './services/notification.service';
 import { PaymentService } from './services/payment.service';
 import { RedisService } from './services/redis.service';
 import { SmsService } from './services/sms.service';
+import { TimeService } from './services/time.service';
 
 @Global()
 @Module({
@@ -55,6 +56,7 @@ import { SmsService } from './services/sms.service';
     FawaterakService,
     NotificationService,
     RedisService,
+    TimeService,
     SendEmailProcessor,
     SendPushNotificationProcessor,
     ProcessOrderProcessor,
@@ -70,6 +72,7 @@ import { SmsService } from './services/sms.service';
     FawaterakService,
     NotificationService,
     RedisService,
+    TimeService,
   ],
 })
-export class SharedModule {}
+export class SharedModule { }

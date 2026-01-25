@@ -71,6 +71,7 @@ model User {
   chatChannels             ChatChannel[]               @relation("UserChannels")
   withdrawRequests         WithdrawRequest[]
   payoutAccounts           PayoutAccount[]
+  paymentLogs              PaymentLog[]
 
   @@map("users")
 }
@@ -1703,4 +1704,27 @@ model SpecialDiscount {
 enum DiscountType {
   PERCENTAGE @map("percentage")
   FIXED      @map("fixed")
+}
+
+enum PaymentLogStatus {
+  PENDING
+  SUCCESS
+  FAILED
+}
+
+model PaymentLog {
+  id                  String           @id @default(uuid())
+  userId              String           @map("user_id")
+  invoiceId           String?          @map("invoice_id")
+  amount              Decimal          @db.Decimal(10, 2)
+  currency            String           @default("EGP")
+  status              PaymentLogStatus
+  provider            String           @default("FAWATERAK")
+  rawProviderResponse Json?            @map("raw_provider_response")
+  isProcessed         Boolean          @default(false) @map("is_processed")
+  createdAt           DateTime         @default(now()) @map("created_at")
+  updatedAt           DateTime         @updatedAt @map("updated_at")
+  user                User             @relation(fields: [userId], references: [id])
+
+  @@map("payment_logs")
 }

@@ -7,4 +7,5 @@ export default registerAs('app', () => ({
   jwtRefreshSecret: process.env.JWT_REFRESH_SECRET,
   jwtRefreshExpiration: process.env.JWT_REFRESH_EXPIRATION || '7d',
   url: process.env.APP_URL || 'http://localhost:3000',
+  baseUrl: process.env.APP_BASE_URL || 'http://localhost:3001',
 }));

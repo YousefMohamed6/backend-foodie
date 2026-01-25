@@ -3,6 +3,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { Prisma, TransactionType } from '@prisma/client';
 import crypto from 'crypto';
 import { PrismaService } from '../../prisma/prisma.service';
@@ -20,18 +21,19 @@ export class WalletService {
   constructor(
     private prisma: PrismaService,
     private readonly fawaterakService: FawaterakService,
-  ) {}
+    private readonly configService: ConfigService,
+  ) { }
 
   async getBalance(userId: string) {
     const getSum = async (type: TransactionType) => {
       const depositFilter =
         type === TransactionType.DEPOSIT
           ? {
-              OR: [
-                { paymentStatus: WalletConstants.PAYMENT_STATUS_PAID },
-                { paymentStatus: null },
-              ],
-            }
+            OR: [
+              { paymentStatus: WalletConstants.PAYMENT_STATUS_PAID },
+              { paymentStatus: null },
+            ],
+          }
           : {};
       const aggregations = await this.prisma.walletTransaction.aggregate({
         _sum: {
@@ -136,11 +138,12 @@ export class WalletService {
         email: user.email,
         phone: user.phoneNumber,
         address: WalletConstants.ADDRESS_NA,
+        customer_unique_id: userId,
       },
       redirectionUrls: {
-        successUrl: topUpDto.successUrl,
-        failUrl: topUpDto.failUrl,
-        pendingUrl: topUpDto.pendingUrl,
+        successUrl: topUpDto.successUrl || `${this.configService.get('app.baseUrl')}/api/v1/payments/redirect`,
+        failUrl: topUpDto.failUrl || `${this.configService.get('app.baseUrl')}/api/v1/payments/redirect`,
+        pendingUrl: topUpDto.pendingUrl || `${this.configService.get('app.baseUrl')}/api/v1/payments/redirect`,
       },
       payLoad: { referenceId: transaction.id },
     });

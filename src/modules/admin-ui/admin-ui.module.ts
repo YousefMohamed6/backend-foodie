@@ -5,6 +5,8 @@ import { Prisma } from '@prisma/client';
 import AdminJS from 'adminjs';
 import { PrismaModule } from '../../prisma/prisma.module';
 import { PrismaService } from '../../prisma/prisma.service';
+import { RedisService } from '../../shared/services/redis.service';
+import { SharedModule } from '../../shared/shared.module';
 
 // Register the Prisma adapter for AdminJS
 AdminJS.registerAdapter({ Database, Resource });
@@ -13,9 +15,9 @@ AdminJS.registerAdapter({ Database, Resource });
   imports: [
     PrismaModule,
     AdminModule.createAdminAsync({
-      imports: [PrismaModule],
-      inject: [PrismaService],
-      useFactory: async (prisma: PrismaService) => {
+      imports: [PrismaModule, SharedModule],
+      inject: [PrismaService, RedisService],
+      useFactory: async (prisma: PrismaService, redisService: RedisService) => {
         // Retrieve the DMMF (Data Model Meta Format) to get all model definitions automatically.
         // We access _dmmf from the Prisma Client instance (runtime) or fallback to Prisma.dmmf if available.
         // This ensures we get all models defined in schema.prisma without manual listing.
@@ -50,25 +52,58 @@ AdminJS.registerAdapter({ Database, Resource });
         }
 
         // Map all models to AdminJS resources
-        const resources = dmmf.models.map((model) => ({
-          resource: {
-            model: model,
-            client: prisma,
-          },
-          options: {
-            // Customize resource options here if needed (e.g., navigation grouping)
-            navigation: {
-              name: 'Database',
-              icon: 'Database',
+        const resources = dmmf.models.map((model) => {
+          const resourceName = model.name.toLowerCase();
+
+          // Define cache invalidation hook
+          const cacheInvalidationHook = async (response, request) => {
+            // Only invalidate on successful mutations (POST requests for New/Edit/Delete)
+            if (request.method === 'post') {
+              const patterns: Record<string, string[]> = {
+                vendor: ['vendors:*'],
+                zone: ['zones:*'],
+                product: ['products:*', 'vendors:*'],
+                category: ['categories:*', 'vendors:*'],
+                banner: ['banners:*'],
+                setting: ['global:settings', 'setting:*'],
+                specialdiscount: ['vendors:*'],
+                coupon: ['vendors:*'],
+              };
+
+              const matches = patterns[resourceName];
+              if (matches) {
+                console.log(`AdminUI: Invalidating cache for ${resourceName} via patterns: ${matches.join(', ')}`);
+                for (const pattern of matches) {
+                  await redisService.delPattern(pattern);
+                }
+              }
+            }
+            return response;
+          };
+
+          return {
+            resource: {
+              model: model,
+              client: prisma,
             },
-            actions: {
-              bulkDelete: {
-                actionType: 'bulk',
-                method: 'post',
+            options: {
+              navigation: {
+                name: 'Database',
+                icon: 'Database',
+              },
+              actions: {
+                new: { after: [cacheInvalidationHook] },
+                edit: { after: [cacheInvalidationHook] },
+                delete: { after: [cacheInvalidationHook] },
+                bulkDelete: {
+                  actionType: 'bulk',
+                  method: 'post',
+                  after: [cacheInvalidationHook],
+                },
               },
             },
-          },
-        }));
+          };
+        });
 
         console.log(
           `AdminUI: Automatically loaded ${resources.length} resources.`,

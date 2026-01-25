@@ -5,7 +5,7 @@ import {
     forwardRef,
     Inject,
     Injectable,
-    NotFoundException,
+    NotFoundException
 } from '@nestjs/common';
 import {
     CommissionSource,
@@ -18,7 +18,6 @@ import {
 import { I18nService } from 'nestjs-i18n';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { NotificationService } from '../../../shared/services/notification.service';
-import { RedisService } from '../../../shared/services/redis.service';
 import { AnalyticsTrackingService } from '../../analytics/analytics-tracking.service';
 import { DriversService } from '../../drivers/drivers.service';
 import { CommissionService } from '../commission.service';
@@ -45,7 +44,6 @@ export class OrderDriverService {
         private commissionService: CommissionService,
         private notificationService: NotificationService,
         private analyticsTrackingService: AnalyticsTrackingService,
-        private redisService: RedisService,
         private ordersGateway: OrdersGateway,
         private i18n: I18nService,
         @Inject(forwardRef(() => OrderDeliveryService))
@@ -216,34 +214,17 @@ export class OrderDriverService {
                 throw new ForbiddenException(ORDERS_ERRORS.ACCESS_DENIED);
             }
 
-            const lockKey = `${OrderConstants.REDIS_LOCK_ASSIGN_ORDER_PREFIX}${assignDriverDto.driverId}`;
-            const client = this.redisService.getClient();
-            if (client) {
-                const lock = await client.set(lockKey, 'true', { NX: true, EX: 10 });
-                if (!lock) {
-                    throw new ConflictException(
-                        ORDERS_ERRORS.DRIVER_IS_BEING_ASSIGNED_ANOTHER_ORDER,
-                    );
-                }
+            const maxDebt = await this.commissionService.getMaxDriverDebt();
+            const currentBalance = Number(driver.driverProfile.walletAmount || 0);
+            const currentDebt = currentBalance < 0 ? Math.abs(currentBalance) : 0;
+
+            let expectedNewDebt = 0;
+            if (order.paymentMethod === PaymentMethod.cash) {
+                expectedNewDebt = Number(order.totalAmount) - Number(order.tipAmount);
             }
 
-            try {
-                const maxDebt = await this.commissionService.getMaxDriverDebt();
-                const currentBalance = Number(driver.driverProfile.walletAmount || 0);
-                const currentDebt = currentBalance < 0 ? Math.abs(currentBalance) : 0;
-
-                let expectedNewDebt = 0;
-                if (order.paymentMethod === PaymentMethod.cash) {
-                    expectedNewDebt = Number(order.totalAmount) - Number(order.tipAmount);
-                }
-
-                if (currentDebt + expectedNewDebt > maxDebt) {
-                    throw new BadRequestException(ORDERS_ERRORS.DRIVER_MAX_DEBT_EXCEEDED);
-                }
-            } finally {
-                if (client) {
-                    await client.del(lockKey);
-                }
+            if (currentDebt + expectedNewDebt > maxDebt) {
+                throw new BadRequestException(ORDERS_ERRORS.DRIVER_MAX_DEBT_EXCEEDED);
             }
 
             await this.prisma.managerAuditLog.create({
@@ -257,10 +238,19 @@ export class OrderDriverService {
         }
 
         const savedOrder = await this.prisma.$transaction(async (tx) => {
-            await tx.driverProfile.update({
-                where: { userId: assignDriverDto.driverId },
+            // Atomic update to mark driver as BUSY only if they are not already BUSY
+            const updateResult = await tx.driverProfile.updateMany({
+                where: {
+                    userId: assignDriverDto.driverId,
+                    status: { not: DriverStatus.BUSY },
+                },
                 data: { status: DriverStatus.BUSY },
             });
+
+            // If no record was updated, it means the driver was already BUSY
+            if (updateResult.count === 0) {
+                throw new ConflictException(ORDERS_ERRORS.DRIVER_BUSY);
+            }
 
             return tx.order.update({
                 where: { id },

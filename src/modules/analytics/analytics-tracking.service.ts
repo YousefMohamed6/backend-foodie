@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
+import { TimeService } from '../../shared/services/time.service';
 import {
   AnalyticsConfig,
   PaymentTransactionStatus,
@@ -22,7 +23,8 @@ export class AnalyticsTrackingService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly eventEmitter: EventEmitter2,
-  ) {}
+    private readonly timeService: TimeService,
+  ) { }
 
   /**
    * Track order lifecycle events
@@ -47,7 +49,7 @@ export class AnalyticsTrackingService {
           metadata: data.metadata,
           locationLat: data.locationLat,
           locationLng: data.locationLng,
-          eventTimestamp: new Date(),
+          eventTimestamp: this.timeService.now(),
         },
       });
 
@@ -93,7 +95,7 @@ export class AnalyticsTrackingService {
           duration: data.duration,
           averageSpeed: data.averageSpeed,
           metadata: data.metadata,
-          eventTimestamp: new Date(),
+          eventTimestamp: this.timeService.now(),
         },
       });
 
@@ -148,7 +150,7 @@ export class AnalyticsTrackingService {
           errorMessage: data.errorMessage,
           completedAt: data.completedAt,
           metadata: data.metadata,
-          initiatedAt: new Date(),
+          initiatedAt: this.timeService.now(),
         },
       });
 
@@ -191,7 +193,7 @@ export class AnalyticsTrackingService {
           startDate: data.startDate,
           endDate: data.endDate,
           metadata: data.metadata,
-          eventTimestamp: new Date(),
+          eventTimestamp: this.timeService.now(),
         },
       });
 
@@ -230,7 +232,7 @@ export class AnalyticsTrackingService {
           changedFields: data.changedFields || [],
           ipAddress: data.ipAddress,
           userAgent: data.userAgent,
-          timestamp: new Date(),
+          timestamp: this.timeService.now(),
         },
       });
 
@@ -267,7 +269,7 @@ export class AnalyticsTrackingService {
           metadata: event.metadata,
           locationLat: event.locationLat,
           locationLng: event.locationLng,
-          eventTimestamp: new Date(),
+          eventTimestamp: this.timeService.now(),
         })),
       });
 

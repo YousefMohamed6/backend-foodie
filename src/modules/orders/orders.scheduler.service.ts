@@ -14,6 +14,8 @@ import {
   OrderConstants,
   ORDERS_NOTIFICATIONS,
 } from './orders.constants';
+import { OrdersGateway } from './orders.gateway';
+import { mapOrderResponse, orderInclude } from './orders.helper';
 
 @Injectable()
 export class OrdersSchedulerService {
@@ -25,7 +27,8 @@ export class OrdersSchedulerService {
     private readonly analyticsTrackingService: AnalyticsTrackingService,
     private readonly settingsService: SettingsService,
     private readonly walletService: WalletService,
-  ) {}
+    private readonly ordersGateway: OrdersGateway,
+  ) { }
 
   /**
    * Check for orders that are estimated to be ready
@@ -323,7 +326,20 @@ export class OrdersSchedulerService {
         }
       }
 
-      // 5. Track the cancellation
+      // 5. Notify via WebSocket
+      const updatedOrder = await this.prisma.order.findUnique({
+        where: { id: order.id },
+        include: orderInclude,
+      });
+      if (updatedOrder) {
+        const mappedOrder = mapOrderResponse(updatedOrder);
+        this.ordersGateway.emitOrderUpdate(
+          mappedOrder,
+          updatedOrder.vendor?.zoneId,
+        );
+      }
+
+      // 6. Track the cancellation
       this.analyticsTrackingService.trackOrderLifecycle({
         orderId: order.id,
         eventType: AnalyticsEventType.ORDER_CANCELLED,

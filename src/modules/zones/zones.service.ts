@@ -15,7 +15,7 @@ export class ZonesService {
   constructor(
     private prisma: PrismaService,
     private redisService: RedisService,
-  ) {}
+  ) { }
 
   private readonly CACHE_KEYS = {
     ALL_ZONES: 'zones:all',
@@ -24,8 +24,7 @@ export class ZonesService {
   };
 
   private async invalidateZonesCache() {
-    await this.redisService.del(this.CACHE_KEYS.ALL_ZONES);
-    await this.redisService.del(this.CACHE_KEYS.PUBLISHED_ZONES);
+    await this.redisService.delPattern('zones:*');
   }
 
   async create(createZoneDto: CreateZoneDto) {

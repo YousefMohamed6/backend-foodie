@@ -61,14 +61,11 @@ export class VendorsService {
   };
 
   private async invalidateVendorCache(vendorId?: string, zoneId?: string) {
-    // This is a simple invalidation. In a real production app, we might use patterns (keys *) or more specific tagging.
-    // For now, let's clear main public lists and the specific vendor.
     if (vendorId) {
       await this.redisService.del(this.CACHE_KEYS.VENDOR_BY_ID(vendorId));
     }
-    // Since lists depend on zones/pagination, it's safer to clear or use a shorter TTL.
-    // Given the request for "heavy traffic", we'll use a short-ish TTL (e.g. 5-10 mins) for lists
-    // and rely on manual invalidation for IDs.
+    // Invalidate all vendor lists (including nearest and all) to ensure consistency
+    await this.redisService.delPattern('vendors:*');
   }
 
   async create(createVendorDto: CreateVendorDto, user: User) {
@@ -233,7 +230,9 @@ export class VendorsService {
       });
     });
 
-    return await this.mapVendorResponse(vendor as any);
+    const response = await this.mapVendorResponse(vendor as any);
+    await this.invalidateVendorCache(vendor?.id, vendor?.zoneId);
+    return response;
   }
 
   async findAll(
@@ -751,7 +750,7 @@ export class VendorsService {
   async verifyDocument(dto: VerifyVendorDocumentDto) {
     const { vendorId, documentId, isApproved, rejectionReason } = dto;
 
-    return this.prisma.vendorDocument.update({
+    const result = await this.prisma.vendorDocument.update({
       where: {
         vendorId_documentId: {
           vendorId,
@@ -765,6 +764,9 @@ export class VendorsService {
         rejectionReason: isApproved ? null : rejectionReason,
       },
     });
+
+    await this.invalidateVendorCache(vendorId);
+    return result;
   }
 
   private mapSubscriptionPlan(plan: any) {

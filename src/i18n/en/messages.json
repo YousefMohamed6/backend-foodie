@@ -173,5 +173,14 @@
     "DRIVER_BUSY": "Driver is currently busy with another order",
     "DRIVER_OFFLINE": "Driver is currently offline or unavailable",
     "INVALID_EMAIL": "Invalid email address",
-    "VENDOR_TYPE_NOT_FOUND": "Vendor type not found"
+    "VENDOR_TYPE_NOT_FOUND": "Vendor type not found",
+    "PAYMENT_SUCCESS_TITLE": "Payment Successful",
+    "PAYMENT_SUCCESS_MSG": "Your wallet has been updated.",
+    "PAYMENT_FAILED_TITLE": "Payment Failed",
+    "PAYMENT_FAILED_MSG": "Verification failed. Please try again or contact support.",
+    "PAYMENT_CLOSE_WINDOW": "You can close this window now.",
+    "INVOICE_ID": "Invoice ID",
+    "PAYMENT_METHOD": "Payment Method",
+    "AMOUNT": "Amount",
+    "TRANSACTION_DATE": "Date"
 }

@@ -16,6 +16,7 @@ import {
 import { PrismaService } from '../../../prisma/prisma.service';
 import { MailService } from '../../../shared/services/mail.service';
 import { NotificationService } from '../../../shared/services/notification.service';
+import { TimeService } from '../../../shared/services/time.service';
 import { AnalyticsTrackingService } from '../../analytics/analytics-tracking.service';
 import { CashbackService } from '../../cashback/cashback.service';
 import { APP_SETTINGS } from '../../settings/settings.constants';
@@ -47,6 +48,7 @@ export class OrderCreationService {
         private analyticsTrackingService: AnalyticsTrackingService,
         private mailService: MailService,
         private ordersGateway: OrdersGateway,
+        private timeService: TimeService,
     ) { }
 
     async create(createOrderDto: CreateOrderDto, user: User) {
@@ -124,7 +126,7 @@ export class OrderCreationService {
                 }
             }
 
-            const savedOrder = await tx.order.create({
+            let savedOrder = await tx.order.create({
                 data: {
                     vendorId: createOrderDto.vendorId,
                     authorId: user.id,
@@ -213,7 +215,7 @@ export class OrderCreationService {
                 const autoReleaseDays = await this.settingsService
                     .findOne(APP_SETTINGS.WALLET_AUTO_RELEASE_DAYS)
                     .catch(() => '7');
-                const autoReleaseDate = new Date();
+                const autoReleaseDate = this.timeService.now();
                 autoReleaseDate.setDate(
                     autoReleaseDate.getDate() + parseInt(autoReleaseDays || '7'),
                 );
@@ -235,9 +237,10 @@ export class OrderCreationService {
                     },
                 });
 
-                await tx.order.update({
+                savedOrder = await tx.order.update({
                     where: { id: savedOrder.id },
                     data: { paymentStatus: PaymentStatus.PAID },
+                    include: orderInclude,
                 });
             }
 

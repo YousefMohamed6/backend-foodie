@@ -9,7 +9,7 @@ import {
   WebSocketGateway,
   WebSocketServer,
 } from '@nestjs/websockets';
-import { Order, UserRole } from '@prisma/client';
+import { UserRole } from '@prisma/client';
 import { Server, Socket } from 'socket.io';
 import { WsJwtGuard } from '../../common/guards/ws-jwt.guard';
 import { PrismaService } from '../../prisma/prisma.service';
@@ -28,7 +28,7 @@ export class OrdersGateway implements OnGatewayConnection, OnGatewayDisconnect {
   constructor(
     private readonly jwtService: JwtService,
     private readonly prisma: PrismaService,
-  ) {}
+  ) { }
 
   @WebSocketServer()
   server: Server;
@@ -44,8 +44,31 @@ export class OrdersGateway implements OnGatewayConnection, OnGatewayDisconnect {
       const payload = await this.jwtService.verifyAsync(token);
       client.data.user = payload;
 
-      // Join private user room safely
+      // 1. Join private user room (for customer notifications and driver direct updates)
       client.join(payload.sub);
+
+      // 2. Fetch specific room data based on role
+      const dbUser = await this.prisma.user.findUnique({
+        where: { id: payload.sub },
+        select: { vendorId: true, zoneId: true, role: true },
+      });
+
+      if (dbUser) {
+        // Auto-join Vendor Room
+        if (dbUser.vendorId && dbUser.role === UserRole.VENDOR) {
+          const vendorRoom = `${OrderSocketEvents.VENDOR_ROOM_PREFIX}${dbUser.vendorId}`;
+          client.join(vendorRoom);
+          this.logger.log(`Client ${payload.sub} joined vendor room: ${vendorRoom}`);
+        }
+
+        // Auto-join Zone Room
+        if (dbUser.zoneId && dbUser.role === UserRole.MANAGER) {
+          const zoneRoom = `${OrderSocketEvents.ZONE_ROOM_PREFIX}${dbUser.zoneId}`;
+          client.join(zoneRoom);
+          this.logger.log(`Client ${payload.sub} joined zone room: ${zoneRoom}`);
+        }
+      }
+
       this.logger.log(`Client authenticated: ${payload.sub}`);
     } catch (err) {
       this.logger.error(`WS Connection failed: ${err.message}`);
@@ -196,45 +219,102 @@ export class OrdersGateway implements OnGatewayConnection, OnGatewayDisconnect {
     return { event: 'stopped_watching_zone' };
   }
 
+  @SubscribeMessage('updateDriverLocation')
+  async handleUpdateDriverLocation(
+    @MessageBody()
+    data: {
+      orderId: string;
+      latitude: number;
+      longitude: number;
+      rotation?: number;
+    },
+    @ConnectedSocket() client: Socket,
+  ) {
+    const user = client.data.user;
+    if (!user || user.role !== UserRole.DRIVER) {
+      return { error: 'UNAUTHORIZED' };
+    }
+
+    // 1. Verify driver is assigned to this order
+    const order = await this.prisma.order.findUnique({
+      where: { id: data.orderId },
+      select: { driverId: true, vendorId: true },
+    });
+
+    if (!order || order.driverId !== user.sub) {
+      return { error: 'NOT_ASSIGNED_TO_ORDER' };
+    }
+
+    // 2. Broadcast to all interested parties (Vendor, Customer, Order room)
+    this.emitDriverLocationToOrder(
+      data.orderId,
+      user.sub,
+      order.vendorId,
+      data,
+    );
+
+    return { success: true };
+  }
+
   emitOrderUpdate(
-    order: Pick<Order, 'id' | 'vendorId' | 'authorId' | 'driverId'> &
-      Record<string, any>,
+    order: any,
     zoneId?: string,
   ) {
+    this.logger.log(`Emitting order update: ${order.id}, Status: ${order.status}, Vendor: ${order.vendorId}`);
+
     // Emit to order room
     this.server.to(order.id).emit(OrderSocketEvents.ORDER_UPDATED, order);
+
     // Emit to vendor room (vendor uses vendorId)
-    this.server
-      .to(`${OrderSocketEvents.VENDOR_ROOM_PREFIX}${order.vendorId}`)
-      .emit(OrderSocketEvents.VENDOR_ORDER_UPDATED, order);
+    if (order.vendorId) {
+      const vendorRoom = `${OrderSocketEvents.VENDOR_ROOM_PREFIX}${order.vendorId}`;
+      this.server.to(vendorRoom).emit(OrderSocketEvents.VENDOR_ORDER_UPDATED, order);
+      this.logger.debug(`Sent to vendor room: ${vendorRoom}`);
+    }
+
     // Emit to customer room (customer uses authorId - their own orders)
-    this.server
-      .to(order.authorId)
-      .emit(OrderSocketEvents.CUSTOMER_ORDER_UPDATED, order);
+    if (order.authorId) {
+      this.server
+        .to(order.authorId)
+        .emit(OrderSocketEvents.CUSTOMER_ORDER_UPDATED, order);
+      this.logger.debug(`Sent to customer room: ${order.authorId}`);
+    }
+
     // Emit to driver room if assigned (driver uses driverId - their assigned orders)
     if (order.driverId) {
       this.server
         .to(order.driverId)
         .emit(OrderSocketEvents.DRIVER_ORDER_UPDATED, order);
+      this.logger.debug(`Sent to driver room: ${order.driverId}`);
     }
+
     // Emit to zone room if zoneId is provided (manager uses zoneId)
     if (zoneId) {
-      this.server
-        .to(`${OrderSocketEvents.ZONE_ROOM_PREFIX}${zoneId}`)
-        .emit(OrderSocketEvents.ZONE_ORDER_UPDATED, order);
+      const zoneRoom = `${OrderSocketEvents.ZONE_ROOM_PREFIX}${zoneId}`;
+      this.server.to(zoneRoom).emit(OrderSocketEvents.ZONE_ORDER_UPDATED, order);
+      this.logger.debug(`Sent to zone room: ${zoneRoom}`);
     }
   }
 
   emitDriverLocationToOrder(
     orderId: string,
     driverId: string,
+    vendorId: string,
     location: { latitude: number; longitude: number; rotation?: number },
   ) {
-    this.server.to(orderId).emit(OrderSocketEvents.DRIVER_LOCATION_UPDATED, {
+    const payload = {
       orderId,
       driverId,
       ...location,
       timestamp: new Date(),
-    });
+    };
+
+    // Emit to order room (customer/driver watching specific order)
+    this.server.to(orderId).emit(OrderSocketEvents.DRIVER_LOCATION_UPDATED, payload);
+
+    // Emit to vendor room (vendor dashboard tracking)
+    this.server
+      .to(`${OrderSocketEvents.VENDOR_ROOM_PREFIX}${vendorId}`)
+      .emit(OrderSocketEvents.DRIVER_LOCATION_UPDATED, payload);
   }
 }

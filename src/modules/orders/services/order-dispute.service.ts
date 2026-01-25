@@ -18,6 +18,8 @@ import { NotificationService } from '../../../shared/services/notification.servi
 import { WalletProtectionService } from '../../wallet/wallet-protection.service';
 import { WalletTransactionDescriptions } from '../../wallet/wallet-transaction.constants';
 import { NotificationEventType, ORDERS_ERRORS } from '../orders.constants';
+import { OrdersGateway } from '../orders.gateway';
+import { mapOrderResponse, orderInclude } from '../orders.helper';
 
 @Injectable()
 export class OrderDisputeService {
@@ -26,6 +28,7 @@ export class OrderDisputeService {
         private walletProtectionService: WalletProtectionService,
         private notificationService: NotificationService,
         private i18n: I18nService,
+        private ordersGateway: OrdersGateway,
     ) { }
 
     /**
@@ -64,6 +67,16 @@ export class OrderDisputeService {
             confirmationType,
             WalletTransactionDescriptions.deliveryConfirmedReason().ar,
         );
+
+        // Notify via WebSocket
+        const updatedOrder = await this.prisma.order.findUnique({
+            where: { id: orderId },
+            include: orderInclude,
+        });
+        if (updatedOrder) {
+            const mappedOrder = mapOrderResponse(updatedOrder);
+            this.ordersGateway.emitOrderUpdate(mappedOrder, updatedOrder.vendor?.zoneId);
+        }
 
         return {
             success: true,
@@ -145,6 +158,16 @@ export class OrderDisputeService {
                     type: NotificationEventType.DISPUTE_CREATED,
                 },
             );
+        }
+
+        // Notify via WebSocket
+        const updatedOrder = await this.prisma.order.findUnique({
+            where: { id: orderId },
+            include: orderInclude,
+        });
+        if (updatedOrder) {
+            const mappedOrder = mapOrderResponse(updatedOrder);
+            this.ordersGateway.emitOrderUpdate(mappedOrder, updatedOrder.vendor?.zoneId);
         }
 
         return {
