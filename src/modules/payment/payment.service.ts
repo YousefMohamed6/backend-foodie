@@ -100,6 +100,7 @@ export class PaymentService {
     async verifyPayment(invoiceId: string) {
         this.logger.log(`Verifying payment for invoiceId: ${invoiceId}`);
 
+        // 1. PaymentLog exists.
         const paymentLog = await this.prisma.paymentLog.findFirst({
             where: { invoiceId: String(invoiceId) },
             include: { user: true },
@@ -110,54 +111,83 @@ export class PaymentService {
             throw new NotFoundException('Payment log not found');
         }
 
+        // 2. PaymentLog.isProcessed === false.
+        // 6. Invoice not processed before.
         if (paymentLog.isProcessed) {
             this.logger.log(`Payment already processed for invoiceId: ${invoiceId}`);
             return { status: paymentLog.status, message: 'Already processed' };
         }
 
-        let providerStatus = 'UNKNOWN';
         let providerData: any = {};
 
         try {
-            const response = await this.fawaterakService.getInvoiceData(invoiceId);
+            // Server-to-Server Verification
+            const response = await this.fawaterakService.getInvoiceStatus(invoiceId);
+
+            if (response.status !== 'success') {
+                this.logger.error(`Fawaterak API error for ${invoiceId}: ${JSON.stringify(response)}`);
+                return { status: 'FAILED', message: 'Provider API error' };
+            }
+
             providerData = response.data;
 
-            // Based on Fawaterak getInvoiceData response:
-            // "paid": 1 means successful payment
-            // "total": amount
-            const isPaidStatus = providerData?.paid === 1;
+            // 3. Provider status === PAID.
+            // Note: getTransactionStatus returns data.invoice_status
+            const providerStatus = String(providerData?.invoice_status || '').toUpperCase();
+            const isPaidStatus = providerStatus === 'PAID';
 
             if (isPaidStatus) {
+                // 4. Amount matches logged amount.
                 const providerAmount = parseFloat(String(providerData.total));
                 const loggedAmount = Number(paymentLog.amount);
 
-                if (Math.abs(providerAmount - loggedAmount) > 0.1) {
+                if (Math.abs(providerAmount - loggedAmount) > 0.01) {
                     this.logger.error(`Amount mismatch! Log: ${loggedAmount}, Provider: ${providerAmount}`);
                     await this.markAsFailed(paymentLog.id, { error: 'Amount mismatch', providerData });
                     return { status: 'FAILED', message: 'Amount mismatch' };
                 }
-                providerStatus = 'PAID';
+
+                // 5. Currency matches.
+                const providerCurrency = String(providerData.currency || 'EGP').toUpperCase();
+                if (providerCurrency !== paymentLog.currency.toUpperCase()) {
+                    this.logger.error(`Currency mismatch! Log: ${paymentLog.currency}, Provider: ${providerCurrency}`);
+                    await this.markAsFailed(paymentLog.id, { error: 'Currency mismatch', providerData });
+                    return { status: 'FAILED', message: 'Currency mismatch' };
+                }
+
+                // Validation rules passed, process SUCCESS
+                await this.processSuccess(paymentLog, providerData);
+                return { status: 'SUCCESS', data: providerData };
             } else {
-                this.logger.warn(`Payment not paid yet for invoice ${invoiceId}. Status: ${providerData?.paid}`);
-                providerStatus = 'FAILED';
+                this.logger.warn(`Payment not paid yet for invoice ${invoiceId}. Status: ${providerStatus}`);
+                // If it is FAILED or EXPIRED or CANCELLED, we can mark it as FAILED in our logs
+                if (['FAILED', 'EXPIRED', 'CANCELLED'].includes(providerStatus)) {
+                    await this.markAsFailed(paymentLog.id, providerData);
+                    return { status: 'FAILED', data: providerData };
+                }
+                return { status: 'PENDING', data: providerData };
             }
         } catch (error) {
             this.logger.error(`Failed to verify with provider`, error);
-            await this.markAsFailed(paymentLog.id, { error: error.message });
-            return { status: 'FAILED' };
-        }
-
-        if (providerStatus === 'PAID') {
-            await this.processSuccess(paymentLog, providerData);
-            return { status: 'SUCCESS', data: providerData };
-        } else {
-            await this.markAsFailed(paymentLog.id, providerData);
-            return { status: 'FAILED', data: providerData };
+            // Don't mark as failed yet if it's a network error, keep it pending for retry?
+            // But per prompt rules, if transaction fails we should log it.
+            // We'll keep it as is.
+            return { status: 'FAILED', message: error.message };
         }
     }
 
     private async processSuccess(paymentLog: any, providerData: any) {
         return this.prisma.$transaction(async (tx) => {
+            // Re-check processed status inside transaction to prevent race conditions
+            const log = await tx.paymentLog.findUnique({
+                where: { id: paymentLog.id },
+                select: { isProcessed: true }
+            });
+
+            if (log?.isProcessed) {
+                return;
+            }
+
             await tx.paymentLog.update({
                 where: { id: paymentLog.id },
                 data: {
@@ -170,6 +200,7 @@ export class PaymentService {
             const user = paymentLog.user;
             let updated = false;
 
+            // Wallet Update Logic (Atomic)
             if (user.role === UserRole.CUSTOMER) {
                 await this.walletService.updateUserWallet(user.id, Number(paymentLog.amount), WalletConstants.OPERATION_ADD, tx);
                 updated = true;
@@ -185,6 +216,7 @@ export class PaymentService {
             }
 
             if (!updated) {
+                // Default fallback to user wallet if no specific role match (shouldn't happen with guards)
                 await this.walletService.updateUserWallet(user.id, Number(paymentLog.amount), WalletConstants.OPERATION_ADD, tx);
             }
 

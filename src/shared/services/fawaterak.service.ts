@@ -157,7 +157,6 @@ export class FawaterakService {
     if (!res.ok) {
       const text = await res.text();
       console.error(`[Fawaterak] Get Invoice Failed ${res.status}: ${text}`);
-      // return as object to maintain compatibility with verifyPayment
       return { status: 'error', message: text };
     }
 
@@ -169,5 +168,26 @@ export class FawaterakService {
       console.error(`[Fawaterak] Received non-JSON response: ${text}`);
       return { status: 'error', message: 'Non-JSON response' };
     }
+  }
+
+  async getInvoiceStatus(invoiceId: string | number) {
+    const res = await fetch(
+      this.getApiUrl(`getTransactionStatus/${invoiceId}`),
+      {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${this.apiKey}`,
+        },
+      },
+    );
+
+    if (!res.ok) {
+      const text = await res.text();
+      console.error(`[Fawaterak] Get Transaction Status Failed ${res.status}: ${text}`);
+      return { status: 'error', message: text };
+    }
+
+    return await res.json();
   }
 }
