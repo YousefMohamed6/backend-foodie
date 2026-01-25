@@ -22,7 +22,6 @@ import {
 } from './dto/get-transactions-query.dto';
 import {
   SetWithdrawMethodDto,
-  TopUpWalletDto,
   WithdrawWalletDto,
 } from './dto/wallet.dto';
 import { WalletService } from './wallet.service';
@@ -46,13 +45,6 @@ export class WalletController {
   @ApiQuery({ name: 'limit', required: false })
   getTransactions(@Request() req, @Query() query: GetTransactionsQueryDto) {
     return this.walletService.getTransactions(req.user.id, query);
-  }
-
-  @Post('topup')
-  @Throttle({ default: { ttl: 60000, limit: 3 } }) // 3 requests per minute
-  @ApiOperation({ summary: 'Top up wallet' })
-  topUp(@Body() topUpDto: TopUpWalletDto, @Request() req) {
-    return this.walletService.topUp(req.user.id, topUpDto);
   }
 
   @Get('topup/:id/status')

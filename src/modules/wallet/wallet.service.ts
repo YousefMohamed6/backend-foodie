@@ -5,12 +5,10 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Prisma, TransactionType } from '@prisma/client';
-import crypto from 'crypto';
 import { PrismaService } from '../../prisma/prisma.service';
 import { FawaterakService } from '../../shared/services/fawaterak.service';
 import {
   SetWithdrawMethodDto,
-  TopUpWalletDto,
   WithdrawWalletDto,
 } from './dto/wallet.dto';
 import { WalletTransactionDescriptions } from './wallet-transaction.constants';
@@ -27,7 +25,7 @@ export class WalletService {
   async getBalance(userId: string) {
     const getSum = async (type: TransactionType) => {
       const depositFilter =
-        type === TransactionType.DEPOSIT
+        type === TransactionType.DEPOSIT || type === TransactionType.REFUND || type === TransactionType.PAYMENT
           ? {
             OR: [
               { paymentStatus: WalletConstants.PAYMENT_STATUS_PAID },
@@ -47,10 +45,13 @@ export class WalletService {
       });
       return aggregations._sum.amount ? aggregations._sum.amount.toNumber() : 0;
     };
+
     const deposits = await getSum(TransactionType.DEPOSIT);
+    const refunds = await getSum(TransactionType.REFUND);
     const withdrawals = await getSum(TransactionType.WITHDRAWAL);
     const payments = await getSum(TransactionType.PAYMENT);
-    return deposits - withdrawals - payments;
+
+    return deposits + refunds - withdrawals - payments;
   }
 
   async getTransactions(
@@ -80,89 +81,6 @@ export class WalletService {
       },
       orderBy: { createdAt: 'desc' },
     });
-  }
-
-  async topUp(userId: string, topUpDto: TopUpWalletDto) {
-    if (
-      topUpDto.paymentGateway.toLowerCase() !==
-      WalletConstants.GATEWAY_FAWATERAK
-    ) {
-      throw new BadRequestException('UNSUPPORTED_PAYMENT_GATEWAY');
-    }
-    if (!topUpDto.successUrl || !topUpDto.failUrl || !topUpDto.pendingUrl) {
-      throw new BadRequestException('REDIRECT_URLS_REQUIRED');
-    }
-
-    const user = await this.prisma.user.findUnique({
-      where: { id: userId },
-      select: {
-        firstName: true,
-        lastName: true,
-        email: true,
-        phoneNumber: true,
-      },
-    });
-    if (!user?.email || !user?.phoneNumber) {
-      throw new BadRequestException('MISSING_PAYMENT_DATA');
-    }
-
-    const transactionId = crypto.randomUUID();
-    const topUpDescriptions = WalletTransactionDescriptions.topUp(
-      topUpDto.paymentMethod,
-    );
-    const transaction = await this.prisma.walletTransaction.create({
-      data: {
-        id: transactionId,
-        userId,
-        amount: topUpDto.amount,
-        type: TransactionType.DEPOSIT,
-        descriptionEn: topUpDescriptions.en,
-        descriptionAr: topUpDescriptions.ar,
-        isTopup: true,
-        paymentStatus: WalletConstants.PAYMENT_STATUS_PENDING,
-        referenceId: transactionId,
-        metadata: {
-          gateway: WalletConstants.GATEWAY_FAWATERAK,
-          paymentGateway: topUpDto.paymentGateway,
-          paymentMethod: topUpDto.paymentMethod,
-        },
-      },
-    });
-
-    const invoice = await this.fawaterakService.createInvoiceLink({
-      amount: topUpDto.amount,
-      currency: WalletConstants.CURRENCY_EGP,
-      customer: {
-        first_name: user.firstName,
-        last_name: user.lastName,
-        email: user.email,
-        phone: user.phoneNumber,
-        address: WalletConstants.ADDRESS_NA,
-      },
-      redirectionUrls: {
-        successUrl: topUpDto.successUrl || `${this.configService.get('app.baseUrl')}/api/v1/payments/redirect`,
-        failUrl: topUpDto.failUrl || `${this.configService.get('app.baseUrl')}/api/v1/payments/redirect`,
-        pendingUrl: topUpDto.pendingUrl || `${this.configService.get('app.baseUrl')}/api/v1/payments/redirect`,
-      },
-    });
-
-    const updated = await this.prisma.walletTransaction.update({
-      where: { id: transaction.id },
-      data: {
-        metadata: {
-          ...(transaction.metadata as any),
-          invoiceId: invoice.invoiceId,
-          invoiceKey: invoice.invoiceKey,
-          paymentUrl: invoice.url,
-        },
-      },
-    });
-
-    return {
-      paymentUrl: invoice.url,
-      transactionId: updated.id,
-      invoiceId: invoice.invoiceId,
-    };
   }
 
   async withdraw(userId: string, withdrawDto: WithdrawWalletDto) {

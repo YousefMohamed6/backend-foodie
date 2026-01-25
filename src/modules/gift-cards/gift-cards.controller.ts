@@ -15,7 +15,7 @@ import { GiftCardsService } from './gift-cards.service';
 @ApiTags('Gift Cards')
 @Controller('gift-cards')
 export class GiftCardsController {
-  constructor(private readonly giftCardsService: GiftCardsService) {}
+  constructor(private readonly giftCardsService: GiftCardsService) { }
 
   @Get()
   @ApiOperation({ summary: 'Get all active gift card templates' })

@@ -12,7 +12,7 @@ export class GiftCardsService {
   constructor(
     private prisma: PrismaService,
     private readonly walletService: WalletService,
-  ) {}
+  ) { }
 
   async findAll() {
     return this.prisma.giftCardTemplate.findMany({
@@ -71,11 +71,13 @@ export class GiftCardsService {
     }
 
     // Add balance to user's wallet
-    await this.walletService.topUp(userId, {
-      amount: Number(card.amount),
-      paymentMethod: 'Gift Card',
-      paymentGateway: 'Internal',
-    });
+    // Add balance to user's wallet
+    await this.walletService.refund(
+      userId,
+      Number(card.amount),
+      `Redeem Gift Card: ${card.code}`,
+      `استرداد بطاقة هدايا: ${card.code}`,
+    );
 
     return this.prisma.userGiftCard.update({
       where: { id: card.id },
