@@ -8,6 +8,8 @@ import {
 } from '@nestjs/common';
 import { Request, Response } from 'express';
 import { I18nService } from 'nestjs-i18n';
+import { EnvKeys } from '../constants/env-keys.constants';
+import { NodeEnv } from '../enums/node-env.enum';
 
 @Catch()
 export class GlobalExceptionFilter implements ExceptionFilter {
@@ -89,7 +91,7 @@ export class GlobalExceptionFilter implements ExceptionFilter {
     } else if (exception instanceof Error) {
       messageKey = 'messages.GENERIC_ERROR';
       details =
-        process.env.NODE_ENV === 'development' ? exception.message : null;
+        process.env[EnvKeys.NODE_ENV] === NodeEnv.DEVELOPMENT ? exception.message : null;
     }
 
     const lang = request.headers['x-lang']?.toString() || 'ar';

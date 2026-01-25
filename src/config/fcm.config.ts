@@ -1,8 +1,9 @@
 import { registerAs } from '@nestjs/config';
+import { EnvKeys } from '../common/constants/env-keys.constants';
 
 export default registerAs('fcm', () => ({
-  serviceAccount: process.env.FIREBASE_SERVICE_ACCOUNT
-    ? JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT)
+  serviceAccount: process.env[EnvKeys.FIREBASE_SERVICE_ACCOUNT]
+    ? JSON.parse(process.env[EnvKeys.FIREBASE_SERVICE_ACCOUNT] as string)
     : null,
-  projectId: process.env.FIREBASE_PROJECT_ID,
+  projectId: process.env[EnvKeys.FIREBASE_PROJECT_ID],
 }));

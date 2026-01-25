@@ -8,70 +8,52 @@ import {
 import { Observable } from 'rxjs';
 import { tap } from 'rxjs/operators';
 
+import { EnvKeys } from '../constants/env-keys.constants';
+import { SecurityConstants } from '../constants/security.constants';
+import { NodeEnv } from '../enums/node-env.enum';
+
 @Injectable()
 export class SecureLoggingInterceptor implements NestInterceptor {
   private readonly logger = new Logger('HTTP');
 
   // Sensitive field patterns
-  private readonly SENSITIVE_FIELDS = [
-    'password',
-    'token',
-    'secret',
-    'authorization',
-    'api_key',
-    'apiKey',
-    'jwt',
-    'refresh_token',
-    'refreshToken',
-    'access_token',
-    'accessToken',
-    'credit_card',
-    'creditCard',
-    'card_number',
-    'cardNumber',
-    'cvv',
-    'ssn',
-    'pin',
-  ];
+  private readonly SENSITIVE_FIELDS = SecurityConstants.SENSITIVE_FIELDS;
 
   intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
     const request = context.switchToHttp().getRequest();
     const { method, url, ip, body, query } = request;
     const userAgent = request.get('user-agent') || '';
     const now = Date.now();
-    const isDevelopment = process.env.NODE_ENV !== 'production';
+    const isDevelopment = process.env[EnvKeys.NODE_ENV] !== NodeEnv.PRODUCTION;
 
-    // Sanitize and log request
     const sanitizedBody = this.maskSensitiveData(body);
     const sanitizedQuery = this.maskSensitiveData(query);
 
-    this.logger.log(
-      `Incoming ${method} ${url} from ${ip} - User-Agent: ${userAgent}`,
-    );
+    if (isDevelopment) {
+      this.logger.log(
+        `Incoming ${method} ${url} from ${ip} - User-Agent: ${userAgent}`,
+      );
 
-    if (Object.keys(body || {}).length > 0) {
-      if (isDevelopment) {
-        // In development, log full body for debugging
+      if (Object.keys(body || {}).length > 0) {
         this.logger.debug(
           `Request Body (Full): ${JSON.stringify(body, null, 2)}`,
         );
-      } else {
-        // In production, log sanitized body
-        this.logger.debug(`Request Body: ${JSON.stringify(sanitizedBody)}`);
       }
-    }
 
-    if (Object.keys(sanitizedQuery || {}).length > 0) {
-      this.logger.debug(`Query Params: ${JSON.stringify(sanitizedQuery)}`);
+      if (Object.keys(sanitizedQuery || {}).length > 0) {
+        this.logger.debug(`Query Params: ${JSON.stringify(sanitizedQuery)}`);
+      }
     }
 
     return next.handle().pipe(
       tap({
         next: (data) => {
-          const responseTime = Date.now() - now;
-          this.logger.log(
-            `Completed ${method} ${url} in ${responseTime}ms [SUCCESS]`,
-          );
+          if (isDevelopment) {
+            const responseTime = Date.now() - now;
+            this.logger.log(
+              `Completed ${method} ${url} in ${responseTime}ms [SUCCESS]`,
+            );
+          }
         },
         error: (error) => {
           const responseTime = Date.now() - now;

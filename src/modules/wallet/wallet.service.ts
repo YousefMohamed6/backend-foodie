@@ -138,14 +138,12 @@ export class WalletService {
         email: user.email,
         phone: user.phoneNumber,
         address: WalletConstants.ADDRESS_NA,
-        customer_unique_id: userId,
       },
       redirectionUrls: {
         successUrl: topUpDto.successUrl || `${this.configService.get('app.baseUrl')}/api/v1/payments/redirect`,
         failUrl: topUpDto.failUrl || `${this.configService.get('app.baseUrl')}/api/v1/payments/redirect`,
         pendingUrl: topUpDto.pendingUrl || `${this.configService.get('app.baseUrl')}/api/v1/payments/redirect`,
       },
-      payLoad: { referenceId: transaction.id },
     });
 
     const updated = await this.prisma.walletTransaction.update({

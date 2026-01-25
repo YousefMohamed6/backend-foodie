@@ -5,9 +5,14 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import session from 'express-session';
 import helmet from 'helmet';
 import { AppModule } from './app.module';
+import { EnvKeys } from './common/constants/env-keys.constants';
+import { SecurityConstants } from './common/constants/security.constants';
+import { NodeEnv } from './common/enums/node-env.enum';
+import { MobileShieldGuard } from './common/guards/mobile-shield.guard';
 import { SecureLoggingInterceptor } from './common/interceptors/secure-logging.interceptor';
 import { securityHeadersConfig } from './config/security-headers.config';
 const cookieParser = require('cookie-parser');
+const compression = require('compression');
 
 process.on('unhandledRejection', (reason, promise) => {
   console.error('Unhandled Rejection at:', promise, 'reason:', reason);
@@ -15,33 +20,41 @@ process.on('unhandledRejection', (reason, promise) => {
 
 process.on('uncaughtException', (error) => {
   console.error('Uncaught Exception:', error);
-  if (process.env.NODE_ENV === 'production') {
+  if (process.env[EnvKeys.NODE_ENV] === NodeEnv.PRODUCTION) {
     process.exit(1);
   }
 });
 
 async function bootstrap() {
-  const isProduction = process.env.NODE_ENV === 'production';
+  const isProduction = process.env[EnvKeys.NODE_ENV] === NodeEnv.PRODUCTION;
 
   const app = await NestFactory.create(AppModule, {
     logger: isProduction
-      ? ['error', 'warn', 'log']
+      ? ['error', 'warn']
       : ['error', 'warn', 'log', 'debug'],
   });
 
   const configService = app.get(ConfigService);
-  const port = configService.get<number>('app.port') || 3000;
+  const port = configService.get<number>('app.port') || SecurityConstants.DEFAULT_PORT;
 
+  // SEC-06: Production Hardening
   app.use(helmet(securityHeadersConfig));
+  app.use(compression()); // Reduce payload size
   app.use(cookieParser());
+  app.enableShutdownHooks(); // Graceful shutdown for Prisma and Sockets
+
   app.setGlobalPrefix('api/v1', {
     exclude: ['/api', '/api/*path', 'favicon.ico'],
   });
 
-  const allowedOrigins = configService.get<string>('ALLOWED_ORIGINS');
+  // SEC-06: Global Security Shield for Multi-platform
+  // This ensures that only authorized mobile apps or admin panels can access the API.
+  app.useGlobalGuards(new MobileShieldGuard(configService));
+
+  const allowedOrigins = configService.get<string>(EnvKeys.ALLOWED_ORIGINS);
   const corsOrigins = allowedOrigins
     ? allowedOrigins.split(',').map((origin) => origin.trim())
-    : ['http://localhost:3000', 'http://localhost:4200'];
+    : SecurityConstants.DEFAULT_CORS_ORIGINS;
 
   app.enableCors({
     origin: corsOrigins,
@@ -51,7 +64,7 @@ async function bootstrap() {
   });
 
   const sessionSecret =
-    configService.get<string>('SESSION_SECRET') ||
+    configService.get<string>(EnvKeys.SESSION_SECRET) ||
     (isProduction
       ? (() => {
         throw new Error('SESSION_SECRET is required in production');
@@ -92,8 +105,8 @@ async function bootstrap() {
 
   if (!isProduction) {
     const config = new DocumentBuilder()
-      .setTitle('Foodie Restaurant API')
-      .setDescription('Foodie Restaurant API')
+      .setTitle('Talqah API')
+      .setDescription('Talqah API')
       .setVersion('1.0')
       .addBearerAuth()
       .addSecurity('JWT', {

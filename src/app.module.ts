@@ -1,9 +1,12 @@
 import { Module } from '@nestjs/common';
-import { ConfigModule } from '@nestjs/config';
+import { ConfigModule, ConfigService } from '@nestjs/config';
 import { ServeStaticModule } from '@nestjs/serve-static';
 import { join } from 'path';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
+import { EnvKeys } from './common/constants/env-keys.constants';
+import { SecurityConstants } from './common/constants/security.constants';
+import { NodeEnv } from './common/enums/node-env.enum';
 import appConfig from './config/app.config';
 import databaseConfig from './config/database.config';
 import emailConfig from './config/email.config';
@@ -86,13 +89,13 @@ import {
         fcmConfig,
       ],
       validationSchema: Joi.object({
-        PORT: Joi.number().default(3000),
-        DATABASE_URL: Joi.string().required(),
-        JWT_SECRET: Joi.string().required(),
-        JWT_EXPIRATION: Joi.string().default('15m'),
-        JWT_REFRESH_SECRET: Joi.string().required(),
-        JWT_REFRESH_EXPIRATION: Joi.string().default('7d'),
-        GOOGLE_MAPS_API_KEY: Joi.string().optional(), // Make optional for now, or required if critical
+        [EnvKeys.PORT]: Joi.number().default(3000),
+        [EnvKeys.DATABASE_URL]: Joi.string().required(),
+        [EnvKeys.JWT_SECRET]: Joi.string().required(),
+        [EnvKeys.JWT_EXPIRATION]: Joi.string().default('15m'),
+        [EnvKeys.JWT_REFRESH_SECRET]: Joi.string().required(),
+        [EnvKeys.JWT_REFRESH_EXPIRATION]: Joi.string().default('7d'),
+        [EnvKeys.GOOGLE_MAPS_API_KEY]: Joi.string().optional(), // Make optional for now, or required if critical
       }),
       validationOptions: {
         allowUnknown: true,
@@ -103,12 +106,20 @@ import {
       rootPath: join(process.cwd(), 'uploads'),
       serveRoot: '/uploads',
     }),
-    ThrottlerModule.forRoot([
-      {
-        ttl: 60000, // 1 minute
-        limit: 100, // 100 requests per minute
-      },
-    ]),
+    ThrottlerModule.forRootAsync({
+      imports: [ConfigModule],
+      inject: [ConfigService],
+      useFactory: (config: ConfigService) => [
+        {
+          ttl: config.get(EnvKeys.NODE_ENV) === NodeEnv.PRODUCTION
+            ? SecurityConstants.THROTTLER_TTL_PROD
+            : SecurityConstants.THROTTLER_TTL_DEV,
+          limit: config.get(EnvKeys.NODE_ENV) === NodeEnv.PRODUCTION
+            ? SecurityConstants.THROTTLER_LIMIT_PROD
+            : SecurityConstants.THROTTLER_LIMIT_DEV,
+        },
+      ],
+    }),
     EventEmitterModule.forRoot(),
     ScheduleModule.forRoot(),
     I18nModule.forRoot({

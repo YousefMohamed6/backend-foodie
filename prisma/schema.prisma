@@ -1718,7 +1718,7 @@ model PaymentLog {
   invoiceId           String?          @map("invoice_id")
   amount              Decimal          @db.Decimal(10, 2)
   currency            String           @default("EGP")
-  status              PaymentLogStatus
+  status              PaymentLogStatus @default(PENDING)
   provider            String           @default("FAWATERAK")
   rawProviderResponse Json?            @map("raw_provider_response")
   isProcessed         Boolean          @default(false) @map("is_processed")

@@ -8,73 +8,82 @@ This guide provides instructions for deploying the Foodie Backend (NestJS + Pris
 
 | Component | Technology | Purpose |
 |-----------|------------|---------|
-| App Server | Node.js (v18+) | NestJS application |
+| App Server | Node.js (v20+) | NestJS application (High Availability) |
 | Database | PostgreSQL (v16+) | Primary data store with PostGIS extension |
 | Cache/Queue | Redis | Session management and background jobs |
 | Reverse Proxy | Nginx | SSL termination and load balancing |
-| Process Manager | PM2 | Keeps application alive |
+| Process Manager | PM2 / Docker | Keeps application alive with zero-downtime |
+
+---
+
+## Security Hardening (Production Standards)
+
+The backend implements **Tier 1 Security** through a multi-layer defense system:
+
+1.  **Mobile Shield Guard**: Every API request is validated against a native `X-API-KEY`.
+2.  **Native Integrity Check**: Integrated with the Mobile App's FFI Native Shield.
+3.  **Encrypted Transport**: SSL Certificate Pinning (SHA-256) is enforced.
+4.  **Payload Protection**: Request/Response compression and HPP (HTTP Parameter Pollution) protection.
 
 ---
 
 ## Environment Variables
 
-| Variable | Description |
-|----------|-------------|
-| `PORT` | Server port (default: 3000) |
-| `NODE_ENV` | Environment (production/development) |
-| `DATABASE_URL` | PostgreSQL connection string |
-| `REDIS_HOST` | Redis server host |
-| `REDIS_PORT` | Redis server port |
-| `JWT_SECRET` | Secret for JWT token signing |
+| Variable | Description | Requirement |
+|----------|-------------|-------------|
+| `PORT` | Server port (managed via SecurityConstants) | Optional |
+| `NODE_ENV` | Must be set to `production` | **Critical** |
+| `DATABASE_URL` | PostgreSQL connection string | **Critical** |
+| `SECURE_API_KEY` | Secret key matching Mobile Native Shield | **Critical** |
+| `SESSION_SECRET` | Strong random secret for AdminJS sessions | **Critical** |
+| `ALLOWED_ORIGINS` | Comma-separated list of trusted CORS domains | **Critical** |
+| `JWT_SECRET` | HS256 / RS256 signing secret | **Critical** |
+| `REDIS_HOST` | Redis server host | Required |
 
 ---
 
 ## Deployment Steps
 
 ### 1. Server Preparation
-Install Node.js, PostgreSQL, Redis, and PM2 on your server.
+- Install Node.js (v20+), PostgreSQL (v16+), and Redis.
+- Install PM2 globally: `npm install -g pm2`.
 
-### 2. Environment Configuration
-Create a production `.env` file on your server. Never commit this file to version control.
+### 2. Database Migration & Optimization
+- Create database and enable PostGIS.
+- Run migrations: `npx prisma migrate deploy`.
+- Generate client: `npx prisma generate`.
 
-### 3. Database Setup
-- Create PostgreSQL database
-- Enable PostGIS extension for geospatial queries
+### 3. Build for Production
+- Install dependencies: `npm ci --omit=dev`.
+- Build TypeScript: `npm run build`.
 
-### 4. Build & Deploy
-1. Install dependencies (production only)
-2. Generate Prisma Client
-3. Run database migrations
-4. Build the application
+### 4. Zero-Downtime Launch (PM2)
+```bash
+pm2 start dist/main.js --name foodie-api -i max --env production
+```
 
-### 5. Running with PM2
-Use PM2 to manage the Node.js process and ensure uptime.
-
-### 6. Seed Application Settings
-Run the settings seed script to add required configuration.
+### 5. Compression & Performance
+The backend automatically compresses responses using `Gzip/Brotli` and manages graceful shutdowns for Prisma and Socket.io.
 
 ---
 
-## Scheduled Jobs
+## Rate Limiting (Flood Protection)
 
-The application includes scheduled jobs that run automatically:
-
-| Job | Frequency | Description |
-|-----|-----------|-------------|
-| Order Preparation Check | Every minute | Notify when orders are ready |
-| Vendor Auto-Cancel | Every 5 minutes | Cancel orders vendors didn't accept |
-| Wallet Auto-Release | Every hour | Release held funds past timeout |
+| Environment | Limit | TTL |
+|-------------|-------|-----|
+| **Production** | 60 requests | 1 minute |
+| **Development** | 200 requests | 1 second |
 
 ---
 
 ## Post-Deployment Verification
 
-| Check | Description |
-|-------|-------------|
-| Logs | Check PM2 logs for errors |
-| API Health | Verify API responds correctly |
-| Swagger Docs | Access `/api` for API documentation |
-| Scheduled Jobs | Verify cron jobs are running |
+| Check | Expected Result |
+|-------|-----------------|
+| API Security | Requests without `X-API-KEY` must return `401 Unauthorized` |
+| SSL Pinning | Server certificate must match the pinned SHA-256 in Mobile App |
+| Logs Sanity | Sensitive data (passwords/tokens) must be `***REDACTED***` |
+| Health Check | `/api/v1/health` (if implemented) returns 200 |
 
 ---
 
@@ -82,17 +91,10 @@ The application includes scheduled jobs that run automatically:
 
 | Issue | Solution |
 |-------|----------|
-| Database Connection | Ensure server IP is whitelisted |
-| Redis Connection | Check Redis binding configuration |
-| Prisma Schema | Run `prisma generate` after schema changes |
-| Scheduled Jobs | Verify ScheduleModule is imported |
+| 401 Unauthorized | Verify `SECURE_API_KEY` matches between `.env` and App's FFI. |
+| CORS Errors | Add the request origin to `ALLOWED_ORIGINS` in `.env`. |
+| Memory Leaks | Ensure `NODE_ENV=production` is set to activate production logger. |
 
 ---
 
-## Containerized Deployment (Recommended)
-
-For isolated and reproducible deployments, use Docker with docker-compose to run the application, database, and Redis together.
-
----
-
-**Last Updated**: 2026-01-09
+**Last Updated**: 2026-01-25 (Security Protocol v2.0)

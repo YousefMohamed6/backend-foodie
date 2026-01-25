@@ -60,16 +60,15 @@ export class FawaterakService {
       email: string;
       phone: string;
       address?: string;
-      customer_unique_id: string;
     };
     redirectionUrls: {
       successUrl: string;
       failUrl: string;
       pendingUrl: string;
     };
-    payLoad: Record<string, any>;
   }) {
-    const body = {
+    const body =
+    {
       cartItems: [
         {
           name: 'Wallet Topup',
@@ -77,19 +76,16 @@ export class FawaterakService {
           quantity: '1',
         },
       ],
-      cartTotal: Number(input.amount),
-      shipping: 0,
+      cartTotal: String(input.amount),
       customer: {
         first_name: input.customer.first_name.replace(/[^a-zA-Z0-9\s]/g, '') || 'Customer',
         last_name: input.customer.last_name.replace(/[^a-zA-Z0-9\s]/g, '') || 'User',
         email: input.customer.email,
         phone: input.customer.phone.replace(/[^0-9]/g, ''),
         address: input.customer.address || 'Cairo, Egypt',
-        customer_unique_id: String(input.customer.customer_unique_id),
       },
       redirectionUrls: input.redirectionUrls,
       currency: input.currency,
-      payLoad: input.payLoad,
       sendEmail: true,
       sendSMS: false,
     };

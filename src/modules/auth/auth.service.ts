@@ -14,6 +14,8 @@ import { JwtService } from '@nestjs/jwt';
 import { User, UserRole } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 import * as crypto from 'crypto';
+import { EnvKeys } from '../../common/constants/env-keys.constants';
+import { NodeEnv } from '../../common/enums/node-env.enum';
 import { normalizePhoneNumber } from '../../common/utils/phone.utils';
 import { PrismaService } from '../../prisma/prisma.service';
 import { RedisService } from '../../shared/services/redis.service';
@@ -206,7 +208,7 @@ export class AuthService {
     } catch (err) {
       this.logger.error(`Failed to send OTP to ${phoneNumber}: ${err.message}`);
       // In development, we might want to return the OTP in the response or just log it
-      if (process.env.NODE_ENV !== 'production') {
+      if (process.env[EnvKeys.NODE_ENV] !== NodeEnv.PRODUCTION) {
         return { verificationId: otpKey, devOtp: otp };
       }
       throw new BadRequestException(AUTH_ERRORS.OTP_SEND_FAILED);
