@@ -35,7 +35,7 @@ export class ZonesController {
   @Get()
   @ApiBearerAuth()
   @UseGuards(OptionalJwtAuthGuard, RolesGuard)
-  @Roles(UserRole.ADMIN, UserRole.DRIVER, UserRole.CUSTOMER, UserRole.VENDOR)
+  @Roles(UserRole.ADMIN, UserRole.DRIVER, UserRole.CUSTOMER, UserRole.VENDOR, UserRole.MANAGER)
   @ApiOperation({ summary: 'Get all zones' })
   findAll() {
     return this.zonesService.findAll();

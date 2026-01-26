@@ -26,6 +26,7 @@ import { ChatModule } from './modules/chat/chat.module';
 import { CouponsModule } from './modules/coupons/coupons.module';
 import { CurrenciesModule } from './modules/currencies/currencies.module';
 import { DineInModule } from './modules/dine-in/dine-in.module';
+import { EarningsModule } from './modules/earnings/earnings.module';
 import { FavouritesModule } from './modules/favourites/favourites.module';
 import { GiftCardsModule } from './modules/gift-cards/gift-cards.module';
 import { LanguagesModule } from './modules/languages/languages.module';
@@ -140,6 +141,7 @@ import {
     WalletModule,
     CategoriesModule,
     CouponsModule,
+    EarningsModule,
     ReviewsModule,
     UploadModule,
     // DriversModule,

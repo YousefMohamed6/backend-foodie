@@ -11,7 +11,7 @@ import { mapOrderResponse, orderInclude } from './orders.helper';
 
 @Injectable()
 export class OrderManagementService {
-  constructor(private prisma: PrismaService) {}
+  constructor(private prisma: PrismaService) { }
 
   async getManagerZoneId(managerId: string) {
     const manager = await this.prisma.user.findUnique({
@@ -40,20 +40,30 @@ export class OrderManagementService {
       throw new ForbiddenException('ACCESS_DENIED');
     }
 
-    const zoneId = await this.getManagerZoneId(user.id);
+    try {
+      const zoneId = await this.getManagerZoneId(user.id);
 
-    const orders = await this.prisma.order.findMany({
-      where: {
-        paymentMethod: PaymentMethod.cash,
-        status: OrderStatus.COMPLETED,
-        paymentStatus: PaymentStatus.UNPAID,
-        vendor: { zoneId },
-      },
-      include: orderInclude,
-      orderBy: { updatedAt: 'desc' },
-    });
+      const orders = await this.prisma.order.findMany({
+        where: {
+          paymentMethod: PaymentMethod.cash,
+          status: OrderStatus.COMPLETED,
+          paymentStatus: PaymentStatus.UNPAID,
+          vendor: { zoneId },
+        },
+        include: orderInclude,
+        orderBy: { updatedAt: 'desc' },
+      });
 
-    return orders.map((order) => mapOrderResponse(order));
+      return orders.map((order) => mapOrderResponse(order));
+    } catch (error) {
+      if (
+        error instanceof ForbiddenException &&
+        error.message === 'MANAGER_NO_ZONE'
+      ) {
+        return [];
+      }
+      throw error;
+    }
   }
 
   async getManagerCashSummary(user: User, date: string) {
@@ -90,27 +100,42 @@ export class OrderManagementService {
       throw new ForbiddenException('ACCESS_DENIED');
     }
 
-    if (user.role === UserRole.MANAGER) {
-      const managerZoneId = await this.getManagerZoneId(user.id);
-      const driver = await this.prisma.user.findUnique({
-        where: { id: driverId },
-        select: { zoneId: true },
-      });
-      if (driver?.zoneId !== managerZoneId) {
-        throw new ForbiddenException('DRIVER_OUTSIDE_ZONE');
-      }
-    }
+    const orders = await (async () => {
+      try {
+        let managerZoneId: string | undefined;
+        if (user.role === UserRole.MANAGER) {
+          managerZoneId = await this.getManagerZoneId(user.id);
+        }
 
-    const orders = await this.prisma.order.findMany({
-      where: {
-        driverId: driverId,
-        paymentMethod: PaymentMethod.cash,
-        status: OrderStatus.COMPLETED,
-        paymentStatus: PaymentStatus.UNPAID,
-      },
-      include: orderInclude,
-      orderBy: { updatedAt: 'desc' },
-    });
+        const driver = await this.prisma.user.findUnique({
+          where: { id: driverId },
+          select: { zoneId: true },
+        });
+
+        if (user.role === UserRole.MANAGER && driver?.zoneId !== managerZoneId) {
+          throw new ForbiddenException('DRIVER_OUTSIDE_ZONE');
+        }
+
+        return this.prisma.order.findMany({
+          where: {
+            driverId: driverId,
+            paymentMethod: PaymentMethod.cash,
+            status: OrderStatus.COMPLETED,
+            paymentStatus: PaymentStatus.UNPAID,
+          },
+          include: orderInclude,
+          orderBy: { updatedAt: 'desc' },
+        });
+      } catch (error) {
+        if (
+          error instanceof ForbiddenException &&
+          error.message === 'MANAGER_NO_ZONE'
+        ) {
+          return [];
+        }
+        throw error;
+      }
+    })();
 
     const totalCash = orders.reduce(
       (sum, order) => sum + Number(order.totalAmount),

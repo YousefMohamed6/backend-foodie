@@ -178,7 +178,7 @@ export class VendorsController {
 
   @Get(':id/orders')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.VENDOR, UserRole.ADMIN)
+  @Roles(UserRole.VENDOR, UserRole.ADMIN, UserRole.MANAGER)
   @ApiOperation({ summary: 'Get vendor orders' })
   getOrders(@Param('id') id: string, @Query() query) {
     return this.vendorsService.getOrders(id, query);
@@ -211,7 +211,7 @@ export class VendorsController {
 
   @Patch(':id')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.VENDOR, UserRole.ADMIN)
+  @Roles(UserRole.VENDOR, UserRole.ADMIN, UserRole.MANAGER)
   @ApiOperation({ summary: 'Update a vendor profile' })
   update(@Param('id') id: string, @Body() updateVendorDto: UpdateVendorDto) {
     return this.vendorsService.update(id, updateVendorDto);
@@ -219,7 +219,7 @@ export class VendorsController {
 
   @Delete(':id')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.ADMIN)
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @ApiOperation({ summary: 'Delete a vendor' })
   remove(@Param('id') id: string) {
     return this.vendorsService.remove(id);

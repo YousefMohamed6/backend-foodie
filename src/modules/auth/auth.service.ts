@@ -69,7 +69,12 @@ export class AuthService {
     if (
       registerDto.role &&
       !(
-        [UserRole.CUSTOMER, UserRole.DRIVER, UserRole.VENDOR] as UserRole[]
+        [
+          UserRole.CUSTOMER,
+          UserRole.DRIVER,
+          UserRole.VENDOR,
+          UserRole.MANAGER,
+        ] as UserRole[]
       ).includes(registerDto.role)
     ) {
       // Force to CUSTOMER or throw error. Throwing error is safer.

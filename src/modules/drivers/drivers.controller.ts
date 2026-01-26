@@ -39,7 +39,7 @@ export class DriversController {
 
   @Get()
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.ADMIN)
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @ApiOperation({ summary: 'Get all drivers' })
   findAll() {
     return this.driversService.findAll();
@@ -55,7 +55,7 @@ export class DriversController {
 
   @Get('available')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.ADMIN)
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @ApiOperation({ summary: 'Find available drivers' })
   findAvailable() {
     return this.driversService.findAvailable();
@@ -130,7 +130,7 @@ export class DriversController {
 
   @Get(':id')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.ADMIN)
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @ApiOperation({ summary: 'Get driver by ID' })
   findOne(@Param('id') id: string) {
     return this.driversService.findOne(id);
