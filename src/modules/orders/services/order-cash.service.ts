@@ -69,9 +69,6 @@ export class OrderCashService {
             order.vendor.zoneId,
         );
 
-        if (!order.cashReportedAt) {
-            throw new BadRequestException(ORDERS_ERRORS.CASH_NOT_REPORTED);
-        }
 
         if (order.paymentStatus === PaymentStatus.PAID) {
             throw new BadRequestException(ORDERS_ERRORS.ORDER_ALREADY_PAID);
@@ -89,7 +86,10 @@ export class OrderCashService {
 
             const updatedOrder = await tx.order.update({
                 where: { id },
-                data: { paymentStatus: PaymentStatus.PAID },
+                data: {
+                    paymentStatus: PaymentStatus.PAID,
+                    cashReportedAt: order.cashReportedAt || new Date(),
+                },
                 include: orderInclude,
             });
 
@@ -125,8 +125,16 @@ export class OrderCashService {
         return this.managementService.getManagerCashSummary(user, date);
     }
 
+    async getManagerCashHistory(user: User) {
+        return this.managementService.getManagerCashHistory(user);
+    }
+
     async getDriverPendingCashOrders(driverId: string, user: User) {
         return this.managementService.getDriverPendingCashOrders(driverId, user);
+    }
+
+    async getManagerCashOnHand(user: User) {
+        return this.managementService.getManagerCashOnHand(user);
     }
 
     async confirmManagerPayout(managerId: string, date: string, adminUser: User) {
@@ -163,6 +171,25 @@ export class OrderCashService {
                 payoutDate: startOfDay,
             },
         });
+    }
+
+    async clearManagerCashOnHand(admin: User, managerId: string) {
+        if (admin.role !== UserRole.ADMIN) {
+            throw new ForbiddenException(ORDERS_ERRORS.ACCESS_DENIED);
+        }
+
+        const cashData = await this.managementService.getManagerCashOnHand({ id: managerId, role: UserRole.MANAGER } as any);
+        const amountToClear = cashData.cashOnHand;
+
+        if (amountToClear <= 0) {
+            throw new BadRequestException('MANAGER_CASH_ALREADY_ZERO');
+        }
+
+        return this.managementService.confirmManagerPayout(admin, managerId, amountToClear);
+    }
+
+    async confirmManagerPayoutGeneral(admin: User, managerId: string, amount: number) {
+        return this.managementService.confirmManagerPayout(admin, managerId, amount);
     }
 
     private emitUpdate(order: any) {

@@ -257,6 +257,7 @@ export class OrderDriverService {
                 data: {
                     driverId: assignDriverDto.driverId,
                     status: OrderStatus.DRIVER_PENDING,
+                    managerId: user.role === UserRole.MANAGER ? user.id : undefined,
                 },
                 include: orderInclude,
             });

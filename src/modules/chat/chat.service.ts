@@ -40,6 +40,12 @@ export class ChatService {
           },
         },
         order: true,
+        messages: {
+          take: 1,
+          orderBy: {
+            createdAt: 'desc',
+          },
+        },
       },
       orderBy: {
         lastMessageTime: 'desc',
@@ -238,6 +244,33 @@ export class ChatService {
         driverProfileImage: order.driver.profilePictureURL,
         name: `Order #${order.id.slice(-6)} - Driver & Vendor`,
       };
+    } else if (dto.chatType === ChatConstants.CHAT_TYPES.MANAGER_DRIVER) {
+      if (!order.driver) {
+        throw new BadRequestException('ORDER_NO_DRIVER_ASSIGNED');
+      }
+      participantIds = [userId, order.driver.id];
+      channelData = {
+        ...channelData,
+        driverId: order.driver.id,
+        driverName: `${order.driver.firstName} ${order.driver.lastName}`,
+        driverProfileImage: order.driver.profilePictureURL,
+        name: `Order #${order.id.slice(-6)} - Manager & Driver`,
+      };
+    } else if (dto.chatType === ChatConstants.CHAT_TYPES.MANAGER_CUSTOMER) {
+      participantIds = [userId, order.author.id];
+      channelData = {
+        ...channelData,
+        name: `Order #${order.id.slice(-6)} - Manager & Customer`,
+      };
+    } else if (dto.chatType === ChatConstants.CHAT_TYPES.MANAGER_VENDOR) {
+      participantIds = [userId, order.vendor.authorId];
+      channelData = {
+        ...channelData,
+        restaurantId: order.vendorId,
+        restaurantName: order.vendor.title,
+        restaurantProfileImage: order.vendor.logo,
+        name: `Order #${order.id.slice(-6)} - Manager & Vendor`,
+      };
     }
 
     // Check if channel already exists for this order and chat type
@@ -262,6 +295,42 @@ export class ChatService {
         },
       },
     });
+
+    if (channel) {
+      if (
+        dto.chatType.startsWith('MANAGER_') &&
+        !channel.participants.some((p) => p.id === userId)
+      ) {
+        await this.prisma.chatChannel.update({
+          where: { id: channel.id },
+          data: {
+            participants: {
+              connect: { id: userId },
+            },
+          },
+        });
+
+        // Refresh channel data
+        channel = await this.prisma.chatChannel.findUnique({
+          where: { id: channel.id },
+          include: {
+            participants: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                profilePictureURL: true,
+                role: true,
+              },
+            },
+            messages: {
+              take: 20,
+              orderBy: { createdAt: 'desc' },
+            },
+          },
+        });
+      }
+    }
 
     if (!channel) {
       // Create new channel

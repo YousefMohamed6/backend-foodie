@@ -156,12 +156,24 @@ export class OrdersService {
     return this.cashService.getManagerCashSummary(user, date);
   }
 
+  async getManagerCashHistory(user: User) {
+    return this.cashService.getManagerCashHistory(user);
+  }
+
   async getDriverPendingCashOrders(driverId: string, user: User) {
     return this.cashService.getDriverPendingCashOrders(driverId, user);
   }
 
+  async getManagerCashOnHand(user: User) {
+    return this.cashService.getManagerCashOnHand(user);
+  }
+
   async confirmManagerPayout(managerId: string, date: string, adminUser: User) {
     return this.cashService.confirmManagerPayout(managerId, date, adminUser);
+  }
+
+  async clearManagerCashOnHand(admin: User, managerId: string) {
+    return this.cashService.clearManagerCashOnHand(admin, managerId);
   }
 
   // ==================== COMMISSION REPORTS ====================

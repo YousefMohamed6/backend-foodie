@@ -53,6 +53,9 @@ model User {
   notifications            Notification[]
   ordersAsAuthor           Order[]                     @relation("OrderAuthor")
   ordersAsDriver           Order[]                     @relation("OrderDriver")
+  ordersAsManager          Order[]                     @relation("OrderManager")
+  paymentLogs              PaymentLog[]
+  payoutAccounts           PayoutAccount[]
   referralsAsReferred      Referral[]                  @relation("Referred")
   referralsAsReferrer      Referral[]                  @relation("Referrer")
   refreshTokens            RefreshToken[]
@@ -68,10 +71,8 @@ model User {
   vendorAuthorOf           Vendor?                     @relation("VendorAuthor")
   walletTransactions       WalletTransaction[]
   withdrawMethod           WithdrawMethod?
-  chatChannels             ChatChannel[]               @relation("UserChannels")
   withdrawRequests         WithdrawRequest[]
-  payoutAccounts           PayoutAccount[]
-  paymentLogs              PaymentLog[]
+  chatChannels             ChatChannel[]               @relation("UserChannels")
 
   @@map("users")
 }
@@ -135,57 +136,57 @@ model PlatformTransaction {
 }
 
 model Vendor {
-  id                      String                  @id @default(uuid())
-  authorId                String                  @unique
-  title                   String
-  description             String?
-  photo                   String?
-  logo                    String?
-  vendorTypeId            String
-  latitude                Decimal                 @db.Decimal(10, 8)
-  longitude               Decimal                 @db.Decimal(11, 8)
-  address                 String?
-  zoneId                  String
-  fcmToken                String?
-  walletAmount            Decimal                 @default(0) @db.Decimal(10, 2)
-  reviewsSum              Decimal                 @default(0) @db.Decimal(10, 2)
-  reviewsCount            Int                     @default(0)
-  restaurantCost          String?
-  subscriptionPlanId      String?
-  subscriptionExpiryDate  DateTime?
-  createdAt               DateTime                @default(now())
-  updatedAt               DateTime                @updatedAt
-  isActive                Boolean                 @default(true) @map("is_active")
-  isDineInActive          Boolean                 @default(false) @map("is_dine_in_active")
-  phoneNumber             String?                 @map("phone_number")
-  subscriptionTotalOrders Int?                    @default(0)
-  subscriptionProductsLimit Int?                  @default(0) @map("subscription_products_limit")
-  subscriptionId          String?
-  advertisements          Advertisement[]
-  categoriesOwned         Category[]              @relation("CategoryVendor")
-  coupons                 Coupon[]
-  deliveryEvents          DeliveryEvent[]         @relation("VendorDeliveryEvents")
-  dineInBookings          DineInBooking[]
-  favoriteVendors         FavoriteVendor[]
-  orders                  Order[]
-  products                Product[]
-  reviews                 Review[]
-  stories                 Story[]
-  users                   User[]                  @relation("UserVendor")
-  commission              VendorCommission?
-  restaurantMenuPhotos    VendorMenuPhoto[]
-  VendorMetricsSnapshot   VendorMetricsSnapshot[]
-  photos                  VendorPhoto[]
-  schedules               VendorSchedule[]
-  author                  User                    @relation("VendorAuthor", fields: [authorId], references: [id])
-  subscription            Subscription?           @relation("VendorSubscription", fields: [subscriptionId], references: [id])
-  subscriptionPlan        SubscriptionPlan?       @relation(fields: [subscriptionPlanId], references: [id])
-  vendorType              VendorType              @relation(fields: [vendorTypeId], references: [id], onDelete: Restrict)
-  zone                    Zone                    @relation(fields: [zoneId], references: [id])
-  categories              Category[]              @relation("VendorCategories")
-  documents               VendorDocument[]
-  specialDiscounts        SpecialDiscount[]
-  specialDiscountEnable   Boolean                 @default(false) @map("special_discount_enable")
+  id                        String                  @id @default(uuid())
+  authorId                  String                  @unique
+  title                     String
+  description               String?
+  photo                     String?
+  logo                      String?
+  vendorTypeId              String
+  latitude                  Decimal                 @db.Decimal(10, 8)
+  longitude                 Decimal                 @db.Decimal(11, 8)
+  address                   String?
+  zoneId                    String
+  fcmToken                  String?
+  walletAmount              Decimal                 @default(0) @db.Decimal(10, 2)
+  reviewsSum                Decimal                 @default(0) @db.Decimal(10, 2)
+  reviewsCount              Int                     @default(0)
+  restaurantCost            String?
+  subscriptionPlanId        String?
+  subscriptionExpiryDate    DateTime?
+  createdAt                 DateTime                @default(now())
+  updatedAt                 DateTime                @updatedAt
+  isActive                  Boolean                 @default(true) @map("is_active")
+  isDineInActive            Boolean                 @default(false) @map("is_dine_in_active")
+  phoneNumber               String?                 @map("phone_number")
+  subscriptionTotalOrders   Int?                    @default(0)
+  subscriptionId            String?
+  subscriptionProductsLimit Int?                    @default(0) @map("subscription_products_limit")
+  specialDiscountEnable     Boolean                 @default(false) @map("special_discount_enable")
+  advertisements            Advertisement[]
+  categoriesOwned           Category[]              @relation("CategoryVendor")
+  coupons                   Coupon[]
+  deliveryEvents            DeliveryEvent[]         @relation("VendorDeliveryEvents")
+  dineInBookings            DineInBooking[]
+  favoriteVendors           FavoriteVendor[]
+  orders                    Order[]
+  products                  Product[]
+  reviews                   Review[]
+  specialDiscounts          SpecialDiscount[]
+  stories                   Story[]
+  users                     User[]                  @relation("UserVendor")
+  commission                VendorCommission?
+  documents                 VendorDocument[]
+  restaurantMenuPhotos      VendorMenuPhoto[]
+  VendorMetricsSnapshot     VendorMetricsSnapshot[]
+  photos                    VendorPhoto[]
+  schedules                 VendorSchedule[]
+  author                    User                    @relation("VendorAuthor", fields: [authorId], references: [id])
+  subscription              Subscription?           @relation("VendorSubscription", fields: [subscriptionId], references: [id])
+  subscriptionPlan          SubscriptionPlan?       @relation(fields: [subscriptionPlanId], references: [id])
+  vendorType                VendorType              @relation(fields: [vendorTypeId], references: [id])
+  zone                      Zone                    @relation(fields: [zoneId], references: [id])
+  categories                Category[]              @relation("VendorCategories")
 
   @@map("vendors")
 }
@@ -262,16 +263,16 @@ model Product {
   categoryId       String?            @map("category_id")
   discountPrice    Decimal?           @map("dis_price") @db.Decimal(10, 2)
   isActive         Boolean            @default(true) @map("is_active")
-  isPublish        Boolean            @default(true) @map("is_publish")
   vendorId         String             @map("vendor_id")
+  reviewsCount     Int                @default(0)
+  reviewsSum       Decimal            @default(0) @db.Decimal(10, 2)
+  isPublish        Boolean            @default(true) @map("is_publish")
   favoriteProducts FavoriteProduct[]
   orderItems       OrderItem[]
   itemAttributes   ProductAttribute[]
   extras           ProductExtra[]
   category         Category?          @relation(fields: [categoryId], references: [id])
   vendor           Vendor             @relation(fields: [vendorId], references: [id], onDelete: Cascade)
-  reviewsSum       Decimal            @default(0) @db.Decimal(10, 2)
-  reviewsCount     Int                @default(0)
   reviews          Review[]
 
   @@map("products")
@@ -303,20 +304,20 @@ model ProductAttribute {
 }
 
 model Category {
-  id               String            @id @default(uuid())
-  englishName      String?           @map("english_name")
-  arabicName       String?           @map("arabic_name")
-  description      String?
-  descriptionAr    String?           @map("description_ar")
-  image            String?           @map("photo")
-  createdAt        DateTime          @default(now())
-  updatedAt        DateTime          @updatedAt
-  isActive         Boolean           @default(true) @map("is_active")
-  showOnHome       Boolean           @default(false) @map("show_on_homepage")
-  vendorId         String?           @map("vendor_id")
-  vendor           Vendor?           @relation("CategoryVendor", fields: [vendorId], references: [id])
-  products         Product[]
-  vendors          Vendor[]          @relation("VendorCategories")
+  id            String    @id @default(uuid())
+  description   String?
+  image         String?   @map("photo")
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  isActive      Boolean   @default(true) @map("is_active")
+  showOnHome    Boolean   @default(false) @map("show_on_homepage")
+  vendorId      String?   @map("vendor_id")
+  arabicName    String?   @map("arabic_name")
+  descriptionAr String?   @map("description_ar")
+  englishName   String?   @map("english_name")
+  vendor        Vendor?   @relation("CategoryVendor", fields: [vendorId], references: [id])
+  products      Product[]
+  vendors       Vendor[]  @relation("VendorCategories")
 
   @@map("categories")
 }
@@ -334,6 +335,7 @@ model Order {
   updatedAt                 DateTime                  @updatedAt
   authorId                  String                    @map("author_id")
   driverId                  String?                   @map("driver_id")
+  managerId                 String?                   @map("manager_id")
   vendorId                  String                    @map("vendor_id")
   paymentMethod             PaymentMethod             @map("payment_method")
   adminCommissionAmount     Decimal                   @default(0) @db.Decimal(10, 2)
@@ -352,13 +354,14 @@ model Order {
   driverCommissionValue     Decimal                   @default(0) @map("driver_commission_value") @db.Decimal(10, 2)
   driverNet                 Decimal                   @default(0) @map("driver_net") @db.Decimal(10, 2)
   estimatedReadyAt          DateTime?                 @map("estimated_ready_at")
-  deliveryOtp               String?                   @map("delivery_otp")
   isReadyNotificationSent   Boolean                   @default(false) @map("is_ready_notification_sent")
   platformTotalCommission   Decimal                   @default(0) @map("platform_total_commission") @db.Decimal(10, 2)
   vendorCommissionApplied   Boolean                   @default(false) @map("vendor_commission_applied")
   vendorCommissionRate      Decimal                   @default(0) @map("vendor_commission_rate") @db.Decimal(10, 4)
   vendorCommissionValue     Decimal                   @default(0) @map("vendor_commission_value") @db.Decimal(10, 2)
   vendorNet                 Decimal                   @default(0) @map("vendor_net") @db.Decimal(10, 2)
+  deliveryOtp               String?                   @map("delivery_otp")
+  specialDiscountId         String?                   @map("special_discount_id")
   chatChannels              ChatChannel[]
   deliveryEvents            DeliveryEvent[]
   disputes                  Dispute[]
@@ -371,11 +374,11 @@ model Order {
   address                   Address?                  @relation(fields: [addressId], references: [id])
   author                    User                      @relation("OrderAuthor", fields: [authorId], references: [id])
   driver                    User?                     @relation("OrderDriver", fields: [driverId], references: [id])
+  manager                   User?                     @relation("OrderManager", fields: [managerId], references: [id])
+  specialDiscount           SpecialDiscount?          @relation(fields: [specialDiscountId], references: [id])
   vendor                    Vendor                    @relation(fields: [vendorId], references: [id])
   reviews                   Review[]
   walletTransactions        WalletTransaction[]
-  specialDiscountId         String?                   @map("special_discount_id")
-  specialDiscount           SpecialDiscount?          @relation(fields: [specialDiscountId], references: [id])
 
   @@map("orders")
 }
@@ -430,11 +433,11 @@ model VendorType {
   id          String   @id @default(uuid())
   englishName String
   arabicName  String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
   photo       String?
   isActive    Boolean  @default(true) @map("is_active")
   showOnHome  Boolean  @default(false) @map("show_on_homepage")
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
   vendors     Vendor[]
 
   @@map("vendor_types")
@@ -459,24 +462,24 @@ model Zone {
 
 model SubscriptionPlan {
   id            String                @id @default(uuid())
-  arabicName    String                @map("arabic_name")
-  englishName   String                @map("english_name")
   description   String?
   price         Decimal               @db.Decimal(10, 2)
   createdAt     DateTime              @default(now())
   updatedAt     DateTime              @updatedAt
   durationDays  Int                   @map("duration_days")
-  totalOrders   Int                   @default(0) @map("total_orders")
   isActive      Boolean               @default(true) @map("is_active")
+  totalOrders   Int                   @default(0) @map("total_orders")
+  arabicName    String                @map("arabic_name")
+  englishName   String                @map("english_name")
+  image         String
+  place         String
+  planPoints    String[]              @map("plan_points")
+  productsLimit Int                   @map("products_limit")
+  type          String
+  features      SubscriptionFeature[]
   subscriptions Subscription[]
   users         User[]
   vendors       Vendor[]
-  productsLimit Int                   @map("products_limit")
-  place         String
-  image         String
-  type          String
-  planPoints    String[]              @map("plan_points")
-  features      SubscriptionFeature[]
 
   @@map("subscription_plans")
 }
@@ -653,7 +656,6 @@ model DisputeAuditLog {
 model Coupon {
   id             String   @id @default(uuid())
   code           String   @unique
-  name           String   @unique
   discount       String   @default("0")
   image          String?
   discountType   String   @default("percentage")
@@ -665,6 +667,7 @@ model Coupon {
   updatedAt      DateTime @updatedAt
   isActive       Boolean  @default(true) @map("is_active")
   vendorId       String?  @map("vendor_id")
+  name           String   @unique
   vendor         Vendor?  @relation(fields: [vendorId], references: [id], onDelete: Cascade)
 
   @@map("coupons")
@@ -705,14 +708,14 @@ model ReviewImage {
 
 model DriverDocument {
   id              String         @id @default(uuid())
-  status          DocumentStatus @default(PENDING)
   createdAt       DateTime       @default(now())
   updatedAt       DateTime       @updatedAt
-  documentId      String         @map("document_id")
   backImage       String?        @map("back_image")
   driverId        String         @map("driver_id")
   frontImage      String         @map("front_image")
   rejectionReason String?        @map("rejection_reason")
+  documentId      String         @map("document_id")
+  status          DocumentStatus @default(PENDING)
   document        Document       @relation("DocumentToDriver", fields: [documentId], references: [id], onDelete: Cascade)
   driver          DriverProfile  @relation(fields: [driverId], references: [id], onDelete: Cascade)
 
@@ -724,21 +727,21 @@ model ChatChannel {
   id                     String        @id @default(uuid())
   name                   String?
   lastMessageTime        DateTime?
+  createdAt              DateTime      @default(now())
+  updatedAt              DateTime      @updatedAt
+  lastMessageText        String?       @map("last_message")
+  orderId                String?       @map("order_id")
   chatType               String?       @map("chat_type")
   customerId             String?       @map("customer_id")
   customerName           String?       @map("customer_name")
   customerProfileImage   String?       @map("customer_profile_image")
-  restaurantId           String?       @map("restaurant_id")
-  restaurantName         String?       @map("restaurant_name")
-  restaurantProfileImage String?       @map("restaurant_profile_image")
   driverId               String?       @map("driver_id")
   driverName             String?       @map("driver_name")
   driverProfileImage     String?       @map("driver_profile_image")
-  createdAt              DateTime      @default(now())
-  updatedAt              DateTime      @updatedAt
-  lastMessageText        String?       @map("last_message")
   lastMessageType        String?       @default("TEXT") @map("last_message_type")
-  orderId                String?       @map("order_id")
+  restaurantId           String?       @map("restaurant_id")
+  restaurantName         String?       @map("restaurant_name")
+  restaurantProfileImage String?       @map("restaurant_profile_image")
   order                  Order?        @relation(fields: [orderId], references: [id])
   messages               ChatMessage[]
   participants           User[]        @relation("UserChannels")
@@ -751,14 +754,14 @@ model ChatMessage {
   channelId      String
   senderId       String
   content        String?     @map("message")
-  messageType    String      @default("TEXT") @map("message_type")
-  filePath       String?     @map("file_path")
-  videoThumbnail String?     @map("video_thumbnail")
   receiverId     String?
   orderId        String?
   isRead         Boolean     @default(false) @map("seen")
   createdAt      DateTime    @default(now())
   updatedAt      DateTime    @updatedAt
+  filePath       String?     @map("file_path")
+  messageType    String      @default("TEXT") @map("message_type")
+  videoThumbnail String?     @map("video_thumbnail")
   channel        ChatChannel @relation(fields: [channelId], references: [id])
   sender         User        @relation(fields: [senderId], references: [id])
 
@@ -927,31 +930,31 @@ model Banner {
 }
 
 model Advertisement {
-  id           String    @id @default(uuid())
-  title        String
-  description  String?
-  image        String?   @map("photo")
-  profileImage String?   @map("profile_image")
-  coverImage   String?   @map("cover_image")
-  video        String?
-  startDate    DateTime? @map("start_date")
-  endDate      DateTime? @map("end_date")
-  status       String    @default("pending")
-  type         String?   @default("vendor_promotion")
+  id            String    @id @default(uuid())
+  title         String
+  description   String?
+  image         String?   @map("photo")
+  redirectType  String?   @map("redirect_type")
+  redirectId    String?   @map("redirect_id")
+  isActive      Boolean   @default(true) @map("is_active")
+  canceledNote  String?   @map("canceled_note")
+  cost          Decimal   @default(0) @db.Decimal(10, 2)
+  coverImage    String?   @map("cover_image")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  endDate       DateTime? @map("end_date")
+  isPaused      Boolean?  @map("is_paused")
+  pauseNote     String?   @map("pause_note")
   paymentStatus Boolean   @default(false) @map("payment_status")
-  priority     String?   @default("N/A")
-  isPaused     Boolean?  @map("is_paused")
-  canceledNote String?   @map("canceled_note")
-  pauseNote    String?   @map("pause_note")
-  cost         Decimal   @default(0) @db.Decimal(10, 2)
-  redirectType String?   @map("redirect_type")
-  redirectUrl  String?   @map("redirect_url")
-  redirectId   String?   @map("redirect_id")
-  vendorId     String?   @map("vendor_id")
-  createdAt    DateTime  @default(now()) @map("created_at")
-  updatedAt    DateTime  @updatedAt @map("updated_at")
-  isActive     Boolean   @default(true) @map("is_active")
-  vendor       Vendor?   @relation(fields: [vendorId], references: [id])
+  priority      String?   @default("N/A")
+  profileImage  String?   @map("profile_image")
+  redirectUrl   String?   @map("redirect_url")
+  startDate     DateTime? @map("start_date")
+  status        String    @default("pending")
+  type          String?   @default("vendor_promotion")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+  vendorId      String?   @map("vendor_id")
+  video         String?
+  vendor        Vendor?   @relation(fields: [vendorId], references: [id])
 
   @@map("advertisements")
 }
@@ -1025,15 +1028,15 @@ model OnBoarding {
 model Document {
   id              String           @id @default(uuid())
   title           String           @unique
-  type            String           @default("vendor")
   frontSide       Boolean          @default(false) @map("front_side")
   backSide        Boolean          @default(false) @map("back_side")
   expireAt        Boolean          @default(false) @map("expire_at")
   enable          Boolean          @default(true)
   createdAt       DateTime         @default(now()) @map("created_at")
   updatedAt       DateTime         @updatedAt @map("updated_at")
-  vendorDocuments VendorDocument[] @relation("DocumentToVendor")
+  type            String           @default("vendor")
   driverDocuments DriverDocument[] @relation("DocumentToDriver")
+  vendorDocuments VendorDocument[] @relation("DocumentToVendor")
 
   @@map("documents")
 }
@@ -1047,12 +1050,11 @@ model Attribute {
   @@map("attributes")
 }
 
-
 model ReviewRating {
-  id          String          @id @default(uuid())
-  rating      Int
-  reviewId    String
-  review      Review          @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+  id       String @id @default(uuid())
+  rating   Int
+  reviewId String
+  review   Review @relation(fields: [reviewId], references: [id], onDelete: Cascade)
 
   @@map("review_ratings")
 }
@@ -1461,6 +1463,131 @@ model spatial_ref_sys {
   proj4text String? @db.VarChar(2048)
 }
 
+model SupportInbox {
+  id               String             @id @default(uuid())
+  userId           String             @map("user_id")
+  userName         String             @map("user_name")
+  userProfileImage String?            @map("user_profile_image")
+  adminId          String?            @map("admin_id")
+  adminName        String?            @map("admin_name")
+  lastMessage      String?            @map("last_message")
+  lastMessageType  SupportMessageType @default(TEXT) @map("last_message_type")
+  lastSenderId     String?            @map("last_sender_id")
+  isRead           Boolean            @default(false) @map("is_read")
+  createdAt        DateTime           @default(now()) @map("created_at")
+  updatedAt        DateTime           @updatedAt @map("updated_at")
+  messages         SupportMessage[]
+
+  @@map("support_inboxes")
+}
+
+model SupportMessage {
+  id             String             @id @default(uuid())
+  inboxId        String             @map("inbox_id")
+  senderId       String             @map("sender_id")
+  senderName     String             @map("sender_name")
+  senderRole     String             @map("sender_role")
+  type           SupportMessageType @default(TEXT)
+  message        String?
+  filePath       String?            @map("file_path")
+  videoThumbnail String?            @map("video_thumbnail")
+  createdAt      DateTime           @default(now()) @map("created_at")
+  inbox          SupportInbox       @relation(fields: [inboxId], references: [id], onDelete: Cascade)
+
+  @@index([inboxId])
+  @@map("support_messages")
+}
+
+model WithdrawRequest {
+  id              String           @id @default(uuid())
+  userId          String
+  amount          Decimal          @db.Decimal(10, 2)
+  status          WithdrawStatus   @default(PENDING)
+  method          WithdrawalMethod
+  accountDetails  Json?
+  referenceId     String?
+  adminNotes      String?
+  snapshotBalance Decimal?         @db.Decimal(10, 2)
+  payoutAccountId String?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  processedAt     DateTime?
+  completedAt     DateTime?
+  rejectedAt      DateTime?
+  failedAt        DateTime?
+  payoutAccount   PayoutAccount?   @relation(fields: [payoutAccountId], references: [id])
+  user            User             @relation(fields: [userId], references: [id])
+
+  @@map("withdraw_requests")
+}
+
+model PayoutAccount {
+  id               String            @id @default(uuid())
+  userId           String            @map("user_id")
+  method           WithdrawalMethod
+  details          Json              @map("details")
+  isDefault        Boolean           @default(false) @map("is_default")
+  createdAt        DateTime          @default(now()) @map("created_at")
+  updatedAt        DateTime          @updatedAt @map("updated_at")
+  user             User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  withdrawRequests WithdrawRequest[]
+
+  @@map("payout_accounts")
+}
+
+model VendorDocument {
+  id              String         @id @default(uuid())
+  vendorId        String         @map("vendor_id")
+  documentId      String         @map("document_id")
+  frontImage      String?        @map("front_image")
+  backImage       String?        @map("back_image")
+  status          DocumentStatus @default(PENDING)
+  createdAt       DateTime       @default(now()) @map("created_at")
+  updatedAt       DateTime       @updatedAt @map("updated_at")
+  expireAt        DateTime?      @map("expire_at")
+  rejectionReason String?        @map("rejection_reason")
+  document        Document       @relation("DocumentToVendor", fields: [documentId], references: [id], onDelete: Cascade)
+  vendor          Vendor         @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+
+  @@unique([vendorId, documentId])
+  @@map("vendor_documents")
+}
+
+model SpecialDiscount {
+  id           String       @id @default(uuid())
+  vendorId     String       @map("vendor_id")
+  endDate      DateTime
+  discount     Decimal      @db.Decimal(10, 2)
+  couponCode   String       @map("coupon_code")
+  photo        String       @map("photo")
+  discountType DiscountType @default(PERCENTAGE) @map("discount_type")
+  createdAt    DateTime     @default(now()) @map("created_at")
+  updatedAt    DateTime     @updatedAt @map("updated_at")
+  isActive     Boolean      @default(true) @map("is_active")
+  isPublish    Boolean      @default(false) @map("is_publish")
+  orders       Order[]
+  vendor       Vendor       @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+
+  @@map("special_discounts")
+}
+
+model PaymentLog {
+  id                  String           @id @default(uuid())
+  userId              String           @map("user_id")
+  invoiceId           String?          @map("invoice_id")
+  amount              Decimal          @db.Decimal(10, 2)
+  currency            String           @default("EGP")
+  status              PaymentLogStatus
+  provider            String           @default("FAWATERAK")
+  rawProviderResponse Json?            @map("raw_provider_response")
+  isProcessed         Boolean          @default(false) @map("is_processed")
+  createdAt           DateTime         @default(now()) @map("created_at")
+  updatedAt           DateTime         @updatedAt @map("updated_at")
+  user                User             @relation(fields: [userId], references: [id])
+
+  @@map("payment_logs")
+}
+
 enum UserRole {
   CUSTOMER @map("customer")
   VENDOR   @map("vendor")
@@ -1568,42 +1695,6 @@ enum SupportMessageType {
   VIDEO @map("video")
 }
 
-model SupportInbox {
-  id               String             @id @default(uuid())
-  userId           String             @map("user_id")
-  userName         String             @map("user_name")
-  userProfileImage String?            @map("user_profile_image")
-  adminId          String?            @map("admin_id")
-  adminName        String?            @map("admin_name")
-  lastMessage      String?            @map("last_message")
-  lastMessageType  SupportMessageType @default(TEXT) @map("last_message_type")
-  lastSenderId     String?            @map("last_sender_id")
-  isRead           Boolean            @default(false) @map("is_read")
-  createdAt        DateTime           @default(now()) @map("created_at")
-  updatedAt        DateTime           @updatedAt @map("updated_at")
-  messages         SupportMessage[]
-
-  @@map("support_inboxes")
-}
-
-model SupportMessage {
-  id             String             @id @default(uuid())
-  inboxId        String             @map("inbox_id")
-  senderId       String             @map("sender_id")
-  senderName     String             @map("sender_name")
-  senderRole     String             @map("sender_role")
-  type           SupportMessageType @default(TEXT)
-  message        String?
-  filePath       String?            @map("file_path")
-  videoThumbnail String?            @map("video_thumbnail")
-  createdAt      DateTime           @default(now()) @map("created_at")
-  inbox          SupportInbox       @relation(fields: [inboxId], references: [id], onDelete: Cascade)
-
-  @@index([inboxId])
-  @@map("support_messages")
-}
-
-
 enum WithdrawStatus {
   PENDING
   APPROVED
@@ -1619,86 +1710,10 @@ enum WithdrawalMethod {
   VODAFONE_CASH
 }
 
-model WithdrawRequest {
-  id              String   @id @default(uuid())
-  userId          String
-  amount          Decimal  @db.Decimal(10, 2)
-  status          WithdrawStatus @default(PENDING)
-  method          WithdrawalMethod
-  accountDetails  Json?
-  referenceId     String?
-  adminNotes      String?
-  snapshotBalance Decimal? @db.Decimal(10, 2)
-  payoutAccountId String?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-  processedAt     DateTime?
-  completedAt     DateTime?
-  rejectedAt      DateTime?
-  failedAt        DateTime?
-
-  user           User           @relation(fields: [userId], references: [id])
-  payoutAccount  PayoutAccount? @relation(fields: [payoutAccountId], references: [id])
-  
-  @@map("withdraw_requests")
-}
-
-model PayoutAccount {
-  id          String           @id @default(uuid())
-  userId      String           @map("user_id")
-  method      WithdrawalMethod
-  details     Json             @map("details") // Stores { accountNumber, bankName, etc. }
-  isDefault   Boolean          @default(false) @map("is_default")
-  createdAt   DateTime         @default(now()) @map("created_at")
-  updatedAt   DateTime         @updatedAt      @map("updated_at")
-
-  user             User             @relation(fields: [userId], references: [id], onDelete: Cascade)
-  withdrawRequests WithdrawRequest[]
-
-  @@map("payout_accounts")
-}
-
-model VendorDocument {
-  id              String         @id @default(uuid())
-  vendorId        String         @map("vendor_id")
-  documentId      String         @map("document_id")
-  frontImage      String?        @map("front_image")
-  backImage       String?        @map("back_image")
-  expireAt        DateTime?      @map("expire_at")
-  status          DocumentStatus @default(PENDING)
-  rejectionReason String?        @map("rejection_reason")
-  createdAt       DateTime       @default(now()) @map("created_at")
-  updatedAt       DateTime       @updatedAt @map("updated_at")
-  document        Document       @relation("DocumentToVendor", fields: [documentId], references: [id], onDelete: Cascade)
-  vendor          Vendor         @relation(fields: [vendorId], references: [id], onDelete: Cascade)
-
-  @@unique([vendorId, documentId])
-  @@map("vendor_documents")
-}
-
 enum DocumentStatus {
   PENDING  @map("pending")
   ACCEPTED @map("accepted")
   REJECTED @map("rejected")
-}
-
-
-model SpecialDiscount {
-  id                String          @id @default(uuid())
-  vendorId          String          @map("vendor_id")
-  vendor            Vendor          @relation(fields: [vendorId], references: [id], onDelete: Cascade)
-  endDate           DateTime
-  discount          Decimal         @db.Decimal(10, 2)
-  couponCode        String          @map("coupon_code")
-  photo             String          @map("photo")
-  discountType      DiscountType    @default(PERCENTAGE) @map("discount_type")
-  isPublish         Boolean         @default(false) @map("is_publish")
-  isActive          Boolean         @default(true) @map("is_active")
-  createdAt         DateTime        @default(now()) @map("created_at")
-  updatedAt         DateTime        @updatedAt @map("updated_at")
-
-  orders            Order[]
-  @@map("special_discounts")
 }
 
 enum DiscountType {
@@ -1710,21 +1725,4 @@ enum PaymentLogStatus {
   PENDING
   SUCCESS
   FAILED
-}
-
-model PaymentLog {
-  id                  String           @id @default(uuid())
-  userId              String           @map("user_id")
-  invoiceId           String?          @map("invoice_id")
-  amount              Decimal          @db.Decimal(10, 2)
-  currency            String           @default("EGP")
-  status              PaymentLogStatus @default(PENDING)
-  provider            String           @default("FAWATERAK")
-  rawProviderResponse Json?            @map("raw_provider_response")
-  isProcessed         Boolean          @default(false) @map("is_processed")
-  createdAt           DateTime         @default(now()) @map("created_at")
-  updatedAt           DateTime         @updatedAt @map("updated_at")
-  user                User             @relation(fields: [userId], references: [id])
-
-  @@map("payment_logs")
 }

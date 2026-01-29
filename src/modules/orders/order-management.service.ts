@@ -95,6 +95,28 @@ export class OrderManagementService {
     };
   }
 
+  async getManagerCashHistory(user: User) {
+    if (user.role !== UserRole.MANAGER) {
+      throw new ForbiddenException('ACCESS_DENIED');
+    }
+
+    const history = await this.prisma.managerCashConfirmation.findMany({
+      where: { managerId: user.id },
+      include: {
+        order: {
+          include: orderInclude,
+        },
+        driver: true,
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    return history.map((h) => ({
+      ...h,
+      order: mapOrderResponse(h.order as any),
+    }));
+  }
+
   async getDriverPendingCashOrders(driverId: string, user: User) {
     if (user.role === UserRole.DRIVER && user.id !== driverId) {
       throw new ForbiddenException('ACCESS_DENIED');
@@ -148,5 +170,53 @@ export class OrderManagementService {
       totalCash,
       orders: orders.map((order) => mapOrderResponse(order)),
     };
+  }
+  async getManagerCashOnHand(user: User) {
+    if (user.role !== UserRole.MANAGER) {
+      throw new ForbiddenException('ACCESS_DENIED');
+    }
+
+    const totalCashConfirmed = await this.prisma.managerCashConfirmation.aggregate({
+      where: { managerId: user.id },
+      _sum: { amount: true },
+    });
+
+    const totalCashPaidOut = await this.prisma.managerPayoutConfirmation.aggregate({
+      where: { managerId: user.id },
+      _sum: { amount: true },
+    });
+
+    const collected = Number(totalCashConfirmed._sum.amount ?? 0);
+    const paidOut = Number(totalCashPaidOut._sum.amount ?? 0);
+
+    return {
+      cashOnHand: collected - paidOut,
+      totalCollected: collected,
+      totalPaidOut: paidOut,
+    };
+  }
+
+  async confirmManagerPayout(admin: User, managerId: string, amount: number) {
+    if (admin.role !== UserRole.ADMIN) {
+      throw new ForbiddenException('ACCESS_DENIED');
+    }
+
+    // Optional: Validate manager exists
+    const manager = await this.prisma.user.findUnique({
+      where: { id: managerId, role: UserRole.MANAGER },
+    });
+
+    if (!manager) {
+      throw new ForbiddenException('MANAGER_NOT_FOUND');
+    }
+
+    return this.prisma.managerPayoutConfirmation.create({
+      data: {
+        managerId,
+        adminId: admin.id,
+        amount,
+        payoutDate: new Date(),
+      },
+    });
   }
 }

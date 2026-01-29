@@ -124,6 +124,7 @@ export class OrdersGateway implements OnGatewayConnection, OnGatewayDisconnect {
           author: true,
           vendor: true,
           driver: true,
+          manager: true,
           address: true,
           specialDiscount: true,
           items: {

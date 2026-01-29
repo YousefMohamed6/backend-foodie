@@ -172,6 +172,19 @@ export class OrdersController {
     return { success: true, message: 'ORDER_SUCCESS', data };
   }
 
+  @Post('manager/:managerId/reset-cash')
+  @Roles(UserRole.ADMIN)
+  @ApiOperation({
+    summary: 'Admin resets manager cash on hand to zero (records payout)',
+  })
+  async resetManagerCash(@Param('managerId') managerId: string, @Request() req) {
+    const data = await this.ordersService.clearManagerCashOnHand(
+      req.user,
+      managerId,
+    );
+    return { success: true, message: 'MANAGER_CASH_RESET_SUCCESS', data };
+  }
+
   @Get('drivers/:driverId/pending-cash-orders')
   @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.DRIVER)
   @ApiOperation({

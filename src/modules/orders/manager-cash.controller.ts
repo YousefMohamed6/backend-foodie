@@ -24,7 +24,7 @@ import { OrdersService } from './orders.service';
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('manager')
 export class ManagerCashController {
-  constructor(private readonly ordersService: OrdersService) {}
+  constructor(private readonly ordersService: OrdersService) { }
 
   @Get('orders/pending-cash')
   @Roles(UserRole.MANAGER)
@@ -42,6 +42,15 @@ export class ManagerCashController {
     return this.ordersService.confirmCashReceipt(orderId, req.user);
   }
 
+  @Get('cash-on-hand')
+  @Roles(UserRole.MANAGER)
+  @ApiOperation({
+    summary: 'Get total cash on hand for manager (collected - paid out)',
+  })
+  getCashOnHand(@Request() req) {
+    return this.ordersService.getManagerCashOnHand(req.user);
+  }
+
   @Get('cash-summary')
   @Roles(UserRole.MANAGER)
   @ApiOperation({
@@ -54,5 +63,14 @@ export class ManagerCashController {
   })
   getCashSummary(@Query('date') date: string, @Request() req) {
     return this.ordersService.getManagerCashSummary(req.user, date);
+  }
+
+  @Get('cash-history')
+  @Roles(UserRole.MANAGER)
+  @ApiOperation({
+    summary: 'Get full history of confirmed cash collections for a manager',
+  })
+  getCashHistory(@Request() req) {
+    return this.ordersService.getManagerCashHistory(req.user);
   }
 }
