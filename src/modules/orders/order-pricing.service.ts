@@ -107,7 +107,11 @@ export class OrderPricingService {
     const calculatedDistanceFee = distance * deliveryFeePerKm;
     let deliveryCharge = Math.max(calculatedDistanceFee, minDeliveryFee);
 
-    if (firstOrderFreeDeliveryEnabled && userId) {
+    // FIX: Takeaway orders should NOT have delivery charges
+    // Delivery fee only applies to orders that require driver delivery
+    if (createOrderDto.takeAway === true) {
+      deliveryCharge = 0;
+    } else if (firstOrderFreeDeliveryEnabled && userId) {
       const previousOrdersCount = await this.prisma.order.count({
         where: { authorId: userId },
       });

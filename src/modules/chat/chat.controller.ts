@@ -29,6 +29,7 @@ import { ChatService } from './chat.service';
 import {
   CreateChannelDto,
   CreateOrderChatDto,
+  CreatePrivateChatDto,
   SendMediaMessageDto,
   SendMessageDto,
 } from './dto/chat.dto';
@@ -86,6 +87,15 @@ export class ChatController {
     @Request() req: any,
   ) {
     return this.chatService.createChannel(req.user.id, createChannelDto);
+  }
+
+  @Post('private-chat')
+  @ApiOperation({ summary: 'Create or get private chat channel with manager' })
+  createPrivateChat(
+    @Body() dto: CreatePrivateChatDto,
+    @Request() req: any,
+  ) {
+    return this.chatService.createPrivateChat(req.user.id, dto.managerId);
   }
 
   @Post('order-chat')

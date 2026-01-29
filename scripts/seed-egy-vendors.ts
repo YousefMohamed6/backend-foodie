@@ -126,6 +126,7 @@ async function main() {
                 latitude: zone.latitude || 31.1659,
                 longitude: zone.longitude || 31.6763,
                 zoneId: zone.id,
+                subscriptionExpiryDate: new Date(Date.now() + 1000 * 60 * 60 * 24 * 365), // 1 year
             },
             create: {
                 authorId: user.id,
@@ -139,6 +140,7 @@ async function main() {
                 longitude: zone.longitude || 31.6763,
                 zoneId: zone.id,
                 isActive: true,
+                subscriptionExpiryDate: new Date(Date.now() + 1000 * 60 * 60 * 24 * 365), // 1 year
             },
         });
 
@@ -163,22 +165,28 @@ async function main() {
             });
 
             if (existingProduct) {
+                const price = 100 + Math.floor(Math.random() * 200);
+                const discountPrice = Math.floor(price * 0.7); // 30% discount
                 await prisma.product.update({
                     where: { id: existingProduct.id },
                     data: {
                         image: randomImage,
+                        price: price,
+                        discountPrice: discountPrice,
                         quantity: randomQty,
                         isActive: true,
                         isPublish: true,
                     },
                 });
             } else {
+                const price = 100 + Math.floor(Math.random() * 200);
+                const discountPrice = Math.floor(price * 0.7); // 30% discount
                 await prisma.product.create({
                     data: {
                         name: productName,
                         description: `وصف لذيذ لـ ${productName} - جودة ممتازة وسعر مناسب`,
-                        price: 50 + Math.floor(Math.random() * 200),
-                        discountPrice: 40 + Math.floor(Math.random() * 150),
+                        price: price,
+                        discountPrice: discountPrice,
                         image: randomImage,
                         quantity: randomQty,
                         categoryId: cat.id,

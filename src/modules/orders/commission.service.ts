@@ -25,21 +25,26 @@ export class CommissionService {
   constructor(
     private prisma: PrismaService,
     private settingsService: SettingsService,
-  ) {}
+  ) { }
 
   private round(amount: number): number {
     return Math.round(amount * 100) / 100;
   }
 
+  /**
+   * Calculate vendor commission based on the vendor's portion only.
+   * IMPORTANT: baseAmount should be (orderSubtotal - discountAmount), NOT orderTotal.
+   * orderTotal includes delivery fees and tips which belong to the driver.
+   */
   calculateVendorCommission(
-    orderTotal: number,
+    baseAmount: number,
     rate: number,
   ): CommissionCalculation {
-    const value = (orderTotal * rate) / 100;
+    const value = (baseAmount * rate) / 100;
     return {
       rate,
       value: this.round(value),
-      baseAmount: orderTotal,
+      baseAmount: baseAmount,
     };
   }
 

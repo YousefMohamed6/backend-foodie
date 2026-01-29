@@ -1,6 +1,9 @@
 import { ApiProperty } from '@nestjs/swagger';
 
 export class MarsoulResponseDto {
+  @ApiProperty({ description: 'ID of the manager (user)' })
+  id: string;
+
   @ApiProperty({ description: 'Full name of the manager' })
   managerName: string;
 

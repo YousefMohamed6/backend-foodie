@@ -121,3 +121,12 @@ export class CreateOrderChatDto {
   @IsNotEmpty()
   chatType: 'CUSTOMER_VENDOR' | 'CUSTOMER_DRIVER' | 'DRIVER_VENDOR' | 'MANAGER_DRIVER' | 'MANAGER_CUSTOMER' | 'MANAGER_VENDOR';
 }
+
+export class CreatePrivateChatDto {
+  @ApiProperty({
+    description: 'Manager ID to start chat with',
+  })
+  @IsString()
+  @IsNotEmpty()
+  managerId: string;
+}

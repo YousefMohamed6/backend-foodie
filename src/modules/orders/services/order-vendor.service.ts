@@ -122,17 +122,19 @@ export class OrderVendorService {
 
             let vendorCommissionRate = 0;
             let vendorCommissionValue = 0;
-            let vendorNet = Number(order.orderTotal);
+
+            const vendorBaseAmount = Number(order.orderSubtotal) - Number(order.discountAmount);
+            let vendorNet = Math.max(0, vendorBaseAmount);
 
             if (isFreePlan) {
                 vendorCommissionRate =
                     await this.commissionService.getVendorCommissionRate();
                 const calculation = this.commissionService.calculateVendorCommission(
-                    Number(order.orderTotal),
+                    vendorBaseAmount,
                     vendorCommissionRate,
                 );
                 vendorCommissionValue = calculation.value;
-                vendorNet = Number(order.orderTotal) - vendorCommissionValue;
+                vendorNet = Math.max(0, vendorBaseAmount - vendorCommissionValue);
 
                 await this.commissionService.createCommissionSnapshot(
                     {
@@ -141,7 +143,7 @@ export class OrderVendorService {
                         source: CommissionSource.VENDOR,
                         commissionRate: vendorCommissionRate,
                         commissionValue: vendorCommissionValue,
-                        baseAmount: Number(order.orderTotal),
+                        baseAmount: vendorBaseAmount,
                     },
                     tx,
                 );

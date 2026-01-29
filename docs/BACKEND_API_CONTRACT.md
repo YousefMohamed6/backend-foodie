@@ -208,6 +208,39 @@ Body: {
 Response: UserModel
 ```
 
+#### Get Driver Earnings
+```
+GET /api/v1/drivers/earnings
+Headers: Authorization: Bearer {token}
+Query: {
+  "period": "daily" | "monthly" | "yearly",
+  "date": "ISO8601 string"
+}
+Response: {
+  "period": string,
+  "startDate": string,
+  "endDate": string,
+  "totalOrders": number,
+  "totalDeliveryFees": number,
+  "totalTips": number,
+  "driverNet": number,
+  "driverTotalEarnings": number,
+  "platformCommission": number,
+  "orders": [
+    {
+      "id": "string",
+      "vendorName": "string",
+      "deliveryCharge": number,
+      "tipAmount": number,
+      "driverNet": number,
+      "platformCommission": number,
+      "paymentMethod": "string",
+      "createdAt": "string"
+    }
+  ]
+}
+```
+
 ---
 
 ## Vendors
@@ -915,12 +948,43 @@ Body: {
 Response: ConversationModel
 ```
 
-#### Mark Messages as Seen
+#### Get Chat Threads (Inbox)
 ```
-PATCH /api/v1/chat/threads/{threadId}/seen
+GET /api/v1/chat/threads
 Headers: Authorization: Bearer {token}
 Response: {
-  "message": "string"
+  "threads": InboxModel[]
+}
+```
+
+#### Create Private Chat (Customer -> Manager)
+```
+POST /api/v1/chat/private-chat
+Headers: Authorization: Bearer {token}
+Body: {
+  "managerId": "string"
+}
+Response: ChatChannelModel
+```
+
+---
+
+## Private Mobile Services (Marsoul)
+
+#### Get All Active Managers
+```
+GET /api/v1/marsoul
+Headers: Authorization: Bearer {token}
+Response: {
+  "success": true,
+  "data": [
+    {
+      "managerName": "string",
+      "phone": "string",
+      "zoneId": "string",
+      "zoneName": "string"
+    }
+  ]
 }
 ```
 

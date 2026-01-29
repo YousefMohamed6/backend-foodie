@@ -22,7 +22,7 @@ export class WalletService {
     private readonly configService: ConfigService,
   ) { }
 
-  async getBalance(userId: string) {
+  async getBalance(userId: string, transactionUser?: string) {
     const getSum = async (type: TransactionType) => {
       const depositFilter =
         type === TransactionType.DEPOSIT || type === TransactionType.REFUND || type === TransactionType.PAYMENT
@@ -40,6 +40,7 @@ export class WalletService {
         where: {
           userId,
           type,
+          ...(transactionUser ? { transactionUser } : {}),
           ...depositFilter,
         },
       });
@@ -399,5 +400,44 @@ export class WalletService {
       throw new NotFoundException('TRANSACTION_NOT_FOUND');
     }
     return { status: tx.paymentStatus || WalletConstants.PAYMENT_STATUS_PAID };
+  }
+
+  /**
+   * Reconciliation tool to find and fix discrepancies between ledger and profile balance
+   */
+  async reconcileUserWallet(userId: string, transactionUser?: string, applyFix = false) {
+    const ledgerBalance = await this.getBalance(userId, transactionUser);
+
+    let profileBalance = 0;
+    const customer = await this.prisma.customerProfile.findUnique({ where: { userId } });
+    const driver = await this.prisma.driverProfile.findUnique({ where: { userId } });
+
+    if (transactionUser === WalletConstants.TRANSACTION_USER_DRIVER && driver) {
+      profileBalance = driver.walletAmount.toNumber();
+    } else if (transactionUser === WalletConstants.TRANSACTION_USER_VENDOR) {
+      const vendor = await this.prisma.vendor.findFirst({ where: { authorId: userId } });
+      profileBalance = Number(vendor?.walletAmount ?? 0);
+    } else if (customer) {
+      profileBalance = customer.walletAmount.toNumber();
+    }
+
+    const discrepancy = ledgerBalance - profileBalance;
+
+    if (applyFix && discrepancy !== 0) {
+      if (transactionUser === WalletConstants.TRANSACTION_USER_DRIVER) {
+        await this.updateDriverWallet(userId, ledgerBalance, WalletConstants.OPERATION_ADD);
+      } else {
+        await this.updateUserWallet(userId, ledgerBalance, WalletConstants.OPERATION_ADD);
+      }
+    }
+
+    return {
+      userId,
+      transactionUser,
+      ledgerBalance,
+      profileBalance,
+      discrepancy,
+      fixed: applyFix && discrepancy !== 0,
+    };
   }
 }

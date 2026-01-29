@@ -289,29 +289,63 @@ export class DriversService {
       },
       select: {
         id: true,
-        totalAmount: true,
+        deliveryCharge: true,
+        tipAmount: true,
+        driverNet: true,
+        driverCommissionValue: true,
+        paymentMethod: true,
         createdAt: true,
+        vendor: {
+          select: {
+            title: true,
+          },
+        },
+      },
+      orderBy: {
+        createdAt: 'desc',
       },
     });
 
-    const totalEarnings = orders.reduce(
-      (sum, order) => sum + Number(order.totalAmount),
-      0,
+    // Calculate totals from actual order data
+    const totals = orders.reduce(
+      (acc, order) => {
+        acc.totalDeliveryFees += Number(order.deliveryCharge) || 0;
+        acc.totalTips += Number(order.tipAmount) || 0;
+        acc.totalDriverNet += Number(order.driverNet) || 0;
+        acc.totalPlatformCommission += Number(order.driverCommissionValue) || 0;
+        return acc;
+      },
+      {
+        totalDeliveryFees: 0,
+        totalTips: 0,
+        totalDriverNet: 0,
+        totalPlatformCommission: 0,
+      },
     );
 
-    // Calculate driver commission (typically 80-90% of order total)
-    const commissionRate = 0.85; // 85% to driver, 15% platform fee
-    const driverEarnings = totalEarnings * commissionRate;
+    // Driver total earnings = driverNet + tips (tips are 100% for driver)
+    const driverTotalEarnings = totals.totalDriverNet + totals.totalTips;
 
     return {
       period,
       startDate,
       endDate,
       totalOrders: orders.length,
-      totalEarnings,
-      driverEarnings: Math.round(driverEarnings * 100) / 100,
-      platformFee: Math.round((totalEarnings - driverEarnings) * 100) / 100,
-      orders,
+      totalDeliveryFees: Math.round(totals.totalDeliveryFees * 100) / 100,
+      totalTips: Math.round(totals.totalTips * 100) / 100,
+      driverNet: Math.round(totals.totalDriverNet * 100) / 100,
+      driverTotalEarnings: Math.round(driverTotalEarnings * 100) / 100,
+      platformCommission: Math.round(totals.totalPlatformCommission * 100) / 100,
+      orders: orders.map((order) => ({
+        id: order.id,
+        vendorName: order.vendor?.title || '',
+        deliveryCharge: Number(order.deliveryCharge) || 0,
+        tipAmount: Number(order.tipAmount) || 0,
+        driverNet: Number(order.driverNet) || 0,
+        platformCommission: Number(order.driverCommissionValue) || 0,
+        paymentMethod: order.paymentMethod,
+        createdAt: order.createdAt,
+      })),
     };
   }
 }

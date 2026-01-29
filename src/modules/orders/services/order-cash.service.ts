@@ -75,12 +75,15 @@ export class OrderCashService {
         }
 
         return await this.prisma.$transaction(async (tx) => {
+            const amountToSettlement =
+                Number(order.totalAmount) - Number(order.tipAmount);
+
             await tx.managerCashConfirmation.create({
                 data: {
                     managerId: user.id,
                     driverId: order.driverId!,
                     orderId: id,
-                    amount: order.totalAmount,
+                    amount: amountToSettlement,
                 },
             });
 
@@ -95,10 +98,10 @@ export class OrderCashService {
 
             const cashHandoverDescriptions =
                 WalletTransactionDescriptions.cashHandover(id);
-            await this.prisma.walletTransaction.create({
+            await tx.walletTransaction.create({
                 data: {
                     userId: order.driverId!,
-                    amount: Number(order.totalAmount),
+                    amount: amountToSettlement,
                     type: TransactionType.DEPOSIT,
                     descriptionEn: cashHandoverDescriptions.en,
                     descriptionAr: cashHandoverDescriptions.ar,
@@ -106,12 +109,14 @@ export class OrderCashService {
                     transactionUser: OrderConstants.DRIVER_TRANSACTION_USER,
                 },
             });
+
             await this.walletService.updateDriverWallet(
                 order.driverId!,
-                Number(order.totalAmount),
+                amountToSettlement,
                 OrderConstants.WALLET_OPERATION_ADD,
                 tx,
             );
+
 
             return this.emitUpdate(updatedOrder);
         });

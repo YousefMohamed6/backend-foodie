@@ -138,7 +138,7 @@ export class OrdersGateway implements OnGatewayConnection, OnGatewayDisconnect {
       });
 
       if (activeOrder) {
-        const mappedOrder = mapOrderResponse(activeOrder);
+        const mappedOrder = mapOrderResponse(activeOrder as any);
         client.emit(OrderSocketEvents.DRIVER_ORDER_UPDATED, mappedOrder);
         this.logger.log(`Sent active order ${activeOrder.id} to driver ${driverId} on connect`);
       }

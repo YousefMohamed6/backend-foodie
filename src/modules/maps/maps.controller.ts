@@ -11,12 +11,36 @@ import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { MapsService } from './maps.service';
 
+import { ZonesService } from '../zones/zones.service';
+
 @ApiTags('Maps')
 @ApiBearerAuth()
 @Controller('maps')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class MapsController {
-  constructor(private readonly mapsService: MapsService) { }
+  constructor(
+    private readonly mapsService: MapsService,
+    private readonly zonesService: ZonesService,
+  ) { }
+
+  @Get('check-zone')
+  @Roles(UserRole.CUSTOMER, UserRole.VENDOR)
+  @ApiOperation({ summary: 'Check if location is within any zone' })
+  @ApiQuery({ name: 'lat', required: true, type: Number })
+  @ApiQuery({ name: 'lng', required: true, type: Number })
+  async checkZone(
+    @Query('lat') lat: string,
+    @Query('lng') lng: string,
+  ) {
+    const zone = await this.zonesService.findZoneByLocation(
+      parseFloat(lat),
+      parseFloat(lng),
+    );
+    return {
+      inZone: !!zone,
+      zone: zone,
+    };
+  }
 
   @Get('route')
   @Roles(UserRole.CUSTOMER, UserRole.VENDOR, UserRole.DRIVER, UserRole.ADMIN, UserRole.MANAGER)

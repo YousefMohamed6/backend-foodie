@@ -92,8 +92,14 @@ export class UsersService {
         lng: driver?.currentLng,
       };
     } else {
+      const customer = await this.prisma.customerProfile.findUnique({
+        where: { userId: user.id },
+      });
       const { password, ...userData } = user;
-      result = userData;
+      result = {
+        ...userData,
+        walletAmount: customer?.walletAmount ?? 0,
+      };
     }
 
     await this.redisService.set(cacheKey, result, 3600);

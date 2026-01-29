@@ -31,12 +31,13 @@ import { WalletService } from './wallet.service';
 @UseGuards(JwtAuthGuard)
 @Controller('wallet')
 export class WalletController {
-  constructor(private readonly walletService: WalletService) {}
+  constructor(private readonly walletService: WalletService) { }
 
   @Get('balance')
   @ApiOperation({ summary: 'Get wallet balance' })
-  getBalance(@Request() req) {
-    return this.walletService.getBalance(req.user.id);
+  @ApiQuery({ name: 'transactionUser', required: false, description: 'Filter by user role types (customer, driver, vendor)' })
+  getBalance(@Request() req, @Query('transactionUser') transactionUser?: string) {
+    return this.walletService.getBalance(req.user.id, transactionUser);
   }
 
   @Get('transactions')

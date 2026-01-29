@@ -568,7 +568,7 @@ model WalletTransaction {
   heldBalanceId            String?                   @map("held_balance_id")
   resolutionReason         String?                   @map("resolution_reason")
   heldBalance              HeldBalance?              @relation(fields: [heldBalanceId], references: [id])
-  order                    Order?                    @relation(fields: [orderId], references: [id])
+  order                    Order?                    @relation(fields: [orderId], references: [id], onDelete: Cascade)
   subscription             Subscription?             @relation(fields: [subscriptionId], references: [id])
   user                     User                      @relation(fields: [userId], references: [id])
 
@@ -605,7 +605,7 @@ model HeldBalance {
   autoReleaseDate    DateTime?                 @map("auto_release_date")
   disputeId          String?                   @map("dispute_id")
   dispute            Dispute?                  @relation(fields: [disputeId], references: [id])
-  order              Order                     @relation(fields: [orderId], references: [id])
+  order              Order                     @relation(fields: [orderId], references: [id], onDelete: Cascade)
   walletTransactions WalletTransaction[]
 
   @@map("held_balances")
@@ -628,7 +628,7 @@ model Dispute {
   createdAt        DateTime          @default(now()) @map("created_at")
   resolvedAt       DateTime?         @map("resolved_at")
   auditLogs        DisputeAuditLog[]
-  order            Order             @relation(fields: [orderId], references: [id])
+  order            Order             @relation(fields: [orderId], references: [id], onDelete: Cascade)
   heldBalances     HeldBalance[]
 
   @@map("disputes")
@@ -688,7 +688,7 @@ model Review {
   ratings    ReviewRating[]
   customer   User           @relation(fields: [customerId], references: [id])
   driver     User?          @relation("ReviewDriver", fields: [driverId], references: [id])
-  order      Order?         @relation(fields: [orderId], references: [id])
+  order      Order?         @relation(fields: [orderId], references: [id], onDelete: Cascade)
   product    Product?       @relation(fields: [productId], references: [id])
   vendor     Vendor         @relation(fields: [vendorId], references: [id], onDelete: Cascade)
 
@@ -742,7 +742,7 @@ model ChatChannel {
   restaurantId           String?       @map("restaurant_id")
   restaurantName         String?       @map("restaurant_name")
   restaurantProfileImage String?       @map("restaurant_profile_image")
-  order                  Order?        @relation(fields: [orderId], references: [id])
+  order                  Order?        @relation(fields: [orderId], references: [id], onDelete: Cascade)
   messages               ChatMessage[]
   participants           User[]        @relation("UserChannels")
 
@@ -762,7 +762,7 @@ model ChatMessage {
   filePath       String?     @map("file_path")
   messageType    String      @default("TEXT") @map("message_type")
   videoThumbnail String?     @map("video_thumbnail")
-  channel        ChatChannel @relation(fields: [channelId], references: [id])
+  channel        ChatChannel @relation(fields: [channelId], references: [id], onDelete: Cascade)
   sender         User        @relation(fields: [senderId], references: [id])
 
   @@map("chat_messages")
@@ -1084,7 +1084,7 @@ model ManagerAuditLog {
   createdAt DateTime @default(now())
   driver    User?    @relation("DriverManagerLogs", fields: [driverId], references: [id])
   manager   User     @relation("ManagerLogs", fields: [managerId], references: [id])
-  order     Order    @relation("OrderManagerLogs", fields: [orderId], references: [id])
+  order     Order    @relation("OrderManagerLogs", fields: [orderId], references: [id], onDelete: Cascade)
 
   @@map("manager_audit_logs")
 }
@@ -1098,7 +1098,7 @@ model ManagerCashConfirmation {
   createdAt DateTime @default(now())
   driver    User     @relation("DriverCashConfirmations", fields: [driverId], references: [id])
   manager   User     @relation("ManagerCashConfirmations", fields: [managerId], references: [id])
-  order     Order    @relation("OrderCashConfirmations", fields: [orderId], references: [id])
+  order     Order    @relation("OrderCashConfirmations", fields: [orderId], references: [id], onDelete: Cascade)
 
   @@map("manager_cash_confirmations")
 }

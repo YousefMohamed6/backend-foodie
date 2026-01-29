@@ -188,6 +188,11 @@ export class OrderCreationService {
             }
 
             if (createOrderDto.paymentMethod === PaymentMethod.wallet) {
+                const balance = await this.walletService.getBalance(user.id);
+                if (balance < calcs.totalAmount) {
+                    throw new BadRequestException(ORDERS_ERRORS.INSUFFICIENT_FUNDS);
+                }
+
                 await tx.walletTransaction.create({
                     data: {
                         userId: user.id,

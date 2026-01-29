@@ -155,6 +155,84 @@ export class ChatService {
     });
   }
 
+  async createPrivateChat(userId: string, managerId: string) {
+    const [user, manager] = await Promise.all([
+      this.prisma.user.findUnique({ where: { id: userId } }),
+      this.prisma.user.findUnique({ where: { id: managerId } }),
+    ]);
+
+    if (!manager) {
+      throw new NotFoundException('MANAGER_NOT_FOUND');
+    }
+
+    if (!user) {
+      throw new NotFoundException('USER_NOT_FOUND');
+    }
+
+    // Check if channel already exists for this manager and customer
+    let channel = await this.prisma.chatChannel.findFirst({
+      where: {
+        chatType: ChatConstants.CHAT_TYPES.MANAGER_CUSTOMER,
+        orderId: null,
+        AND: [
+          { participants: { some: { id: userId } } },
+          { participants: { some: { id: managerId } } },
+        ],
+      },
+      include: {
+        participants: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            profilePictureURL: true,
+            role: true,
+          },
+        },
+        messages: {
+          take: 20,
+          orderBy: { createdAt: 'desc' },
+        },
+      },
+    });
+
+    if (!channel) {
+      // Create new channel
+      channel = await this.prisma.chatChannel.create({
+        data: {
+          chatType: ChatConstants.CHAT_TYPES.MANAGER_CUSTOMER,
+          name: `${manager.firstName} ${manager.lastName}`,
+          customerId: userId,
+          customerName: `${user.firstName} ${user.lastName}`,
+          customerProfileImage: user.profilePictureURL,
+          participants: {
+            connect: [{ id: userId }, { id: managerId }],
+          },
+        },
+        include: {
+          participants: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              profilePictureURL: true,
+              role: true,
+            },
+          },
+          messages: true,
+        },
+      });
+    }
+
+    return {
+      success: true,
+      data: {
+        ...channel,
+        messages: channel.messages?.reverse() || [],
+      },
+    };
+  }
+
   /**
    * Create or get existing chat channel for an order
    */

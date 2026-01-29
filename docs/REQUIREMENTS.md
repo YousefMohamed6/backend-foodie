@@ -11,19 +11,20 @@ The core workflow involves a customer placing an order, its acceptance by a vend
 ## 1. Payment Handling & Timing
 
 ### Wallet Payment (Prepaid)
-- **Placement**: Total amount (Order Subtotal + Delivery Fee + Tip) is immediately deducted from the customer's wallet and moved to HELD state.
+- **Placement**: Total amount (Order Subtotal + Delivery Fee + Tip - Discount) is immediately deducted from the customer's wallet and moved to HELD state.
 - **SHIPPED**: HeldBalance record is updated with calculated vendor/driver/admin amounts. Funds remain HELD.
 - **DELIVERED**: Driver marks delivered. Customer is notified to confirm receipt. Funds still HELD.
 - **COMPLETED**: Upon customer confirmation, OTP validation, or auto-release timeout, funds are distributed:
-  - **Vendor**: Receives (Subtotal - Admin Commission)
-  - **Driver**: Receives (Driver Portion of Delivery Fee + 100% of Tip)
-  - **Admin**: Receives (Vendor Commission + Admin Portion of Delivery Fee)
+  - **Vendor**: Receives `(Subtotal - Discount - Vendor Commission)`
+  - **Driver**: Receives `(Delivery Fee - Driver Commission + 100% of Tip)`
+  - **Platform**: Receives `(Vendor Commission + Driver Commission)`
 
 ### Cash on Delivery (COD)
 - **Placement**: No wallet deduction.
 - **DELIVERED**: Wallet credits occur only when the order is marked complete:
-  - Vendor, Driver, Admin credited as per standard split
-  - **Driver Debt**: Full cash collected (Subtotal + Fee) recorded as debt against driver's wallet
+  - Vendor, Driver, Platform credited as per standard split
+  - **Driver Debt**: Cash collected `(Order Total - Tip)` recorded as debt against driver's wallet
+  - Tips are NOT included in driver debt (driver keeps cash tips)
 
 ---
 
@@ -32,23 +33,61 @@ The core workflow involves a customer placing an order, its acceptance by a vend
 ### Delivery Fee Calculation
 - Calculated as `Distance (km) × Delivery_Fee_Per_Km`
 - **Floor**: Must never be lower than `min_delivery_fee`
+- **Takeaway Orders**: Delivery fee is always `0` when `takeAway = true`
 
-### Admin Commission (Vendor)
-- Percentage of order subtotal
-- Waived if vendor is on premium/paid subscription plan (Price > 0)
+### Vendor Commission (Platform Fee)
+- **Base Amount**: `orderSubtotal - discountAmount` (NEVER includes delivery or tips)
+- **Calculation**: `vendorCommission = baseAmount × vendorCommissionRate`
+- **Waived**: If vendor is on premium/paid subscription plan (Price > 0)
+- **CRITICAL**: Vendor is NOT entitled to delivery fees or tips under any circumstance
 
-### Admin Commission (Delivery)
+### Driver Commission (Platform Fee)
 - Platform takes `driver_commission_rate` from delivery fee
 - **Driver Safety Floor**: Driver receives at least `min_delivery_pay`. Platform commission reduced if necessary.
+- **Calculation**: `driverNet = max(minPay, deliveryCharge - driverCommission)`
 
 ### Tips
+- **100% to Driver**: Tips are NEVER shared with vendor or platform.
 - **Wallet**: 100% digital credit to Driver's wallet.
 - **COD**: Tips kept physically by driver, NOT credited digitally, NOT included in debt.
-- Neither platform nor vendor takes any share.
 
 ---
 
-## 3. Financial Safety & Safeguards
+## 3. Financial Domain Isolation (CRITICAL)
+
+### Core Principle
+Each monetary unit must flow **exactly once** to its rightful owner. The platform has four independent financial stakeholders with strictly separated money domains:
+
+| Stakeholder | Entitled To | NOT Entitled To |
+|-------------|-------------|------------------|
+| **Customer** | Pays full order total | — |
+| **Vendor** | Product subtotal minus discount & commission | Delivery fees, Tips |
+| **Driver** | Delivery fee minus commission + 100% tips | Vendor commission |
+| **Platform** | Vendor commission + Driver commission | Tips |
+
+### Financial Formulas
+
+```
+orderTotal = orderSubtotal + deliveryCharge + tipAmount - discountAmount
+
+vendorBaseAmount = orderSubtotal - discountAmount
+vendorNet = vendorBaseAmount - vendorCommission
+
+driverNet = max(minPay, deliveryCharge - driverCommission)
+driverTotal = driverNet + tipAmount
+
+platformTotal = vendorCommission + driverCommission
+```
+
+### Balance Equation Verification
+```
+customerPays = vendorNet + vendorCommission + driverNet + driverCommission + tipAmount
+            = orderTotal ✓
+```
+
+---
+
+## 4. Financial Safety & Safeguards
 
 ### Driver Debt Limit
 - Configurable `max_driver_debt` limit.
@@ -71,7 +110,7 @@ The core workflow involves a customer placing an order, its acceptance by a vend
 
 ---
 
-## 4. Cancellations and Refunds
+## 5. Cancellations and Refunds
 
 ### Pre-Shipping Cancellations
 - Wallet orders: Full refund to customer (including tip).
@@ -86,12 +125,12 @@ The core workflow involves a customer placing an order, its acceptance by a vend
 
 ---
 
-## 5. Wallet Protection & Dispute Handling
+## 6. Wallet Protection & Dispute Handling
 
-### 5.1 Core Principle
+### 6.1 Core Principle
 Wallet balance is NEVER released immediately upon driver confirmation alone for prepaid orders. Funds remain in a HELD state until delivery confirmation is verified.
 
-### 5.2 Wallet Balance States
+### 6.2 Wallet Balance States
 
 | State | Description |
 |-------|-------------|
@@ -100,7 +139,7 @@ Wallet balance is NEVER released immediately upon driver confirmation alone for 
 | `RELEASED_BALANCE` | Funds moved to available after delivery confirmation |
 | `REFUNDED_BALANCE` | Funds returned to customer due to dispute resolution |
 
-### 5.3 Delivery Confirmation Types
+### 6.3 Delivery Confirmation Types
 
 | Type | Description | Trigger |
 |------|-------------|---------|
@@ -111,7 +150,7 @@ Wallet balance is NEVER released immediately upon driver confirmation alone for 
 
 ---
 
-## 6. Order Auto-Cancellation
+## 7. Order Auto-Cancellation
 
 ### Vendor Timeout
 - Orders in PLACED status auto-cancelled if vendor doesn't accept within timeout.
@@ -120,13 +159,15 @@ Wallet balance is NEVER released immediately upon driver confirmation alone for 
 
 ---
 
-## 7. Implementation Status
+## 8. Implementation Status
 
 | Feature | Status |
 |---------|--------|
 | Wallet Payment Flow | ✅ Implemented |
 | COD Payment Flow | ✅ Implemented |
 | Commission Calculations | ✅ Implemented |
+| Financial Domain Isolation | ✅ Implemented (Audited 2026-01-29) |
+| Takeaway Order Pricing | ✅ Implemented |
 | Driver Debt Tracking | ✅ Implemented |
 | Cancel/Refund Logic | ✅ Implemented |
 | Wallet Protection (HeldBalance) | ✅ Implemented |
@@ -152,51 +193,55 @@ Wallet balance is NEVER released immediately upon driver confirmation alone for 
 
 ---
 
-## 8. Vendor Working Hours
+## 9. Vendor Working Hours
 
-### 8.1 Core Principle
+### 9.1 Core Principle
 Vendors have configurable working hours for each day of the week. The application determines if a vendor is "Open" or "Closed" dynamically.
 
-### 8.2 Working Hours Logic
+### 9.2 Working Hours Logic
 - **Multiple Timeslots**: Supports split shifts (e.g., Lunch and Dinner sessions).
 - **Validation**: Orders are blocked if the vendor status is "Closed".
 
 ---
 
-## 9. Geospatial Logic & Zone-Based Filtering
+## 10. Geospatial Logic & Zone-Based Filtering
 
-### 9.1 Address-Zone Synchronization
+### 10.1 Address-Zone Synchronization
 - Automatically maps a customer's default address to a delivery `Zone` using point-in-polygon logic.
 - Updates the user profile with `zoneId` for targeted product discovery.
 
-### 9.2 Zone-Filtered Product Discovery
+### 10.2 Zone-Filtered Product Discovery
 - Customers only see products from vendors operating within their current active zone.
 - Ensures delivery feasibility at the browsing stage.
 
 ---
 
-## 10. Vendor Subscriptions & Capacity Limits
+## 11. Vendor Subscriptions & Capacity Limits
 
-### 10.1 Core Principle
+### 11.1 Core Principle
 Subscription plans control vendor capabilities and capacity. Plans are categorized by price (Free vs. Paid).
 
-### 10.2 Capability Limits
+### 11.2 Capability Limits
 - **Order Limit**: Paid plans may have a fixed quota of orders (`totalOrders`).
 - **Product Limit**: Controls how many active products a vendor can manage simultaneously (`productsLimit`).
 - **Feature Toggles**: Controls access to specific modules like Dine-in, Chat, or Mobile App.
 
-### 10.3 Enforcement
+### 11.3 Financial Impact
+- **Free Plans (Price = 0)**: Platform takes vendor commission from order subtotal.
+- **Paid Plans (Price > 0)**: No vendor commission, but vendor still only receives product subtotal (NOT delivery or tips).
+
+### 11.4 Enforcement
 - **Soft Limit**: Vendors are prevented from creating new products if they exceed their plan's `productsLimit`.
 - **Order Blocking**: Vendors on limited plans cannot accept new orders if their quota is exhausted.
 
 ---
 
-## 11. Secure Delivery Verification (OTP)
+## 12. Secure Delivery Verification (OTP)
 
-### 11.1 Purpose
+### 12.1 Purpose
 Mandatory for **Wallet (Prepaid)** orders to ensure funds are only released upon physical verification of receipt.
 
-### 11.2 The Workflow
+### 12.2 The Workflow
 1. **Generation**: Unique 6-digit OTP created when order status becomes `SHIPPED`.
 2. **Access**: Customer views OTP in order details.
 3. **Verification**: Driver must enter the correct OTP in their app to transition the order to `COMPLETED`.
@@ -204,69 +249,77 @@ Mandatory for **Wallet (Prepaid)** orders to ensure funds are only released upon
 
 ---
 
-## 12. Vendor Document Verification
+## 13. Vendor Document Verification
 
-### 12.1 Regulatory Compliance
+### 13.1 Regulatory Compliance
 Vendors must upload identity and business documents.
 - **Workflow**: Upload → `PENDING` → Admin Review → `ACCEPTED` / `REJECTED`.
 - **Integrity**: Any document update resets status to `PENDING`, triggering a new review cycle.
 
 ---
 
-## 13. Special Discounts & Coupons
+## 14. Special Discounts & Coupons
 
-### 13.1 Vendor Coupons
+### 14.1 Vendor Coupons
 Vendors create flat or percentage discounts with configurable limits:
 - **Scope**: Can be public (visible on profile) or private (code-based).
 - **Constraints**: Minimum order amount, maximum discount cap, and expiry date.
 
 ---
 
-## 14. Product Visibility & Soft Deletion
+## 15. Product Visibility & Soft Deletion
 
-### 14.1 Status Definitions
+### 15.1 Status Definitions
 - **isActive**: Internal flag for deletion. If `false`, the product is "deleted" and hidden from all users (Vendors & Customers).
 - **isPublish**: Visibility flag for customers.
   - `isPublish = true`: Visible to everyone.
   - `isPublish = false`: Visible only to the Vendor for management purposes.
 
-### 14.2 Business Rules
+### 15.2 Business Rules
 - **Creation**: New products are automatically initialized as `isActive = true`.
 - **Soft Delete**: When a vendor "deletes" a product, `isActive` and `isPublish` are both set to `false`. These records are preserved in the DB for order history integrity but removed from all listings.
 
 ---
 
-## 15. Dine-in Table Bookings
+## 16. Dine-in Table Bookings
 
-### 15.1 Core Principle
+### 16.1 Core Principle
 Allows customers to reserve tables at restaurant-type vendors for specific dates and times.
 - **Tracking**: Manage upcoming vs. past bookings.
 - **Availability**: Integrated with vendor working hours to ensure bookings only occur during operational hours.
 
 ---
 
-## 16. Loyalty & Growth Systems
+## 17. Loyalty & Growth Systems
 
-### 16.1 Referrals
+### 17.1 Referrals
 - Custom referral codes for every user.
 - Rewards (Wallet credits) applied to the referrer upon successful referral registration or first order.
 
-### 16.2 Cashback
+### 17.2 Cashback
 - Percentage-based cashback on orders that credits the customer's wallet after completion.
 - Configurable per-campaign or per-vendor.
 
-### 16.3 Gift Cards
+### 17.3 Gift Cards
 - **Purchase**: Digital gift cards purchased via wallet or payment gateway.
 - **Redemption**: Unique codes that instantly top-up the recipient's wallet balance upon redemption.
 
 ---
 
-## 17. Business Intelligence & Analytics
+## 18. Business Intelligence & Analytics
 
-### 17.1 Reporting
+### 18.1 Reporting
 Comprehensive data aggregation for Admin and Vendors:
 - **Revenue Tracking**: Daily/Weekly/Monthly income reports.
 - **Order Analytics**: Success vs. Cancellation rates.
 - **Product Performance**: Top selling items and low-performing categories.
 
-**Last Updated**: 2026-01-19
+---
+
+## Appendix: Financial Audit History
+
+| Date | Auditor | Status | Description |
+|------|---------|--------|-------------|
+| 2026-01-29 | System Audit | ✅ Passed | Fixed vendor commission base (subtotal only), takeaway pricing, tips isolation |
+
+**Last Updated**: 2026-01-29
