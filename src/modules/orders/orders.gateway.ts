@@ -96,10 +96,53 @@ export class OrdersGateway implements OnGatewayConnection, OnGatewayDisconnect {
         this.logger.log(`Manager ${user.sub} auto-joined zone room: ${zoneRoom}`);
       }
 
+      // Auto-fetch active order for DRIVER
+      if (dbUser.role === UserRole.DRIVER) {
+        await this.sendActiveOrderToDriver(client, user.sub);
+      }
+
       this.logger.log(`Client connected: ${user.sub} (${dbUser.role})`);
     } catch (err) {
       this.logger.error(`WS Connection failed: ${err.message}`, err.stack);
       client.disconnect();
+    }
+  }
+
+  /**
+   * Fetch and emit any active order assigned to the driver upon connection
+   */
+  private async sendActiveOrderToDriver(client: Socket, driverId: string) {
+    try {
+      const activeOrder = await this.prisma.order.findFirst({
+        where: {
+          driverId: driverId,
+          status: {
+            in: ['DRIVER_PENDING', 'DRIVER_ACCEPTED', 'SHIPPED', 'IN_TRANSIT'],
+          },
+        },
+        include: {
+          author: true,
+          vendor: true,
+          driver: true,
+          address: true,
+          specialDiscount: true,
+          items: {
+            include: {
+              extras: true,
+              product: true,
+            },
+          },
+        },
+        orderBy: { createdAt: 'desc' },
+      });
+
+      if (activeOrder) {
+        const mappedOrder = mapOrderResponse(activeOrder);
+        client.emit(OrderSocketEvents.DRIVER_ORDER_UPDATED, mappedOrder);
+        this.logger.log(`Sent active order ${activeOrder.id} to driver ${driverId} on connect`);
+      }
+    } catch (error) {
+      this.logger.error(`Error fetching active order for driver ${driverId}: ${error.message}`);
     }
   }
 
@@ -229,10 +272,13 @@ export class OrdersGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
     const zoneRoom = `${OrderSocketEvents.ZONE_ROOM_PREFIX}${dbUser.zoneId}`;
     client.join(zoneRoom);
-    this.logger.log(
-      `Manager ${user.sub} watching zone orders: ${dbUser.zoneId}`,
-    );
-    return { event: 'watching_zone', zoneId: dbUser.zoneId };
+    this.logger.log(`Manager ${user.sub} joined zone room: ${zoneRoom}`);
+    return { event: 'watching_zone', zoneId: dbUser.zoneId, room: zoneRoom };
+  }
+
+  @SubscribeMessage(OrderSocketEvents.JOIN_ORDERS_ROOM)
+  async handleJoinOrdersRoom(@ConnectedSocket() client: Socket) {
+    return this.handleWatchZoneOrders(client);
   }
 
   @SubscribeMessage('stopWatchZoneOrders')
@@ -251,12 +297,15 @@ export class OrdersGateway implements OnGatewayConnection, OnGatewayDisconnect {
     if (dbUser?.zoneId) {
       const zoneRoom = `${OrderSocketEvents.ZONE_ROOM_PREFIX}${dbUser.zoneId}`;
       client.leave(zoneRoom);
-      this.logger.log(
-        `Manager ${user.sub} stopped watching zone orders: ${dbUser.zoneId}`,
-      );
+      this.logger.log(`Manager ${user.sub} left zone room: ${zoneRoom}`);
     }
 
     return { event: 'stopped_watching_zone' };
+  }
+
+  @SubscribeMessage(OrderSocketEvents.LEAVE_ORDERS_ROOM)
+  async handleLeaveOrdersRoom(@ConnectedSocket() client: Socket) {
+    return this.handleStopWatchZoneOrders(client);
   }
 
   @SubscribeMessage('updateDriverLocation')
@@ -362,7 +411,13 @@ export class OrdersGateway implements OnGatewayConnection, OnGatewayDisconnect {
       if (zoneId) {
         const zoneRoom = `${OrderSocketEvents.ZONE_ROOM_PREFIX}${zoneId}`;
         this.server.to(zoneRoom).emit(OrderSocketEvents.ZONE_ORDER_UPDATED, order);
-        this.logger.debug(`Sent to zone room: ${zoneRoom}`);
+
+        // Also emit specialized events to the zone room so managers can listen specifically if needed
+        this.server.to(zoneRoom).emit(OrderSocketEvents.VENDOR_ORDER_UPDATED, order);
+        this.server.to(zoneRoom).emit(OrderSocketEvents.CUSTOMER_ORDER_UPDATED, order);
+        this.server.to(zoneRoom).emit(OrderSocketEvents.DRIVER_ORDER_UPDATED, order);
+
+        this.logger.debug(`Sent all update types to zone room: ${zoneRoom}`);
       }
     } catch (error) {
       this.logger.error(`Error emitting order update: ${error.message}`, error.stack);

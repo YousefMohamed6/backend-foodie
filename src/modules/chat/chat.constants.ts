@@ -20,6 +20,7 @@ export const ChatConstants = {
   CHAT_TYPES: {
     CUSTOMER_VENDOR: 'CUSTOMER_VENDOR',
     CUSTOMER_DRIVER: 'CUSTOMER_DRIVER',
+    DRIVER_VENDOR: 'DRIVER_VENDOR',
     ADMIN: 'ADMIN',
   },
   SOCKET_EVENTS: {
@@ -36,4 +37,4 @@ export const ChatConstants = {
 } as const;
 
 export type ChatMessageType = 'TEXT' | 'IMAGE' | 'VIDEO';
-export type ChatType = 'CUSTOMER_VENDOR' | 'CUSTOMER_DRIVER' | 'ADMIN';
+export type ChatType = 'CUSTOMER_VENDOR' | 'CUSTOMER_DRIVER' | 'DRIVER_VENDOR' | 'ADMIN';

@@ -5,14 +5,14 @@ import { ConfigService } from '@nestjs/config';
 export class MapsService {
   private readonly logger = new Logger(MapsService.name);
 
-  constructor(private configService: ConfigService) {}
+  constructor(private configService: ConfigService) { }
 
   async getRoute(
     sourceLat: number,
     sourceLng: number,
     destLat: number,
     destLng: number,
-  ): Promise<any> {
+  ): Promise<{ lat: number; lng: number }[]> {
     const key = this.configService.get<string>('GOOGLE_MAPS_API_KEY');
 
     if (!key) {
@@ -27,20 +27,51 @@ export class MapsService {
 
       if (data.status !== 'OK') {
         this.logger.error(`Google Maps API error: ${data.status}`);
-        throw new Error(`Failed to get route: ${data.status}`);
+        return [];
       }
 
-      return {
-        routes: data.routes,
-        status: data.status,
-        distance: data.routes[0]?.legs[0]?.distance,
-        duration: data.routes[0]?.legs[0]?.duration,
-        polyline: data.routes[0]?.overview_polyline,
-      };
+      const points = data.routes[0]?.overview_polyline?.points;
+      if (!points) return [];
+
+      return this.decodePolyline(points);
     } catch (error) {
       this.logger.error('Failed to fetch route from Google Maps:', error);
-      throw error;
+      return [];
     }
+  }
+
+  private decodePolyline(encoded: string): { lat: number; lng: number }[] {
+    const points: { lat: number; lng: number }[] = [];
+    let index = 0,
+      len = encoded.length;
+    let lat = 0,
+      lng = 0;
+
+    while (index < len) {
+      let b,
+        shift = 0,
+        result = 0;
+      do {
+        b = encoded.charCodeAt(index++) - 63;
+        result |= (b & 0x1f) << shift;
+        shift += 5;
+      } while (b >= 0x20);
+      const dlat = result & 1 ? ~(result >> 1) : result >> 1;
+      lat += dlat;
+
+      shift = 0;
+      result = 0;
+      do {
+        b = encoded.charCodeAt(index++) - 63;
+        result |= (b & 0x1f) << shift;
+        shift += 5;
+      } while (b >= 0x20);
+      const dlng = result & 1 ? ~(result >> 1) : result >> 1;
+      lng += dlng;
+
+      points.push({ lat: lat / 1e5, lng: lng / 1e5 });
+    }
+    return points;
   }
   async searchPlaces(input: string, language = 'ar'): Promise<string[]> {
     const key = this.configService.get<string>('GOOGLE_MAPS_API_KEY');

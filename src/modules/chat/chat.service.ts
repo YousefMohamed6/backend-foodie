@@ -20,7 +20,7 @@ import {
 export class ChatService {
   private readonly logger = new Logger(ChatService.name);
 
-  constructor(private prisma: PrismaService) {}
+  constructor(private prisma: PrismaService) { }
 
   async getChannels(userId: string) {
     return this.prisma.chatChannel.findMany({
@@ -52,7 +52,7 @@ export class ChatService {
     userId: string,
     query: { page?: string | number; limit?: string | number } = {},
   ) {
-    const channel = await this.prisma.chatChannel.findUnique({
+    let channel = await this.prisma.chatChannel.findUnique({
       where: { id: channelId },
       include: {
         participants: {
@@ -61,6 +61,19 @@ export class ChatService {
         order: true,
       },
     });
+
+    // If not found by ID, try finding by orderId (for better compatibility)
+    if (!channel) {
+      channel = await this.prisma.chatChannel.findFirst({
+        where: { orderId: channelId },
+        include: {
+          participants: {
+            select: { id: true },
+          },
+          order: true,
+        },
+      });
+    }
 
     if (!channel) {
       throw new NotFoundException('CHANNEL_NOT_FOUND');
@@ -76,7 +89,7 @@ export class ChatService {
 
     const [messages, total] = await Promise.all([
       this.prisma.chatMessage.findMany({
-        where: { channelId },
+        where: { channelId: channel.id },
         include: {
           sender: {
             select: {
@@ -94,7 +107,7 @@ export class ChatService {
         skip,
         take: limit,
       }),
-      this.prisma.chatMessage.count({ where: { channelId } }),
+      this.prisma.chatMessage.count({ where: { channelId: channel.id } }),
     ]);
 
     return {
@@ -210,6 +223,21 @@ export class ChatService {
         driverProfileImage: order.driver.profilePictureURL,
         name: `Order #${order.id.slice(-6)} - Driver`,
       };
+    } else if (dto.chatType === ChatConstants.CHAT_TYPES.DRIVER_VENDOR) {
+      if (!order.driver) {
+        throw new BadRequestException('ORDER_NO_DRIVER_ASSIGNED');
+      }
+      participantIds = [order.driver.id, order.vendor.authorId];
+      channelData = {
+        ...channelData,
+        restaurantId: order.vendorId,
+        restaurantName: order.vendor.title,
+        restaurantProfileImage: order.vendor.logo,
+        driverId: order.driver.id,
+        driverName: `${order.driver.firstName} ${order.driver.lastName}`,
+        driverProfileImage: order.driver.profilePictureURL,
+        name: `Order #${order.id.slice(-6)} - Driver & Vendor`,
+      };
     }
 
     // Check if channel already exists for this order and chat type
@@ -272,7 +300,7 @@ export class ChatService {
   }
 
   async sendMessage(userId: string, sendMessageDto: SendMessageDto) {
-    const channel = await this.prisma.chatChannel.findUnique({
+    let channel = await this.prisma.chatChannel.findUnique({
       where: { id: sendMessageDto.channelId },
       include: {
         participants: {
@@ -280,6 +308,18 @@ export class ChatService {
         },
       },
     });
+
+    // If not found by ID, try finding by orderId
+    if (!channel) {
+      channel = await this.prisma.chatChannel.findFirst({
+        where: { orderId: sendMessageDto.channelId },
+        include: {
+          participants: {
+            select: { id: true },
+          },
+        },
+      });
+    }
 
     if (!channel) {
       throw new NotFoundException('CHANNEL_NOT_FOUND');
@@ -292,10 +332,13 @@ export class ChatService {
     const [message] = await this.prisma.$transaction([
       this.prisma.chatMessage.create({
         data: {
-          channelId: sendMessageDto.channelId,
+          id: sendMessageDto.id,
+          channelId: channel.id,
           senderId: userId,
           content: sendMessageDto.content,
-          messageType: ChatConstants.MESSAGE_TYPES.TEXT,
+          messageType: sendMessageDto.type || ChatConstants.MESSAGE_TYPES.TEXT,
+          filePath: sendMessageDto.filePath,
+          videoThumbnail: sendMessageDto.videoThumbnail,
         },
         include: {
           sender: {
@@ -310,11 +353,17 @@ export class ChatService {
         },
       }),
       this.prisma.chatChannel.update({
-        where: { id: sendMessageDto.channelId },
+        where: { id: channel.id },
         data: {
-          lastMessageText: sendMessageDto.content,
+          lastMessageText:
+            sendMessageDto.type === ChatConstants.MESSAGE_TYPES.IMAGE
+              ? '[Image]'
+              : sendMessageDto.type === ChatConstants.MESSAGE_TYPES.VIDEO
+                ? '[Video]'
+                : sendMessageDto.content,
           lastMessageTime: new Date(),
-          lastMessageType: ChatConstants.MESSAGE_TYPES.TEXT,
+          lastMessageType:
+            sendMessageDto.type || ChatConstants.MESSAGE_TYPES.TEXT,
         },
         include: { order: true },
       }),
@@ -342,7 +391,7 @@ export class ChatService {
     // Validate based on type
     this.validateMessageData(dto, file);
 
-    const channel = await this.prisma.chatChannel.findUnique({
+    let channel = await this.prisma.chatChannel.findUnique({
       where: { id: dto.channelId },
       include: {
         participants: {
@@ -350,6 +399,18 @@ export class ChatService {
         },
       },
     });
+
+    // If not found by ID, try finding by orderId
+    if (!channel) {
+      channel = await this.prisma.chatChannel.findFirst({
+        where: { orderId: dto.channelId },
+        include: {
+          participants: {
+            select: { id: true },
+          },
+        },
+      });
+    }
 
     if (!channel) {
       throw new NotFoundException('CHANNEL_NOT_FOUND');
@@ -364,13 +425,13 @@ export class ChatService {
 
     // Handle file upload if present
     if (file) {
-      filePath = await this.saveFile(dto.channelId, userId, file);
+      filePath = await this.saveFile(channel.id, userId, file);
     }
 
     // Handle video thumbnail if present
     if (videoThumbnail && dto.type === ChatConstants.MESSAGE_TYPES.VIDEO) {
       thumbnailPath = await this.saveFile(
-        dto.channelId,
+        channel.id,
         userId,
         videoThumbnail,
         'thumbnails',
@@ -382,7 +443,8 @@ export class ChatService {
     const [message] = await this.prisma.$transaction([
       this.prisma.chatMessage.create({
         data: {
-          channelId: dto.channelId,
+          id: dto.id,
+          channelId: channel.id,
           senderId: userId,
           content: dto.content,
           messageType: dto.type,
@@ -402,7 +464,7 @@ export class ChatService {
         },
       }),
       this.prisma.chatChannel.update({
-        where: { id: dto.channelId },
+        where: { id: channel.id },
         data: {
           lastMessageText: lastMessagePreview,
           lastMessageTime: new Date(),
@@ -420,10 +482,27 @@ export class ChatService {
   }
 
   async markAsSeen(channelId: string, userId: string) {
-    // Update all unread messages not sent by this user
+    // Find the actual channel first to handle orderId vs channelId
+    let channel = await this.prisma.chatChannel.findUnique({
+      where: { id: channelId },
+      select: { id: true },
+    });
+
+    if (!channel) {
+      channel = await this.prisma.chatChannel.findFirst({
+        where: { orderId: channelId },
+        select: { id: true },
+      });
+    }
+
+    if (!channel) {
+      return { success: false, message: 'Channel not found' };
+    }
+
+    // Update all unread messages in the actual channel
     await this.prisma.chatMessage.updateMany({
       where: {
-        channelId,
+        channelId: channel.id,
         isRead: false,
         senderId: { not: userId },
       },

@@ -38,21 +38,25 @@ export class DriversService {
     });
   }
 
-  findAll() {
-    return this.prisma.driverProfile.findMany({
-      include: { user: true },
+  async findAll() {
+    const users = await this.prisma.user.findMany({
+      where: { role: UserRole.DRIVER },
+      include: { driverProfile: true },
     });
+    return users.map((u) => this.flattenDriver(u));
   }
 
   async findOne(id: string) {
-    const driver = await this.prisma.driverProfile.findUnique({
-      where: { id },
+    const driver = await this.prisma.driverProfile.findFirst({
+      where: {
+        OR: [{ id }, { userId: id }],
+      },
       include: { user: true },
     });
     if (!driver) {
       throw new NotFoundException('DRIVER_NOT_FOUND');
     }
-    return driver;
+    return this.flattenDriver(driver);
   }
 
   async findByUser(userId: string) {
@@ -60,34 +64,73 @@ export class DriversService {
       where: { userId },
       include: { user: true },
     });
-    return driver;
+    if (!driver) return null;
+    return this.flattenDriver(driver);
   }
 
   async update(id: string, updateDriverDto: UpdateDriverDto) {
-    await this.findOne(id);
-    return this.prisma.driverProfile.update({
-      where: { id },
+    const driver = await this.findOne(id);
+    const updated = await this.prisma.driverProfile.update({
+      where: { id: (driver as any).profileId },
       data: updateDriverDto as Prisma.DriverProfileUpdateInput,
+      include: { user: true },
     });
+    return this.flattenDriver(updated);
   }
 
   async remove(id: string) {
-    await this.findOne(id);
+    const driver = await this.findOne(id);
     return this.prisma.driverProfile.delete({
-      where: { id },
+      where: { id: (driver as any).profileId },
     });
   }
 
-  async findAvailable(lat?: number, lng?: number, radius?: number) {
-    // For now, just return all available drivers.
-    // lat, lng, radius are placeholders for spatial query
-    return this.prisma.driverProfile.findMany({
+  async findAvailable() {
+    const drivers = await this.prisma.driverProfile.findMany({
       where: {
         status: DriverStatus.AVAILABLE,
         isOnline: true,
       },
       include: { user: true },
     });
+    return drivers.map((d) => this.flattenDriver(d));
+  }
+
+  private flattenDriver(data: any) {
+    if (!data) return null;
+
+    let user, profile;
+
+    if (data.driverProfile !== undefined) {
+      // Input is a User with included driverProfile
+      const { driverProfile, ...userData } = data;
+      user = userData;
+      profile = driverProfile;
+    } else if (data.user !== undefined) {
+      // Input is a DriverProfile with included user
+      const { user: userData, ...profileData } = data;
+      user = userData;
+      profile = profileData;
+    } else {
+      // Unknown format or direct User/Profile without inclusion
+      // If it looks like a User, treat it as such
+      if (data.role) {
+        user = data;
+        profile = data.driverProfile;
+      } else {
+        profile = data;
+        user = data.user;
+      }
+    }
+
+    return {
+      ...(profile || {}),
+      ...user,
+      id: user?.id || data.id,
+      profileId: profile?.id,
+      user: user || null,
+      driverProfile: profile || null,
+    };
   }
 
   async getOrders(userId: string, query: Record<string, any>) {

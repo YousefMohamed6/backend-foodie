@@ -76,6 +76,7 @@ export enum AnalyticsEventType {
   ORDER_DELIVERED = 'ORDER_DELIVERED',
   ORDER_PREPARED = 'ORDER_PREPARED',
   ORDER_PICKED_UP = 'ORDER_PICKED_UP',
+  ORDER_IN_TRANSIT = 'ORDER_IN_TRANSIT',
   ORDER_CANCELLED = 'ORDER_CANCELLED',
   DELIVERY_FAILED = 'DELIVERY_FAILED',
 }
@@ -103,4 +104,6 @@ export const OrderSocketEvents = {
   DRIVER_ORDER_UPDATED: 'driverOrderUpdated',
   ZONE_ORDER_UPDATED: 'zoneOrderUpdated',
   DRIVER_LOCATION_UPDATED: 'orderDriverLocationUpdated',
+  JOIN_ORDERS_ROOM: 'joinOrdersRoom',
+  LEAVE_ORDERS_ROOM: 'leaveOrdersRoom',
 } as const;

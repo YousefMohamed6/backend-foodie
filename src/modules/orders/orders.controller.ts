@@ -31,7 +31,7 @@ import { OrdersService } from './orders.service';
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('orders')
 export class OrdersController {
-  constructor(private readonly ordersService: OrdersService) {}
+  constructor(private readonly ordersService: OrdersService) { }
 
   @Post()
   @Roles(UserRole.CUSTOMER)
@@ -146,6 +146,14 @@ export class OrdersController {
   async confirmPickup(@Param('id') id: string, @Request() req) {
     const data = await this.ordersService.confirmPickup(id, req.user);
     return { success: true, message: 'ORDER_PICKED_UP', data };
+  }
+
+  @Post(':id/start-transit')
+  @Roles(UserRole.DRIVER)
+  @ApiOperation({ summary: 'Driver starts transit to customer location' })
+  async startTransit(@Param('id') id: string, @Request() req) {
+    const data = await this.ordersService.startTransit(id, req.user);
+    return { success: true, message: 'ORDER_IN_TRANSIT', data };
   }
 
   @Post(':id/report-cash')

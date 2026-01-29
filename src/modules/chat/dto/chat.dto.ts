@@ -25,8 +25,15 @@ export class CreateChannelDto {
 }
 
 export class SendMessageDto {
+  @ApiPropertyOptional({
+    description: 'Message ID (optional, can be provided by client)',
+  })
+  @IsString()
+  @IsOptional()
+  id?: string;
+
   @ApiProperty({
-    description: 'Channel ID to send message to',
+    description: 'Channel ID or Order ID to send message to',
   })
   @IsString()
   @IsNotEmpty()
@@ -40,9 +47,38 @@ export class SendMessageDto {
   @IsOptional()
   @MaxLength(5000)
   content?: string;
+
+  @ApiPropertyOptional({
+    description: 'Message type: TEXT, IMAGE, or VIDEO',
+    enum: ['TEXT', 'IMAGE', 'VIDEO'],
+  })
+  @IsString()
+  @IsOptional()
+  type?: 'TEXT' | 'IMAGE' | 'VIDEO';
+
+  @ApiPropertyOptional({
+    description: 'File path for media messages',
+  })
+  @IsString()
+  @IsOptional()
+  filePath?: string;
+
+  @ApiPropertyOptional({
+    description: 'Video thumbnail path',
+  })
+  @IsString()
+  @IsOptional()
+  videoThumbnail?: string;
 }
 
 export class SendMediaMessageDto {
+  @ApiPropertyOptional({
+    description: 'Message ID (optional, can be provided by client)',
+  })
+  @IsString()
+  @IsOptional()
+  id?: string;
+
   @ApiProperty({
     description: 'Channel ID to send message to',
   })
@@ -78,10 +114,10 @@ export class CreateOrderChatDto {
   orderId: string;
 
   @ApiProperty({
-    description: 'Chat type: CUSTOMER_VENDOR or CUSTOMER_DRIVER',
-    enum: ['CUSTOMER_VENDOR', 'CUSTOMER_DRIVER'],
+    description: 'Chat type: CUSTOMER_VENDOR, CUSTOMER_DRIVER or DRIVER_VENDOR',
+    enum: ['CUSTOMER_VENDOR', 'CUSTOMER_DRIVER', 'DRIVER_VENDOR'],
   })
   @IsString()
   @IsNotEmpty()
-  chatType: 'CUSTOMER_VENDOR' | 'CUSTOMER_DRIVER';
+  chatType: 'CUSTOMER_VENDOR' | 'CUSTOMER_DRIVER' | 'DRIVER_VENDOR';
 }

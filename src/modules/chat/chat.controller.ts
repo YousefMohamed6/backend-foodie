@@ -41,7 +41,7 @@ export class ChatController {
   constructor(
     private readonly chatService: ChatService,
     private readonly chatGateway: ChatGateway,
-  ) {}
+  ) { }
 
   @Get('threads')
   @ApiOperation({ summary: 'Get user chat threads' })
@@ -114,7 +114,7 @@ export class ChatController {
     );
 
     // Broadcast to channel via WebSocket
-    this.chatGateway.broadcastMessage(sendMessageDto.channelId, result.data);
+    this.chatGateway.broadcastMessage(result.data.channelId, result.data);
 
     return result;
   }
@@ -193,7 +193,8 @@ export class ChatController {
     );
 
     // Broadcast to channel via WebSocket
-    this.chatGateway.broadcastMessage(dto.channelId, result.data);
+    // Broadcast to channel via WebSocket
+    this.chatGateway.broadcastMessage(result.data.channelId, result.data);
 
     return result;
   }

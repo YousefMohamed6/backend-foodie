@@ -274,6 +274,16 @@ export class OrderDriverService {
             },
         });
 
+        await this.notificationService.sendOrderNotification(
+            assignDriverDto.driverId,
+            ORDERS_NOTIFICATIONS.ORDER_DRIVER_PENDING,
+            {
+                orderId: savedOrder.id,
+                status: savedOrder.status,
+                type: 'order',
+            },
+        );
+
         return this.emitUpdate(savedOrder);
     }
 
@@ -503,6 +513,55 @@ export class OrderDriverService {
 
             return this.emitUpdate(savedOrder);
         });
+    }
+
+    async startTransit(id: string, user: User) {
+        const order = await this.prisma.order.findUnique({
+            where: { id },
+            include: { vendor: true },
+        });
+
+        if (!order) throw new NotFoundException(ORDERS_ERRORS.ORDER_NOT_FOUND);
+
+        if (order.driverId !== user.id) {
+            throw new ForbiddenException(ORDERS_ERRORS.DRIVER_NOT_ASSIGNED);
+        }
+
+        if (order.status !== OrderStatus.SHIPPED) {
+            throw new BadRequestException(ORDERS_ERRORS.ORDER_NOT_SHIPPED);
+        }
+
+        const savedOrder = await this.prisma.order.update({
+            where: { id },
+            data: { status: OrderStatus.IN_TRANSIT },
+            include: orderInclude,
+        });
+
+        this.analyticsTrackingService.trackOrderLifecycle({
+            orderId: savedOrder.id,
+            eventType: AnalyticsEventType.ORDER_IN_TRANSIT,
+            previousStatus: OrderStatus.SHIPPED,
+            newStatus: OrderStatus.IN_TRANSIT,
+            actorId: user.id,
+            actorRole: UserRole.DRIVER,
+            metadata: {
+                driverId: user.id,
+                vendorId: order.vendorId,
+                transitStartTime: new Date(),
+            },
+        });
+
+        await this.notificationService.sendOrderNotification(
+            order.authorId,
+            ORDERS_NOTIFICATIONS.ORDER_IN_TRANSIT,
+            {
+                orderId: savedOrder.id,
+                vendorName: order.vendor.title,
+                status: savedOrder.status,
+            },
+        );
+
+        return this.emitUpdate(savedOrder);
     }
 
     private emitUpdate(order: any) {

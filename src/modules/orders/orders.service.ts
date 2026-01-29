@@ -110,6 +110,10 @@ export class OrdersService {
     return this.driverService.confirmPickup(id, user);
   }
 
+  async startTransit(id: string, user: User) {
+    return this.driverService.startTransit(id, user);
+  }
+
   // ==================== VENDOR OPERATIONS ====================
 
   async vendorRejectOrder(id: string, user: User) {
