@@ -1,8 +1,8 @@
 import { Controller, Get, UseGuards } from '@nestjs/common';
 import {
   ApiBearerAuth,
+  ApiOkResponse,
   ApiOperation,
-  ApiResponse,
   ApiTags
 } from '@nestjs/swagger';
 import { UserRole } from '@prisma/client';
@@ -24,10 +24,8 @@ export class MarsoulController {
   @ApiOperation({
     summary: 'Get all active managers with their zone information',
   })
-  @ApiResponse({
-    status: 200,
+  @ApiOkResponse({
     description: 'List of managers',
-    data: [MarsoulResponseDto],
   })
   async findAll(): Promise<MarsoulResponseDto[]> {
     return this.marsoulService.findAll();
