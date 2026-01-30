@@ -26,7 +26,7 @@ RUN npx prisma@5.22.0 generate
 
 # Copy build from builder
 COPY --from=builder /app/dist ./dist
-COPY --from=builder /app/uploads ./uploads
+RUN mkdir -p ./uploads
 
 # Create a non-root user for security
 RUN addgroup -S nodejs && adduser -S nestjs -G nodejs
