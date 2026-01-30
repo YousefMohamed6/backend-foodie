@@ -22,15 +22,20 @@ const scripts = [
 async function runSeeds() {
     console.log('🚀 Starting database seeding process...');
 
-    for (const script of scripts) {
-        const scriptPath = path.join(__dirname, script);
-        console.log(`\n📦 Running: ${script}...`);
+    const isProduction = __filename.endsWith('.js');
+    const extension = isProduction ? '.js' : '.ts';
+    const runner = isProduction ? 'node' : 'npx ts-node';
+
+    for (const scriptName of scripts) {
+        const scriptFile = scriptName.replace('.ts', extension);
+        const scriptPath = path.join(__dirname, scriptFile);
+
+        console.log(`\n📦 Running: ${scriptFile} using ${runner}...`);
         try {
-            execSync(`npx ts-node "${scriptPath}"`, { stdio: 'inherit' });
-            console.log(`✅ Successfully completed: ${script}`);
+            execSync(`${runner} "${scriptPath}"`, { stdio: 'inherit' });
+            console.log(`✅ Successfully completed: ${scriptFile}`);
         } catch (error) {
-            console.error(`❌ Error running ${script}:`, error);
-            // We continue to next script as some might fail if data already exists or other non-critical reasons
+            console.error(`❌ Error running ${scriptFile}:`, error);
         }
     }
 
