@@ -23,9 +23,9 @@
     "set-currency": "ts-node scripts/set-default-currency.ts"
   },
   "dependencies": {
-    "@adminjs/express": "^5.1.0",
-    "@adminjs/nestjs": "^5.1.1",
-    "@adminjs/prisma": "^3.0.1",
+    "@adminjs/express": "^6.1.1",
+    "@adminjs/nestjs": "^7.0.0",
+    "@adminjs/prisma": "^5.0.4",
     "@aws-sdk/client-s3": "^3.958.0",
     "@nestjs/bull": "^11.0.4",
     "@nestjs/common": "^11.0.1",
@@ -47,7 +47,7 @@
     "@types/nodemailer": "^7.0.4",
     "@types/ntp-client": "^0.5.0",
     "@types/twilio": "^3.19.2",
-    "adminjs": "^6.8.7",
+    "adminjs": "^7.8.17",
     "apple-signin-auth": "^2.0.0",
     "bcrypt": "^6.0.0",
     "bull": "^4.16.5",
