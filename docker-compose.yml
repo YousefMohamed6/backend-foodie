@@ -15,7 +15,7 @@ services:
 
   # Database
   db:
-    image: postgres:14-alpine
+    image: postgis/postgis:14-3.3-alpine
     restart: always
     environment:
       POSTGRES_USER: ${DATABASE_USER:-postgres}

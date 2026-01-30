@@ -35,8 +35,9 @@ COPY --from=builder /app/dist ./dist
 RUN mkdir -p ./uploads
 
 # Create a non-root user for security
-RUN groupadd -r nodejs && useradd -r -g nodejs nestjs
+RUN groupadd -r nodejs && useradd -m -r -g nodejs nestjs
 RUN chown -R nestjs:nodejs /app
+ENV HOME=/home/nestjs
 USER nestjs
 
 EXPOSE 3000
