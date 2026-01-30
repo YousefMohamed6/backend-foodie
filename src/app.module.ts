@@ -15,7 +15,6 @@ import redisConfig from './config/redis.config';
 import smsConfig from './config/sms.config';
 import storageConfig from './config/storage.config';
 import { AddressesModule } from './modules/addresses/addresses.module';
-import { AdminUIModule } from './modules/admin-ui/admin-ui.module';
 import { AdminModule } from './modules/admin/admin.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { BannersModule } from './modules/banners/banners.module';
@@ -159,7 +158,6 @@ import {
     BannersModule,
     SearchModule,
     AdminModule,
-    AdminUIModule,
     SupportModule,
     DineInModule,
     TaxesModule,
@@ -205,7 +203,6 @@ export class AppModule {
 
     consumer
       .apply(hpp(), XssSanitizationMiddleware, TimeoutMiddleware)
-      .exclude('api/v1/admin/*path', 'api/v1/admin')
       .forRoutes('*path');
   }
 }

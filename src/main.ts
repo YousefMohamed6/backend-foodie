@@ -2,7 +2,6 @@ import { ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
-import session from 'express-session';
 import helmet from 'helmet';
 import { AppModule } from './app.module';
 import { EnvKeys } from './common/constants/env-keys.constants';
@@ -63,25 +62,6 @@ async function bootstrap() {
     maxAge: 86400,
   });
 
-  const sessionSecret =
-    configService.get<string>(EnvKeys.SESSION_SECRET) ||
-    (isProduction
-      ? (() => {
-        throw new Error('SESSION_SECRET is required in production');
-      })()
-      : 'foodie-admin-secret-key-dev');
-
-  app.use(
-    session({
-      secret: sessionSecret,
-      resave: false,
-      saveUninitialized: false,
-      cookie: {
-        maxAge: 24 * 60 * 60 * 1000,
-        sameSite: 'strict',
-      },
-    }),
-  );
 
   // Global Exception Filter is registered in AppModule using APP_FILTER
   // app.useGlobalFilters(new GlobalExceptionFilter());
@@ -126,7 +106,6 @@ async function bootstrap() {
   console.log(`API Base URL: http://localhost:${port}/api/v1`);
   if (!isProduction) {
     console.log(`Swagger documentation: http://localhost:${port}/api`);
-    console.log(`Admin UI: http://localhost:${port}/api/v1/admin`);
   }
 }
 
