@@ -25,6 +25,15 @@ async function main() {
     }
 
     const categories = await prisma.category.findMany();
+    const weekDays = await prisma.weekDay.findMany();
+    const freePlan = await prisma.subscriptionPlan.findFirst({
+        where: { englishName: 'Basic Plan' },
+    });
+
+    if (!freePlan) {
+        console.error('Basic Plan not found. Please run seed-subscription-plans.ts first.');
+        return;
+    }
 
     const egyptianVendors = [
         {
@@ -111,7 +120,17 @@ async function main() {
                     role: UserRole.VENDOR,
                     zoneId: zone.id,
                     isActive: true,
+                    subscriptionPlanId: freePlan.id,
+                    subscriptionExpiryDate: new Date(Date.now() + 1000 * 60 * 60 * 24 * 365),
                 },
+            });
+        } else {
+            user = await prisma.user.update({
+                where: { id: user.id },
+                data: {
+                    subscriptionPlanId: freePlan.id,
+                    subscriptionExpiryDate: new Date(Date.now() + 1000 * 60 * 60 * 24 * 365),
+                }
             });
         }
 
@@ -126,6 +145,7 @@ async function main() {
                 latitude: zone.latitude || 31.1659,
                 longitude: zone.longitude || 31.6763,
                 zoneId: zone.id,
+                subscriptionPlanId: freePlan.id,
                 subscriptionExpiryDate: new Date(Date.now() + 1000 * 60 * 60 * 24 * 365), // 1 year
             },
             create: {
@@ -140,9 +160,44 @@ async function main() {
                 longitude: zone.longitude || 31.6763,
                 zoneId: zone.id,
                 isActive: true,
+                subscriptionPlanId: freePlan.id,
                 subscriptionExpiryDate: new Date(Date.now() + 1000 * 60 * 60 * 24 * 365), // 1 year
             },
         });
+
+        // 2.a Create a Subscription record
+        await prisma.subscription.upsert({
+            where: { id: `sub_${vendor.id}` }, // Generate a consistent ID for seeding
+            update: {
+                status: 'ACTIVE',
+                endDate: new Date(Date.now() + 1000 * 60 * 60 * 24 * 365),
+            },
+            create: {
+                id: `sub_${vendor.id}`,
+                userId: user.id,
+                planId: freePlan.id,
+                startDate: new Date(),
+                endDate: new Date(Date.now() + 1000 * 60 * 60 * 24 * 365),
+                status: 'ACTIVE',
+                amountPaid: 0,
+                paymentMethod: 'system',
+                vendors: { connect: { id: vendor.id } }
+            }
+        });
+
+        // 2.b Add Vendor Schedule for all days
+        await prisma.vendorSchedule.deleteMany({ where: { vendorId: vendor.id } });
+        for (const day of weekDays) {
+            await prisma.vendorSchedule.create({
+                data: {
+                    vendorId: vendor.id,
+                    dayId: day.id,
+                    openTime: '00:00',
+                    closeTime: '23:59',
+                    isActive: true,
+                }
+            });
+        }
 
         console.log(`Processing vendor: ${vendor.title}`);
 
