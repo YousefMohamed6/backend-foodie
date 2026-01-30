@@ -6,7 +6,7 @@ WORKDIR /app
 # Install dependencies first (for caching)
 COPY package*.json ./
 COPY prisma ./prisma/
-RUN npm ci
+RUN npm ci --legacy-peer-deps
 
 # Copy source and build
 COPY . .
@@ -21,7 +21,7 @@ WORKDIR /app
 # Install production dependencies only
 COPY package*.json ./
 COPY prisma ./prisma/
-RUN npm ci --only=production
+RUN npm ci --omit=dev --legacy-peer-deps
 RUN npx prisma generate
 
 # Copy build from builder
