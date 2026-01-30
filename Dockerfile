@@ -1,5 +1,5 @@
 # Production Dockerfile
-FROM node:18-alpine AS builder
+FROM node:24-alpine AS builder
 
 WORKDIR /app
 
@@ -14,7 +14,7 @@ RUN npx prisma generate
 RUN npm run build
 
 # Production image
-FROM node:18-alpine
+FROM node:24-alpine
 
 WORKDIR /app
 
@@ -36,4 +36,4 @@ USER nestjs
 EXPOSE 3000
 
 # Start command
-CMD ["node", "dist/main.js"]
+CMD ["node", "dist/src/main.js"]
