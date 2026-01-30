@@ -21,8 +21,8 @@ WORKDIR /app
 # Install production dependencies only
 COPY package*.json ./
 COPY prisma ./prisma/
-RUN npm install --omit=dev --legacy-peer-deps
-RUN npx prisma generate
+RUN npm install --legacy-peer-deps
+RUN npx prisma@5.22.0 generate
 
 # Copy build from builder
 COPY --from=builder /app/dist ./dist
