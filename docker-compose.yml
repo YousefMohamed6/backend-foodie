@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   # Main Application
   api:
@@ -7,12 +5,8 @@ services:
     restart: always
     ports:
       - "${PORT:-3000}:3000"
-    environment:
-      - DATABASE_URL=postgresql://${DATABASE_USER:-postgres}:${DATABASE_PASSWORD:-postgres}@db:5432/${DATABASE_NAME:-foodie_db}?schema=public
-      - REDIS_HOST=redis
-      - REDIS_PORT=6379
-      - REDIS_PASSWORD=${REDIS_PASSWORD:-}
-      - NODE_ENV=production
+    env_file:
+      - .env
     depends_on:
       - db
       - redis
