@@ -65,20 +65,11 @@ export class AuthService {
       throw new ConflictException(AUTH_ERRORS.EMAIL_ALREADY_EXISTS);
     }
 
-    // Security: Restrict public registration to specific roles
-    if (
-      registerDto.role &&
-      !(
-        [
-          UserRole.CUSTOMER,
-          UserRole.DRIVER,
-          UserRole.VENDOR,
-          UserRole.MANAGER,
-        ] as UserRole[]
-      ).includes(registerDto.role)
-    ) {
-      // Force to CUSTOMER or throw error. Throwing error is safer.
-      throw new ForbiddenException(AUTH_ERRORS.ROLE_NOT_ALLOWED);
+    // Security: Public registration restricted to CUSTOMER role only
+    if (registerDto.role && registerDto.role !== UserRole.CUSTOMER) {
+      throw new ForbiddenException(
+        'Public registration is limited to customers. Other roles require administrative approval.',
+      );
     }
 
     // Password hashing is handled in UsersService.create
@@ -134,6 +125,8 @@ export class AuthService {
     let providerId: string; // Unique ID from the provider (sub)
 
     // Step 1: Verify the token and extract verified data
+    let targetRole: UserRole = UserRole.CUSTOMER;
+
     if (socialLoginDto.provider === 'google') {
       const googlePayload = await this.googleAuthService.verifyIdToken(
         socialLoginDto.idToken,
@@ -143,6 +136,40 @@ export class AuthService {
       firstName = googlePayload.given_name || socialLoginDto.firstName;
       lastName = googlePayload.family_name || socialLoginDto.lastName;
       providerId = googlePayload.sub;
+
+      // Audience-to-Role Mapping (Contextual Role Binding)
+      const audienceMap: Record<string, UserRole> = {
+        '713259914675-0e89jb7shmpjetl4bbk299jq6uabh2vu.apps.googleusercontent.com':
+          UserRole.CUSTOMER,
+        '713259914675-3i4sflf5abbgnfc6ffpgunujam6e4die.apps.googleusercontent.com':
+          UserRole.CUSTOMER,
+        '713259914675-7vopu851pco370ld6et26dsski1mi9q2.apps.googleusercontent.com':
+          UserRole.DRIVER,
+        '713259914675-tf28uh9v7d6li0caekk5s7jpd2g4hbeg.apps.googleusercontent.com':
+          UserRole.DRIVER,
+        '713259914675-mqqa83dvtjn835eean3sc1raeurev71o.apps.googleusercontent.com':
+          UserRole.MANAGER,
+        '713259914675-l4ak92kodiai0l66tisci7a1oa3hecqf.apps.googleusercontent.com':
+          UserRole.MANAGER,
+        '713259914675-c6nf0ccr7tk0mmj5k60klg16snb33t6f.apps.googleusercontent.com':
+          UserRole.VENDOR,
+        '713259914675-ug2t4rqr5puibv9hmgdbobobt82tgi50.apps.googleusercontent.com':
+          UserRole.VENDOR,
+      };
+
+      // These IDs are shared across all 4 apps (Web Client and Shared iOS)
+      const sharedAudiences = [
+        '713259914675-cj07pija8pfjdgbclu3bo97a5tougj5q.apps.googleusercontent.com',
+        '713259914675-42v3h3sv03s9umc5fvj5428vjvqtbc8j.apps.googleusercontent.com',
+      ];
+
+      if (sharedAudiences.includes(googlePayload.aud)) {
+        // For shared IDs, we trust the role requested by the app (validated later)
+        targetRole = socialLoginDto.role || UserRole.CUSTOMER;
+      } else {
+        // For specific IDs, we enforce the hardcoded role
+        targetRole = audienceMap[googlePayload.aud] || UserRole.CUSTOMER;
+      }
     } else if (socialLoginDto.provider === 'apple') {
       const applePayload = await this.appleAuthService.verifyIdentityToken(
         socialLoginDto.idToken,
@@ -158,35 +185,41 @@ export class AuthService {
     }
 
     // Step 2: Find or create user with VERIFIED email
-    let user: User | Omit<User, 'password'> | null =
-      await this.usersService.findByEmail(email);
+    const user = await this.usersService.findByEmail(email);
 
     if (!user) {
-      // Create new user with verified data
-      user = await this.usersService.create({
+      // Create new user with verified data and context-aware role
+      const newUser = await this.usersService.create({
         email,
         firstName: firstName || 'User',
         lastName: lastName || '',
-        password: crypto.randomBytes(32).toString('hex'), // Random password for social users
+        password: crypto.randomBytes(32).toString('hex'),
         provider: socialLoginDto.provider,
         devicePlatform: socialLoginDto.devicePlatform,
+        role: targetRole, // Assign role based on app audience
       } as any);
 
       this.logger.log(
-        `New user created via ${socialLoginDto.provider}: ${email}`,
+        `New user created via ${socialLoginDto.provider}: ${email} with role ${targetRole}`,
       );
-    } else {
-      // Update name if provided (useful for Apple's first login)
-      if (firstName || lastName) {
-        await this.usersService.update(user.id, {
-          firstName: firstName || user.firstName,
-          lastName: lastName || user.lastName,
-        } as any);
-      }
+      return this.generateTokens(newUser, context);
     }
 
-    if (!user)
-      throw new UnauthorizedException(AUTH_ERRORS.USER_CREATION_FAILED);
+    // Step 3: Role Validation (Contextual Role Binding) for existing users
+    // If the app expects a DRIVER but the user is a CUSTOMER, block login for security
+    if (targetRole !== UserRole.CUSTOMER && user.role !== targetRole) {
+      throw new UnauthorizedException(
+        `Your account does not have ${targetRole} permissions.`,
+      );
+    }
+
+    // Update name if provided (useful for Apple's first login)
+    if (firstName || lastName) {
+      await this.usersService.update(user.id, {
+        firstName: firstName || user.firstName,
+        lastName: lastName || user.lastName,
+      } as any);
+    }
 
     if (!user.isActive) {
       throw new UnauthorizedException(AUTH_ERRORS.USER_INACTIVE);
@@ -272,27 +305,13 @@ export class AuthService {
     let user: any = await this.usersService.findByPhone(phoneNumber);
 
     if (!user) {
-      if (
-        dto.role &&
-        !(
-          [
-            UserRole.CUSTOMER,
-            UserRole.DRIVER,
-            UserRole.VENDOR,
-            UserRole.MANAGER,
-          ] as UserRole[]
-        ).includes(dto.role)
-      ) {
-        throw new ForbiddenException(AUTH_ERRORS.ROLE_NOT_ALLOWED);
-      }
-
       const newUserData = {
         firstName: dto.firstName,
         lastName: dto.lastName,
         email: dto.email,
         password: crypto.randomBytes(32).toString('hex'),
         phoneNumber,
-        role: dto.role || UserRole.CUSTOMER,
+        role: UserRole.CUSTOMER,
         provider: 'phone',
         fcmToken: dto.fcmToken,
         devicePlatform: dto.devicePlatform,

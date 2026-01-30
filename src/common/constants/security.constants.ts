@@ -36,4 +36,12 @@ export class SecurityConstants {
     /// Security Messages
     static readonly MSG_UNAUTHORIZED_SHIELD = 'Invalid security token. Access denied.';
     static readonly MSG_SHIELD_DISABLED_WARN = 'SECURE_API_KEY is not set in development. Skipping shield check.';
+
+    /// OAuth Strategy Fallbacks
+    static readonly APPLE_CLIENT_ID_FALLBACK = 'com.foodie.placeholder';
+    static readonly APPLE_TEAM_ID_FALLBACK = 'P8LCE8T6XX';
+    static readonly APPLE_KEY_ID_FALLBACK = 'KEY8888888';
+    static readonly APPLE_PRIVATE_KEY_FALLBACK = '-----BEGIN PRIVATE KEY-----\nMIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQD...';
+    static readonly GOOGLE_CLIENT_ID_FALLBACK = 'google-placeholder-client-id';
+    static readonly GOOGLE_CLIENT_SECRET_FALLBACK = 'google-placeholder-secret';
 }

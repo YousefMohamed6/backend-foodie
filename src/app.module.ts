@@ -205,7 +205,7 @@ export class AppModule {
 
     consumer
       .apply(hpp(), XssSanitizationMiddleware, TimeoutMiddleware)
-      .exclude('api/v1/admin/(.*)', 'api/v1/admin')
-      .forRoutes('*');
+      .exclude('api/v1/admin/*path', 'api/v1/admin')
+      .forRoutes('*path');
   }
 }

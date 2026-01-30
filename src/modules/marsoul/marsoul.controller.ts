@@ -3,7 +3,7 @@ import {
   ApiBearerAuth,
   ApiOperation,
   ApiResponse,
-  ApiTags,
+  ApiTags
 } from '@nestjs/swagger';
 import { UserRole } from '@prisma/client';
 import { Roles } from '../../common/decorators/roles.decorator';
@@ -17,7 +17,7 @@ import { MarsoulService } from './marsoul.service';
 @Controller('marsoul')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class MarsoulController {
-  constructor(private readonly marsoulService: MarsoulService) {}
+  constructor(private readonly marsoulService: MarsoulService) { }
 
   @Get()
   @Roles(UserRole.CUSTOMER, UserRole.ADMIN)

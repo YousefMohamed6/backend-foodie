@@ -20,6 +20,8 @@ export class EnvKeys {
     static readonly SESSION_SECRET = 'SESSION_SECRET';
     static readonly ALLOWED_ORIGINS = 'ALLOWED_ORIGINS';
     static readonly SECURE_API_KEY = 'SECURE_API_KEY';
+    static readonly ALLOWED_GOOGLE_CLIENT_IDS = 'ALLOWED_GOOGLE_CLIENT_IDS';
+    static readonly APPLE_CLIENT_ID = 'APPLE_CLIENT_ID';
 
     // Services
     static readonly GOOGLE_MAPS_API_KEY = 'GOOGLE_MAPS_API_KEY';

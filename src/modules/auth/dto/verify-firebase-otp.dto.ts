@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { DevicePlatform, UserRole } from '@prisma/client';
+import { DevicePlatform } from '@prisma/client';
 import {
   IsEmail,
   IsEnum,
@@ -39,20 +39,6 @@ export class VerifyFirebaseOtpDto {
   @IsEmail()
   @IsNotEmpty()
   email: string;
-
-  @ApiPropertyOptional({
-    description: 'Role for new user (CUSTOMER, DRIVER, VENDOR, or MANAGER)',
-    enum: [
-      UserRole.CUSTOMER,
-      UserRole.DRIVER,
-      UserRole.VENDOR,
-      UserRole.MANAGER,
-    ],
-    default: UserRole.CUSTOMER,
-  })
-  @IsEnum(UserRole)
-  @IsOptional()
-  role?: UserRole;
 
   @ApiPropertyOptional({
     description: 'Device ID for token binding',

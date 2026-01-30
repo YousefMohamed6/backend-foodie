@@ -10,25 +10,22 @@ interface GoogleTokenPayload {
   family_name?: string;
   picture?: string;
   sub: string; // Google user ID
+  aud: string; // Audience (Client ID)
 }
 
 @Injectable()
 export class GoogleAuthService {
   private readonly logger = new Logger(GoogleAuthService.name);
   private googleClient: OAuth2Client;
-  private googleClientId: string;
-  private googleIosClientId: string;
+  private allowedAudiences: string[];
 
   constructor(private configService: ConfigService) {
-    this.googleClientId =
-      this.configService.get<string>('GOOGLE_CLIENT_ID') || '';
-    this.googleIosClientId =
-      this.configService.get<string>('GOOGLE_IOS_CLIENT_ID') ||
-      this.googleClientId;
+    const googleConfig = this.configService.get('app.google');
+    this.allowedAudiences = googleConfig?.allowedClientIds || [];
 
-    if (!this.googleClientId) {
+    if (this.allowedAudiences.length === 0) {
       this.logger.warn(
-        'GOOGLE_CLIENT_ID not configured. Google Sign-In will not work.',
+        'No Google Client IDs configured in ALLOWED_GOOGLE_CLIENT_IDS. Google Sign-In will fail.',
       );
     }
 
@@ -43,8 +40,8 @@ export class GoogleAuthService {
     try {
       const ticket = await this.googleClient.verifyIdToken({
         idToken,
-        // Accept both Android and iOS client IDs
-        audience: [this.googleClientId, this.googleIosClientId],
+        // Accept all configured client IDs as valid audience
+        audience: this.allowedAudiences,
       });
 
       const payload = ticket.getPayload();
@@ -69,6 +66,7 @@ export class GoogleAuthService {
         family_name: payload.family_name,
         picture: payload.picture,
         sub: payload.sub,
+        aud: payload.aud,
       };
     } catch (error: unknown) {
       this.logger.error(

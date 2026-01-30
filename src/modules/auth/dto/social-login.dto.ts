@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { DevicePlatform } from '@prisma/client';
+import { DevicePlatform, UserRole } from '@prisma/client';
 import { IsEnum, IsNotEmpty, IsOptional, IsString } from 'class-validator';
 
 export class SocialLoginDto {
@@ -53,4 +53,13 @@ export class SocialLoginDto {
   @IsOptional()
   @IsEnum(DevicePlatform)
   devicePlatform?: DevicePlatform;
+
+  @ApiProperty({
+    required: false,
+    enum: UserRole,
+    description: 'Intended user role (CUSTOMER, DRIVER, VENDOR, MANAGER)',
+  })
+  @IsOptional()
+  @IsEnum(UserRole)
+  role?: UserRole;
 }
