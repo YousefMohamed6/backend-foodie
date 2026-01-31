@@ -80,7 +80,7 @@ export class OrderCreationService {
                 metadata: {
                     totalAmount: Number(result.orderTotal),
                     vendorId: result.vendorId,
-                    itemsCount: result.products?.length || 0,
+                    itemsCount: (result as any).items?.length || (result as any).products?.length || 0,
                 },
             });
 
@@ -109,7 +109,7 @@ export class OrderCreationService {
         subtotal: number,
         calcs: any,
     ) {
-        return await this.prisma.$transaction(async (tx) => {
+        const transactionResult = await this.prisma.$transaction(async (tx) => {
             if (createOrderDto.cashbackId) {
                 await this.cashbackService.findOne(createOrderDto.cashbackId);
             }
@@ -257,21 +257,34 @@ export class OrderCreationService {
                 });
             }
 
-            const vendor = await tx.vendor.findUnique({
-                where: { id: createOrderDto.vendorId },
-                select: { authorId: true },
-            });
-
-            if (vendor?.authorId) {
-                await this.notificationService.sendOrderNotification(
-                    vendor.authorId,
-                    ORDERS_NOTIFICATIONS.ORDER_PLACED,
-                    { orderId: savedOrder.id, status: savedOrder.status },
-                );
-            }
-
-            return this.emitUpdate(savedOrder);
+            return savedOrder;
         });
+
+        // 1. Send Real-time WebSocket Update
+        const mappedOrder = this.emitUpdate(transactionResult);
+
+        // 2. Send Push Notifications (Async - Don't block response)
+        this.sendOrderNotificationsChecked(createOrderDto.vendorId, transactionResult).catch(err => {
+            this.logger.error(`Failed to send order notifications: ${err.message}`, err.stack);
+        });
+
+        return mappedOrder || transactionResult;
+    }
+
+    // Helper to extract notification logic safely
+    private async sendOrderNotificationsChecked(vendorId: string, order: any) {
+        const vendor = await this.prisma.vendor.findUnique({
+            where: { id: vendorId },
+            select: { authorId: true },
+        });
+
+        if (vendor?.authorId) {
+            await this.notificationService.sendOrderNotification(
+                vendor.authorId,
+                ORDERS_NOTIFICATIONS.ORDER_PLACED,
+                { orderId: order.id, status: order.status },
+            );
+        }
     }
 
     private emitUpdate(order: any) {
