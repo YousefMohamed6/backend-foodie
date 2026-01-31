@@ -79,23 +79,21 @@ export class CategoriesService {
     }
     const cacheKey = `categories:all:${query.vendorId || 'global'}:${query.home}:${query.showInHomepage}:p${page}:l${limit}`;
 
-    // Try to get from cache
-    const cached = await this.redis.get<any[]>(cacheKey);
-    if (cached) return cached;
-
-    const categories = await this.prisma.category.findMany({
-      where,
-      skip,
-      take: limit,
-      include: {
-        products: true,
+    return this.redis.getOrSet(
+      cacheKey,
+      async () => {
+        return this.prisma.category.findMany({
+          where,
+          skip,
+          take: limit,
+          include: {
+            products: true,
+          },
+        });
       },
-    });
-
-    // Cache the result
-    await this.redis.set(cacheKey, categories, 1800); // 30 mins
-
-    return categories;
+      1800, // 30 mins,
+      60, // 60s for empty
+    );
   }
 
   /**

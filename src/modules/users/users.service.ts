@@ -5,7 +5,7 @@ import {
   Injectable,
   UnauthorizedException,
 } from '@nestjs/common';
-import { DriverStatus, TransactionType, User, UserRole } from '@prisma/client';
+import { DriverStatus, TransactionType, UserRole } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 import { normalizePhoneNumber } from '../../common/utils/phone.utils';
 import { PrismaService } from '../../prisma/prisma.service';
@@ -36,74 +36,76 @@ export class UsersService {
     }
 
     const cacheKey = `user:${id}:me`;
-    const cached = await this.redisService.get<any>(cacheKey);
-    if (cached) return cached;
+    return this.redisService.getOrSet(
+      cacheKey,
+      async () => {
+        const user = await this.prisma.user.findUnique({
+          where: { id },
+        });
 
-    const user = await this.prisma.user.findUnique({
-      where: { id },
-    });
+        if (!user) {
+          throw new BadRequestException('USER_NOT_FOUND');
+        }
 
-    if (!user) {
-      throw new BadRequestException('USER_NOT_FOUND');
-    }
+        if (user.isActive === false) {
+          throw new BadRequestException('USER_INACTIVE');
+        }
 
-    if (user.isActive === false) {
-      throw new BadRequestException('USER_INACTIVE');
-    }
-
-    // Map user to author (exclude password and subscription-related fields)
-    const mapUserToAuthor = (u: typeof user) => {
-      const {
-        password,
-        isDocumentVerify,
-        subscriptionPlanId,
-        subscriptionExpiryDate,
-        ...authorData
-      } = u;
-      return authorData;
-    };
-
-    let result;
-
-    if (user.role === UserRole.VENDOR) {
-      const vendor = await this.vendorsService.findByAuthor(user.id);
-      if (vendor) {
-        // Return vendor with author (user) embedded
-        result = {
-          ...vendor,
-          author: mapUserToAuthor(user),
+        // Map user to author (exclude password and subscription-related fields)
+        const mapUserToAuthor = (u: typeof user) => {
+          const {
+            password,
+            isDocumentVerify,
+            subscriptionPlanId,
+            subscriptionExpiryDate,
+            ...authorData
+          } = u;
+          return authorData;
         };
-      } else {
-        // No vendor profile yet - return user data as author structure
-        result = {
-          author: mapUserToAuthor(user),
-        };
-      }
-    } else if (user.role === UserRole.DRIVER) {
-      const driver = await this.prisma.driverProfile.findUnique({
-        where: { userId: user.id },
-      });
-      const { password, ...userData } = user;
-      result = {
-        ...userData,
-        isOnline: driver?.isOnline ?? false,
-        walletAmount: driver?.walletAmount ?? 0,
-        lat: driver?.currentLat,
-        lng: driver?.currentLng,
-      };
-    } else {
-      const customer = await this.prisma.customerProfile.findUnique({
-        where: { userId: user.id },
-      });
-      const { password, ...userData } = user;
-      result = {
-        ...userData,
-        walletAmount: customer?.walletAmount ?? 0,
-      };
-    }
 
-    await this.redisService.set(cacheKey, result, 3600);
-    return result;
+        let result;
+
+        if (user.role === UserRole.VENDOR) {
+          const vendor = await this.vendorsService.findByAuthor(user.id);
+          if (vendor) {
+            // Return vendor with author (user) embedded
+            result = {
+              ...vendor,
+              author: mapUserToAuthor(user),
+            };
+          } else {
+            // No vendor profile yet - return user data as author structure
+            result = {
+              author: mapUserToAuthor(user),
+            };
+          }
+        } else if (user.role === UserRole.DRIVER) {
+          const driver = await this.prisma.driverProfile.findUnique({
+            where: { userId: user.id },
+          });
+          const { password, ...userData } = user;
+          result = {
+            ...userData,
+            isOnline: driver?.isOnline ?? false,
+            walletAmount: driver?.walletAmount ?? 0,
+            lat: driver?.currentLat,
+            lng: driver?.currentLng,
+          };
+        } else {
+          const customer = await this.prisma.customerProfile.findUnique({
+            where: { userId: user.id },
+          });
+          const { password, ...userData } = user;
+          result = {
+            ...userData,
+            walletAmount: customer?.walletAmount ?? 0,
+          };
+        }
+
+        return result;
+      },
+      3600,
+    );
   }
 
   async create(createUserDto: CreateUserDto) {
@@ -282,15 +284,16 @@ export class UsersService {
 
   async findOne(id: string) {
     const cacheKey = `user:${id}:one`;
-    const cached = await this.redisService.get<Omit<User, 'password'>>(cacheKey);
-    if (cached) return cached;
-
-    const user = await this.prisma.user.findUnique({ where: { id } });
-    if (!user) return null;
-    const { password, ...result } = user;
-
-    await this.redisService.set(cacheKey, result, 3600);
-    return result;
+    return this.redisService.getOrSet(
+      cacheKey,
+      async () => {
+        const user = await this.prisma.user.findUnique({ where: { id } });
+        if (!user) return null;
+        const { password, ...result } = user;
+        return result;
+      },
+      3600,
+    );
   }
 
   findByEmail(email: string) {

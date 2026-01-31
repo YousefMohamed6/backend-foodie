@@ -256,81 +256,89 @@ export class VendorsService {
     // Update cache key to include vendorTypeId
     const cacheKey = `${this.CACHE_KEYS.ALL_VENDORS(zoneId, page, limit)}:${query.vendorTypeId || 'all'}`;
 
-    const cached = await this.redisService.get<any[]>(cacheKey);
-    if (cached) return cached;
+    return this.redisService.getOrSet(
+      cacheKey,
+      async () => {
+        const where: Prisma.VendorWhereInput = {
+          isActive: true,
+        };
 
-    const where: Prisma.VendorWhereInput = {
-      isActive: true,
-    };
+        if (zoneId) {
+          where.zoneId = zoneId;
+        }
 
-    if (zoneId) {
-      where.zoneId = zoneId;
-    }
+        if (query.vendorTypeId) {
+          where.vendorTypeId = query.vendorTypeId;
+        }
 
-    if (query.vendorTypeId) {
-      where.vendorTypeId = query.vendorTypeId;
-    }
-
-    const vendors = await this.prisma.vendor.findMany({
-      skip,
-      take: limit,
-      where,
-      include: {
-        photos: true,
-        restaurantMenuPhotos: true,
-        schedules: true,
-        subscriptionPlan: {
+        const vendors = await this.prisma.vendor.findMany({
+          skip,
+          take: limit,
+          where,
           include: {
-            features: true,
+            photos: true,
+            restaurantMenuPhotos: true,
+            schedules: true,
+            subscriptionPlan: {
+              include: {
+                features: true,
+              },
+            },
+            author: true,
+            categories: true,
+            specialDiscounts: {
+              where: {
+                isActive: true,
+                ...(user?.role !== UserRole.VENDOR ? { isPublish: true } : {}),
+              },
+            },
           },
-        },
-        author: true,
-        categories: true,
-        specialDiscounts: { where: { isActive: true, ...(user?.role !== UserRole.VENDOR ? { isPublish: true } : {}) } },
+          orderBy: { createdAt: 'desc' },
+        });
+
+        const response = await Promise.all(
+          vendors.map((v) => this.mapVendorResponse(v as any)),
+        );
+        return response;
       },
-      orderBy: { createdAt: 'desc' },
-    });
-
-    const response = await Promise.all(
-      vendors.map((v) => this.mapVendorResponse(v as any)),
+      300,
+      60,
     );
-
-    // Cache for 5 minutes
-    await this.redisService.set(cacheKey, response, 300);
-
-    return response;
   }
 
   async findOne(id: string, user?: User) {
     const cacheKey = this.CACHE_KEYS.VENDOR_BY_ID(id);
-    const cached = await this.redisService.get(cacheKey);
-    if (cached) return cached;
-
-    const vendor = await this.prisma.vendor.findFirst({
-      where: { id, isActive: true },
-      include: {
-        photos: true,
-        restaurantMenuPhotos: true,
-        schedules: true,
-        subscriptionPlan: {
+    return this.redisService.getOrSet(
+      cacheKey,
+      async () => {
+        const vendor = await this.prisma.vendor.findFirst({
+          where: { id, isActive: true },
           include: {
-            features: true,
+            photos: true,
+            restaurantMenuPhotos: true,
+            schedules: true,
+            subscriptionPlan: {
+              include: {
+                features: true,
+              },
+            },
+            author: true,
+            categories: true,
+            specialDiscounts: {
+              where: {
+                isActive: true,
+                ...(user?.role !== UserRole.VENDOR ? { isPublish: true } : {}),
+              },
+            },
           },
-        },
-        author: true,
-        categories: true,
-        specialDiscounts: { where: { isActive: true, ...(user?.role !== UserRole.VENDOR ? { isPublish: true } : {}) } },
+        });
+        if (!vendor) {
+          throw new NotFoundException(VendorStatusMessages.VENDOR_NOT_FOUND);
+        }
+        return this.mapVendorResponse(vendor as any);
       },
-    });
-    if (!vendor) {
-      throw new NotFoundException(VendorStatusMessages.VENDOR_NOT_FOUND);
-    }
-    const response = await this.mapVendorResponse(vendor as any);
-
-    // Cache for 10 minutes
-    await this.redisService.set(cacheKey, response, 600);
-
-    return response;
+      600,
+    );
   }
 
   async update(id: string, updateVendorDto: UpdateVendorDto) {
@@ -464,72 +472,74 @@ export class VendorsService {
       categoryId,
       zoneId,
     );
-    const cached = await this.redisService.get<any[]>(cacheKey);
-    if (cached) return cached;
-
-    const nearbyVendorsRaw = await this.prisma.$queryRaw<{ id: string }[]>`
+    return this.redisService.getOrSet(
+      cacheKey,
+      async () => {
+        const nearbyVendorsRaw = await this.prisma.$queryRaw<{ id: string }[]>`
       SELECT id, 
       (6371 * acos(cos(radians(${latitude})) * cos(radians(latitude)) * cos(radians(longitude) - radians(${longitude})) + sin(radians(${latitude})) * sin(radians(latitude)))) AS distance
       FROM vendors
       WHERE (6371 * acos(cos(radians(${latitude})) * cos(radians(latitude)) * cos(radians(longitude) - radians(${longitude})) + sin(radians(${latitude})) * sin(radians(latitude)))) <= ${radius}
     `;
 
-    const nearbyIds = nearbyVendorsRaw.map((v) => v.id);
+        const nearbyIds = nearbyVendorsRaw.map((v) => v.id);
 
-    if (nearbyIds.length === 0) {
-      return [];
-    }
+        if (nearbyIds.length === 0) {
+          return [];
+        }
 
-    const now = new Date();
+        const now = new Date();
 
-    const where: Prisma.VendorWhereInput = {
-      id: { in: nearbyIds },
-      isActive: true,
-      ...(isDining !== undefined ? { isDineInActive: isDining } : {}),
-      OR: [
-        { subscriptionExpiryDate: null },
-        { subscriptionExpiryDate: { gt: now } },
-      ],
-      ...(categoryId
-        ? {
-          categories: {
-            some: {
-              id: categoryId,
+        const where: Prisma.VendorWhereInput = {
+          id: { in: nearbyIds },
+          isActive: true,
+          ...(isDining !== undefined ? { isDineInActive: isDining } : {}),
+          OR: [
+            { subscriptionExpiryDate: null },
+            { subscriptionExpiryDate: { gt: now } },
+          ],
+          ...(categoryId
+            ? {
+              categories: {
+                some: {
+                  id: categoryId,
+                },
+              },
+            }
+            : {}),
+        };
+
+        if (zoneId) {
+          where.zoneId = zoneId;
+        }
+
+        const vendors = await this.prisma.vendor.findMany({
+          where,
+          include: {
+            photos: true,
+            restaurantMenuPhotos: true,
+            schedules: true,
+            subscriptionPlan: {
+              include: {
+                features: true,
+              },
+            },
+            author: true,
+            categories: true,
+            specialDiscounts: {
+              where: {
+                isActive: true,
+                ...(user?.role !== UserRole.VENDOR ? { isPublish: true } : {}),
+              },
             },
           },
-        }
-        : {}),
-    };
+        });
 
-    if (zoneId) {
-      where.zoneId = zoneId;
-    }
-
-    const vendors = await this.prisma.vendor.findMany({
-      where,
-      include: {
-        photos: true,
-        restaurantMenuPhotos: true,
-        schedules: true,
-        subscriptionPlan: {
-          include: {
-            features: true,
-          },
-        },
-        author: true,
-        categories: true,
-        specialDiscounts: { where: { isActive: true, ...(user?.role !== UserRole.VENDOR ? { isPublish: true } : {}) } },
+        return Promise.all(vendors.map((v) => this.mapVendorResponse(v as any)));
       },
-    });
-
-    const response = await Promise.all(
-      vendors.map((v) => this.mapVendorResponse(v as any)),
+      120, // 2 mins standard
+      30, // 30s empty
     );
-
-    // Cache for 2 minutes (nearest is more dynamic)
-    await this.redisService.set(cacheKey, response, 120);
-
-    return response;
   }
 
   async getProducts(vendorId: string) {

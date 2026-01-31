@@ -15,7 +15,7 @@ export class PayoutAccountService {
   constructor(
     private prisma: PrismaService,
     private redisService: RedisService,
-  ) {}
+  ) { }
 
   private getCacheKey(userId: string): string {
     return `${this.CACHE_KEY_PREFIX}${userId}`;
@@ -45,21 +45,16 @@ export class PayoutAccountService {
 
   async findAll(userId: string) {
     const cacheKey = this.getCacheKey(userId);
-    const cachedAccounts = await this.redisService.get<any[]>(cacheKey);
-
-    if (cachedAccounts) {
-      return cachedAccounts;
-    }
-
-    const accounts = await this.prisma.payoutAccount.findMany({
-      where: { userId },
-      orderBy: { createdAt: 'desc' },
-    });
-
-    // Cache for 1 hour
-    await this.redisService.set(cacheKey, accounts, 3600);
-
-    return accounts;
+    return this.redisService.getOrSet(
+      cacheKey,
+      async () => {
+        return this.prisma.payoutAccount.findMany({
+          where: { userId },
+          orderBy: { createdAt: 'desc' },
+        });
+      },
+      3600,
+    );
   }
 
   async findOne(id: string, userId: string) {

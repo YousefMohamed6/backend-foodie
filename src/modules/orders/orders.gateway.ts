@@ -73,7 +73,14 @@ export class OrdersGateway implements OnGatewayConnection, OnGatewayDisconnect {
       // 2. Fetch specific room data based on role
       const dbUser = await this.prisma.user.findUnique({
         where: { id: user.sub },
-        select: { vendorId: true, zoneId: true, role: true },
+        select: {
+          vendorId: true,
+          zoneId: true,
+          role: true,
+          vendorAuthorOf: {
+            select: { id: true },
+          },
+        },
       });
 
       if (!dbUser) {
@@ -83,10 +90,11 @@ export class OrdersGateway implements OnGatewayConnection, OnGatewayDisconnect {
       }
 
       // Auto-join Vendor Room
-      if (dbUser.vendorId && dbUser.role === UserRole.VENDOR) {
-        const vendorRoom = `${OrderSocketEvents.VENDOR_ROOM_PREFIX}${dbUser.vendorId}`;
+      const effectiveVendorId = dbUser.vendorId || dbUser.vendorAuthorOf?.id;
+      if (effectiveVendorId && (dbUser.role === UserRole.VENDOR || dbUser.role === UserRole.MANAGER || dbUser.role === UserRole.ADMIN)) {
+        const vendorRoom = `${OrderSocketEvents.VENDOR_ROOM_PREFIX}${effectiveVendorId}`;
         client.join(vendorRoom);
-        this.logger.log(`Vendor ${user.sub} auto-joined vendor room: ${vendorRoom}`);
+        this.logger.log(`User ${user.sub} (${dbUser.role}) auto-joined vendor room: ${vendorRoom}`);
       }
 
       // Auto-join Zone Room
@@ -207,9 +215,10 @@ export class OrdersGateway implements OnGatewayConnection, OnGatewayDisconnect {
         return { error: 'NO_VENDOR_ASSIGNED' };
       }
 
-      // Only vendors can watch vendor orders
-      if (dbUser.role !== UserRole.VENDOR) {
-        this.logger.warn(`User ${user.sub} (${dbUser.role}) attempted to watch vendor orders`);
+      // Vendors, Managers, and Admins can watch vendor orders if associated
+      const allowedRoles = [UserRole.VENDOR, UserRole.MANAGER, UserRole.ADMIN, UserRole.CUSTOMER, UserRole.DRIVER];
+      if (!allowedRoles.includes(dbUser.role)) {
+        this.logger.warn(`User ${user.sub} (${dbUser.role}) attempted to watch vendor orders but role not allowed`);
         return { error: 'FORBIDDEN' };
       }
 

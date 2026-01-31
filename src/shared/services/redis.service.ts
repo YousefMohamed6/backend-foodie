@@ -63,6 +63,74 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
     return this.subClient;
   }
 
+  /**
+   * GENERIC CACHE-ASIDE PATTERN (MANDATORY FOR ALL FETCHES)
+   * 
+   * @param key The Redis key
+   * @param fetcher The function to fetch data from DB if cache misses
+   * @param ttlSeconds Standard TTL for valid data
+   * @param emptyTtlSeconds Short TTL for empty data ([], null) to prevent caching glitches
+   */
+  async getOrSet<T>(
+    key: string,
+    fetcher: () => Promise<T>,
+    ttlSeconds: number = 300,
+    emptyTtlSeconds: number = 30,
+  ): Promise<T> {
+    if (!this.client) {
+      // If Redis is down, fallback directly to DB
+      return fetcher();
+    }
+
+    try {
+      // 1. Try generic get
+      const cached = await this.get<T>(key);
+      if (cached !== null && cached !== undefined) {
+        // Double check for empty array "stuck" in cache if we want to be paranoid
+        // But assuming the SET logic does its job, this is fine.
+        return cached;
+      }
+    } catch (e) {
+      this.logger.error(`Redis Read Error for ${key} - Falling back to DB`, e);
+    }
+
+    // 2. Fallback to DB
+    const data = await fetcher();
+
+    // 3. Save to Redis (Fire and forget, don't block response)
+    if (data !== undefined) {
+      this.setSmart(key, data, ttlSeconds, emptyTtlSeconds).catch((e) =>
+        this.logger.error(`Redis Write Error for ${key}`, e),
+      );
+    }
+
+    return data;
+  }
+
+  /**
+   * Smart Set: Uses shorter TTL for empty arrays/nulls
+   */
+  async setSmart(
+    key: string,
+    value: any,
+    ttl: number,
+    emptyTtl: number,
+  ): Promise<void> {
+    if (!this.client) return;
+
+    let finalTtl = ttl;
+    const isEmpty =
+      value === null || (Array.isArray(value) && value.length === 0);
+
+    if (isEmpty) {
+      finalTtl = emptyTtl;
+      // Optional: Log when we are caching an empty state
+      // this.logger.warn(`Caching EMPTY state for ${key} for ${emptyTtl}s`);
+    }
+
+    await this.set(key, value, finalTtl);
+  }
+
   async get<T = string>(key: string): Promise<T | null> {
     if (!this.client) return null;
     try {
@@ -70,10 +138,12 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
       if (!value) return null;
 
       try {
-        // Attempt to parse as JSON if it's an object/array string
-        return JSON.parse(value) as T;
+        const parsed = JSON.parse(value);
+        // Handle case where "null" string was saved
+        if (parsed === null) return null;
+        return parsed as T;
       } catch {
-        // If parsing fails, return as is (plain string)
+        // If simple string, return as is
         return value as unknown as T;
       }
     } catch (error) {
@@ -85,6 +155,12 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
   async set(key: string, value: any, expirySeconds?: number): Promise<void> {
     if (!this.client) return;
     try {
+      // Store nulls as "null" string or handle strictly?
+      // Best practice: if value is null/undefined, simple don't set it (cache miss next time)?
+      // Or set explicit null to avoid repeated DB hits for non-existent items.
+      // Current decision: support caching valid values.
+      if (value === undefined) return;
+
       const stringValue =
         typeof value === 'string' ? value : JSON.stringify(value);
 
@@ -129,22 +205,17 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
         MATCH: pattern,
         COUNT: 100,
       })) {
-        // Skip empty or invalid keys to prevent DEL command errors
-        if (!key || key.length === 0) {
-          continue;
-        }
+        if (!key) continue;
 
         promises.push(this.client.del(key));
         count++;
 
-        // Process in batches of 100 for pipelining and memory safety
         if (promises.length >= 100) {
           await Promise.all(promises);
           promises.length = 0;
         }
       }
 
-      // Process remaining
       if (promises.length > 0) {
         await Promise.all(promises);
       }

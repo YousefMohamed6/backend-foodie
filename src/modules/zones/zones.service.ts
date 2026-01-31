@@ -56,28 +56,28 @@ export class ZonesService {
   }
 
   async findAll() {
-    const cached = await this.redisService.get<any[]>(
+    return this.redisService.getOrSet(
       this.CACHE_KEYS.ALL_ZONES,
+      async () => {
+        return this.prisma.zone.findMany();
+      },
+      3600, // 1 hour
     );
-    if (cached) return cached;
-
-    const zones = await this.prisma.zone.findMany();
-    await this.redisService.set(this.CACHE_KEYS.ALL_ZONES, zones, 3600); // 1 hour
-    return zones;
   }
 
   async findOne(id: string) {
     const cacheKey = this.CACHE_KEYS.ZONE_BY_ID(id);
-    const cached = await this.redisService.get(cacheKey);
-    if (cached) return cached;
-
-    const zone = await this.prisma.zone.findUnique({ where: { id } });
-    if (!zone) {
-      throw new NotFoundException(`Zone with ID ${id} not found`);
-    }
-
-    await this.redisService.set(cacheKey, zone, 3600); // 1 hour
-    return zone;
+    return this.redisService.getOrSet(
+      cacheKey,
+      async () => {
+        const zone = await this.prisma.zone.findUnique({ where: { id } });
+        if (!zone) {
+          throw new NotFoundException(`Zone with ID ${id} not found`);
+        }
+        return zone;
+      },
+      3600,
+    );
   }
 
   async update(id: string, updateZoneDto: UpdateZoneDto) {
@@ -133,17 +133,15 @@ export class ZonesService {
   }
 
   async findZoneByLocation(lat: number, lng: number) {
-    const cachedPublished = await this.redisService.get<any[]>(
+    const zones = await this.redisService.getOrSet(
       this.CACHE_KEYS.PUBLISHED_ZONES,
+      async () => {
+        return this.prisma.zone.findMany({
+          where: { isPublish: true },
+        });
+      },
+      1800, // 30 mins
     );
-    let zones = cachedPublished;
-
-    if (!zones) {
-      zones = await this.prisma.zone.findMany({
-        where: { isPublish: true },
-      });
-      await this.redisService.set(this.CACHE_KEYS.PUBLISHED_ZONES, zones, 1800); // 30 mins
-    }
 
     for (const zone of zones) {
       const area = zone.area as unknown as { lat: number; lng: number }[];

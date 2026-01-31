@@ -15,30 +15,31 @@ export class BannersService {
 
   async findAll(position?: string) {
     const cacheKey = `${this.CACHE_KEY_PREFIX}all:${position || 'global'}`;
-    const cached = await this.redisService.get<any[]>(cacheKey);
-    if (cached) return cached;
-
-    const where: Prisma.BannerWhereInput = { isActive: true };
-    if (position) where.position = position;
-    const banners = await this.prisma.banner.findMany({ where });
-
-    // Cache for 30 minutes
-    await this.redisService.set(cacheKey, banners, 1800);
-    return banners;
+    return this.redisService.getOrSet(
+      cacheKey,
+      async () => {
+        const where: Prisma.BannerWhereInput = { isActive: true };
+        if (position) where.position = position;
+        return this.prisma.banner.findMany({ where });
+      },
+      1800, // 30 mins
+      60, // 60s for empty
+    );
   }
 
   async findOne(id: string) {
     const cacheKey = `${this.CACHE_KEY_PREFIX}id:${id}`;
-    const cached = await this.redisService.get(cacheKey);
-    if (cached) return cached;
-
-    const banner = await this.prisma.banner.findUnique({ where: { id } });
-    if (!banner) {
-      throw new NotFoundException('BANNER_NOT_FOUND');
-    }
-
-    await this.redisService.set(cacheKey, banner, 3600); // 1 hour
-    return banner;
+    return this.redisService.getOrSet(
+      cacheKey,
+      async () => {
+        const banner = await this.prisma.banner.findUnique({ where: { id } });
+        if (!banner) {
+          throw new NotFoundException('BANNER_NOT_FOUND');
+        }
+        return banner;
+      },
+      3600,
+    );
   }
 
   async create(data: CreateBannerDto) {

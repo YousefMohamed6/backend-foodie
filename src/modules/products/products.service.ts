@@ -161,12 +161,6 @@ export class ProductsService {
       user?.role === UserRole.CUSTOMER && user.zoneId ? user.zoneId : undefined;
 
     // Don't use cache for vendor requests - they need real-time data
-    if (!isVendor) {
-      const cacheKey = this.CACHE_KEYS.ALL_PRODUCTS(query, zoneId);
-      const cached = await this.redisService.get<any[]>(cacheKey);
-      if (cached) return cached;
-    }
-
     const where: Prisma.ProductWhereInput = {
       isActive: true,
       vendor: { isActive: true },
@@ -186,8 +180,9 @@ export class ProductsService {
         if (query.publish !== undefined && query.publish !== 'all') {
           where.isPublish = query.publish === 'true' || query.publish === true;
         }
-        // If publish is undefined or 'all', return all products (published and unpublished)
       }
+      // Don't use cache for vendor requests - they need real-time data
+      return this.fetchProductsFromDb(where, skip, limit);
     } else {
       // Non-vendors (customers, guests) only see published products with available quantity
       where.isPublish = true;
@@ -211,6 +206,23 @@ export class ProductsService {
       }
     }
 
+    const cacheKey = this.CACHE_KEYS.ALL_PRODUCTS(query, zoneId);
+
+    return this.redisService.getOrSet(
+      cacheKey,
+      async () => {
+        return this.fetchProductsFromDb(where, skip, limit);
+      },
+      300,
+      60,
+    );
+  }
+
+  private async fetchProductsFromDb(
+    where: Prisma.ProductWhereInput,
+    skip: number,
+    limit: number,
+  ) {
     const products = await this.prisma.product.findMany({
       where,
       skip,
@@ -218,15 +230,7 @@ export class ProductsService {
       include: { extras: true, itemAttributes: true },
     });
 
-    const response = products.map((p) => this.mapProductResponse(p));
-
-    // Only cache for non-vendor requests
-    if (!isVendor) {
-      const cacheKey = this.CACHE_KEYS.ALL_PRODUCTS(query, zoneId);
-      await this.redisService.set(cacheKey, response, 300);
-    }
-
-    return response;
+    return products.map((p) => this.mapProductResponse(p));
   }
 
   async findByCategoryAndZone(
@@ -236,52 +240,55 @@ export class ProductsService {
     limit: number = 20,
     search?: string,
   ) {
-    if (!user.zoneId) {
+    const zoneId = user.zoneId;
+    if (!zoneId) {
       return [];
     }
 
     const skip = (page - 1) * limit;
 
-    const cacheKey = `${this.CACHE_KEYS.BY_CATEGORY_ZONE(categoryId, user.zoneId)}:p${page}:l${limit}:s${search || ''}`;
-    const cached = await this.redisService.get<any[]>(cacheKey);
-    if (cached) return cached;
+    const cacheKey = `${this.CACHE_KEYS.BY_CATEGORY_ZONE(categoryId, zoneId)}:p${page}:l${limit}:s${search || ''}`;
+    return this.redisService.getOrSet(
+      cacheKey,
+      async () => {
+        const where: Prisma.ProductWhereInput = {
+          categoryId,
+          isActive: true,
+          isPublish: true,
+          quantity: { not: 0 },
+          vendor: {
+            zoneId: zoneId,
+            isActive: true,
+          },
+        };
 
-    const where: Prisma.ProductWhereInput = {
-      categoryId,
-      isActive: true,
-      isPublish: true,
-      quantity: { not: 0 },
-      vendor: {
-        zoneId: user.zoneId,
-        isActive: true,
+        if (search) {
+          where.OR = [
+            { name: { contains: search, mode: 'insensitive' } },
+            { description: { contains: search, mode: 'insensitive' } },
+          ];
+        }
+
+        const products = await this.prisma.product.findMany({
+          where,
+          skip,
+          take: limit,
+          include: {
+            extras: true,
+            itemAttributes: true,
+            vendor: true,
+          },
+          orderBy: { createdAt: 'desc' },
+        });
+
+        const response = products.map((p) =>
+          this.mapProductResponse(p as ProductWithRelations),
+        );
+        return response;
       },
-    };
-
-    if (search) {
-      where.OR = [
-        { name: { contains: search, mode: 'insensitive' } },
-        { description: { contains: search, mode: 'insensitive' } },
-      ];
-    }
-
-    const products = await this.prisma.product.findMany({
-      where,
-      skip,
-      take: limit,
-      include: {
-        extras: true,
-        itemAttributes: true,
-        vendor: true,
-      },
-      orderBy: { createdAt: 'desc' },
-    });
-
-    const response = products.map((p) =>
-      this.mapProductResponse(p as ProductWithRelations),
+      300,
+      60,
     );
-    // Cache for 5 minutes
-    await this.redisService.set(cacheKey, response, 300);
-    return response;
   }
 
   async count(query: { vendorId?: string }) {
@@ -294,21 +301,21 @@ export class ProductsService {
 
   async findOne(id: string) {
     const cacheKey = this.CACHE_KEYS.PRODUCT_BY_ID(id);
-    const cached = await this.redisService.get(cacheKey);
-    if (cached) return cached;
-
-    const product = await this.prisma.product.findUnique({
-      where: { id },
-      include: { vendor: true, extras: true, itemAttributes: true },
-    });
-    if (!product || !product.isActive || !product.vendor?.isActive) {
-      throw new NotFoundException('PRODUCT_NOT_FOUND');
-    }
-    const response = this.mapProductResponse(product);
-
-    // Cache for 10 minutes
-    await this.redisService.set(cacheKey, response, 600);
-    return response;
+    return this.redisService.getOrSet(
+      cacheKey,
+      async () => {
+        const product = await this.prisma.product.findUnique({
+          where: { id },
+          include: { vendor: true, extras: true, itemAttributes: true },
+        });
+        if (!product || !product.isActive || !product.vendor?.isActive) {
+          throw new NotFoundException('PRODUCT_NOT_FOUND');
+        }
+        return this.mapProductResponse(product);
+      },
+      600,
+      60,
+    );
   }
 
   async update(id: string, updateProductDto: UpdateProductDto, user: User) {

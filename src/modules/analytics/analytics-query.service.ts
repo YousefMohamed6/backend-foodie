@@ -17,7 +17,7 @@ export class AnalyticsQueryService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly redis: RedisService,
-  ) {}
+  ) { }
 
   /**
    * Get vendor performance metrics
@@ -29,83 +29,75 @@ export class AnalyticsQueryService {
     const cacheKey = `analytics:vendor:${vendorId}:${days}d`;
 
     // Try cache first
-    const cached = await this.redis.get(cacheKey);
-    if (cached) {
-      return JSON.parse(cached);
-    }
-
-    const startDate = new Date();
-    startDate.setDate(startDate.getDate() - days);
-
-    // Get latest snapshot
-    const snapshot = await this.prisma.vendorMetricsSnapshot.findFirst({
-      where: {
-        vendorId,
-        snapshotType: SnapshotType.DAILY,
-        snapshotDate: { gte: startDate },
-      },
-      orderBy: { snapshotDate: 'desc' },
-    });
-
-    // Get real-time stats for today
-    const todayStart = new Date();
-    todayStart.setHours(0, 0, 0, 0);
-
-    const todayOrders = await this.prisma.order.count({
-      where: {
-        vendorId,
-        createdAt: { gte: todayStart },
-      },
-    });
-
-    const todayRevenue = await this.prisma.order.aggregate({
-      where: {
-        vendorId,
-        status: OrderStatus.COMPLETED,
-        createdAt: { gte: todayStart },
-      },
-      _sum: { orderTotal: true },
-    });
-
-    const result = {
-      vendorId,
-      period: `${days} days`,
-      snapshot: snapshot || null,
-      today: {
-        orders: todayOrders,
-        revenue: todayRevenue._sum.orderTotal || 0,
-      },
-      performance: snapshot
-        ? {
-            acceptanceRating: getPerformanceRating(
-              Number(snapshot.acceptanceRate || 0),
-              {
-                excellent:
-                  AnalyticsConfig.PERFORMANCE_THRESHOLDS
-                    .VENDOR_ACCEPTANCE_RATE_EXCELLENT,
-                good: AnalyticsConfig.PERFORMANCE_THRESHOLDS
-                  .VENDOR_ACCEPTANCE_RATE_GOOD,
-              },
-              true,
-            ),
-            revenueRating:
-              Number(snapshot.totalRevenue) > 10000
-                ? 'EXCELLENT'
-                : Number(snapshot.totalRevenue) > 5000
-                  ? 'GOOD'
-                  : 'AVERAGE',
-          }
-        : null,
-    };
-
-    // Cache for 5 minutes
-    await this.redis.set(
+    return this.redis.getOrSet(
       cacheKey,
-      JSON.stringify(result),
+      async () => {
+        const startDate = new Date();
+        startDate.setDate(startDate.getDate() - days);
+
+        // Get latest snapshot
+        const snapshot = await this.prisma.vendorMetricsSnapshot.findFirst({
+          where: {
+            vendorId,
+            snapshotType: SnapshotType.DAILY,
+            snapshotDate: { gte: startDate },
+          },
+          orderBy: { snapshotDate: 'desc' },
+        });
+
+        // Get real-time stats for today
+        const todayStart = new Date();
+        todayStart.setHours(0, 0, 0, 0);
+
+        const todayOrders = await this.prisma.order.count({
+          where: {
+            vendorId,
+            createdAt: { gte: todayStart },
+          },
+        });
+
+        const todayRevenue = await this.prisma.order.aggregate({
+          where: {
+            vendorId,
+            status: OrderStatus.COMPLETED,
+            createdAt: { gte: todayStart },
+          },
+          _sum: { orderTotal: true },
+        });
+
+        return {
+          vendorId,
+          period: `${days} days`,
+          snapshot: snapshot || null,
+          today: {
+            orders: todayOrders,
+            revenue: todayRevenue._sum.orderTotal || 0,
+          },
+          performance: snapshot
+            ? {
+              acceptanceRating: getPerformanceRating(
+                Number(snapshot.acceptanceRate || 0),
+                {
+                  excellent:
+                    AnalyticsConfig.PERFORMANCE_THRESHOLDS
+                      .VENDOR_ACCEPTANCE_RATE_EXCELLENT,
+                  good: AnalyticsConfig.PERFORMANCE_THRESHOLDS
+                    .VENDOR_ACCEPTANCE_RATE_GOOD,
+                },
+                true,
+              ),
+              revenueRating:
+                Number(snapshot.totalRevenue) > 10000
+                  ? 'EXCELLENT'
+                  : Number(snapshot.totalRevenue) > 5000
+                    ? 'GOOD'
+                    : 'AVERAGE',
+            }
+            : null,
+        };
+      },
       AnalyticsConfig.CACHE_TTL.PLATFORM_SUMMARY,
     );
-
-    return result;
   }
 
   /**
@@ -117,67 +109,60 @@ export class AnalyticsQueryService {
   ) {
     const cacheKey = `analytics:driver:${driverId}:${days}d`;
 
-    const cached = await this.redis.get(cacheKey);
-    if (cached) {
-      return JSON.parse(cached);
-    }
-
-    const startDate = new Date();
-    startDate.setDate(startDate.getDate() - days);
-
-    const snapshot = await this.prisma.driverMetricsSnapshot.findFirst({
-      where: {
-        driverId,
-        snapshotType: SnapshotType.DAILY,
-        snapshotDate: { gte: startDate },
-      },
-      orderBy: { snapshotDate: 'desc' },
-    });
-
-    // Get today's orders
-    const todayStart = new Date();
-    todayStart.setHours(0, 0, 0, 0);
-
-    const todayDeliveries = await this.prisma.order.count({
-      where: {
-        driverId,
-        status: OrderStatus.COMPLETED,
-        createdAt: { gte: todayStart },
-      },
-    });
-
-    const result = {
-      driverId,
-      period: `${days} days`,
-      snapshot: snapshot || null,
-      today: {
-        deliveries: todayDeliveries,
-      },
-      performance: snapshot
-        ? {
-            deliveryTimeRating: getPerformanceRating(
-              snapshot.averageDeliveryTime || 0,
-              {
-                excellent:
-                  AnalyticsConfig.PERFORMANCE_THRESHOLDS
-                    .DRIVER_DELIVERY_TIME_EXCELLENT,
-                good: AnalyticsConfig.PERFORMANCE_THRESHOLDS
-                  .DRIVER_DELIVERY_TIME_GOOD,
-              },
-              false, // lower is better
-            ),
-            ratingScore: Number(snapshot.averageRating || 0),
-          }
-        : null,
-    };
-
-    await this.redis.set(
+    return this.redis.getOrSet(
       cacheKey,
-      JSON.stringify(result),
+      async () => {
+        const startDate = new Date();
+        startDate.setDate(startDate.getDate() - days);
+
+        const snapshot = await this.prisma.driverMetricsSnapshot.findFirst({
+          where: {
+            driverId,
+            snapshotType: SnapshotType.DAILY,
+            snapshotDate: { gte: startDate },
+          },
+          orderBy: { snapshotDate: 'desc' },
+        });
+
+        // Get today's orders
+        const todayStart = new Date();
+        todayStart.setHours(0, 0, 0, 0);
+
+        const todayDeliveries = await this.prisma.order.count({
+          where: {
+            driverId,
+            status: OrderStatus.COMPLETED,
+            createdAt: { gte: todayStart },
+          },
+        });
+
+        return {
+          driverId,
+          period: `${days} days`,
+          snapshot: snapshot || null,
+          today: {
+            deliveries: todayDeliveries,
+          },
+          performance: snapshot
+            ? {
+              deliveryTimeRating: getPerformanceRating(
+                snapshot.averageDeliveryTime || 0,
+                {
+                  excellent:
+                    AnalyticsConfig.PERFORMANCE_THRESHOLDS
+                      .DRIVER_DELIVERY_TIME_EXCELLENT,
+                  good: AnalyticsConfig.PERFORMANCE_THRESHOLDS
+                    .DRIVER_DELIVERY_TIME_GOOD,
+                },
+                false, // lower is better
+              ),
+              ratingScore: Number(snapshot.averageRating || 0),
+            }
+            : null,
+        };
+      },
       AnalyticsConfig.CACHE_TTL.PLATFORM_SUMMARY,
     );
-
-    return result;
   }
 
   /**
@@ -186,67 +171,60 @@ export class AnalyticsQueryService {
   async getCustomerSegments() {
     const cacheKey = AnalyticsConfig.CACHE_KEYS.CUSTOMER_SEGMENTS;
 
-    const cached = await this.redis.get(cacheKey);
-    if (cached) {
-      return JSON.parse(cached);
-    }
-
-    // Get latest customer metrics
-    const metrics = await this.prisma.customerEngagementMetrics.findMany({
-      where: {
-        snapshotType: SnapshotType.MONTHLY,
-      },
-      orderBy: { snapshotDate: 'desc' },
-      take: 1000, // Top 1000 customers
-    });
-
-    const segments: {
-      VIP: any[];
-      ACTIVE: any[];
-      AT_RISK: any[];
-      CHURNED: any[];
-      NEW: any[];
-    } = {
-      VIP: [],
-      ACTIVE: [],
-      AT_RISK: [],
-      CHURNED: [],
-      NEW: [],
-    };
-
-    metrics.forEach((m) => {
-      const segment = getCustomerSegment({
-        daysSinceLastOrder: m.daysSinceLastOrder,
-        totalOrders: m.totalOrders,
-        totalSpent: Number(m.totalSpent),
-      });
-
-      segments[segment].push({
-        customerId: m.customerId,
-        totalOrders: m.totalOrders,
-        totalSpent: Number(m.totalSpent),
-        daysSinceLastOrder: m.daysSinceLastOrder,
-      });
-    });
-
-    const result = {
-      segments,
-      summary: {
-        vip: segments.VIP.length,
-        active: segments.ACTIVE.length,
-        atRisk: segments.AT_RISK.length,
-        churned: segments.CHURNED.length,
-        new: segments.NEW.length,
-      },
-    };
-
-    await this.redis.set(
+    return this.redis.getOrSet(
       cacheKey,
-      JSON.stringify(result),
+      async () => {
+        // Get latest customer metrics
+        const metrics = await this.prisma.customerEngagementMetrics.findMany({
+          where: {
+            snapshotType: SnapshotType.MONTHLY,
+          },
+          orderBy: { snapshotDate: 'desc' },
+          take: 1000, // Top 1000 customers
+        });
+
+        const segments: {
+          VIP: any[];
+          ACTIVE: any[];
+          AT_RISK: any[];
+          CHURNED: any[];
+          NEW: any[];
+        } = {
+          VIP: [],
+          ACTIVE: [],
+          AT_RISK: [],
+          CHURNED: [],
+          NEW: [],
+        };
+
+        metrics.forEach((m) => {
+          const segment = getCustomerSegment({
+            daysSinceLastOrder: m.daysSinceLastOrder,
+            totalOrders: m.totalOrders,
+            totalSpent: Number(m.totalSpent),
+          });
+
+          segments[segment].push({
+            customerId: m.customerId,
+            totalOrders: m.totalOrders,
+            totalSpent: Number(m.totalSpent),
+            daysSinceLastOrder: m.daysSinceLastOrder,
+          });
+        });
+
+        return {
+          segments,
+          summary: {
+            vip: segments.VIP.length,
+            active: segments.ACTIVE.length,
+            atRisk: segments.AT_RISK.length,
+            churned: segments.CHURNED.length,
+            new: segments.NEW.length,
+          },
+        };
+      },
       AnalyticsConfig.CACHE_TTL.CUSTOMER_SEGMENTS,
     );
-
-    return result;
   }
 
   /**
@@ -258,54 +236,47 @@ export class AnalyticsQueryService {
   ) {
     const cacheKey = `${AnalyticsConfig.CACHE_KEYS.VENDOR_RANKINGS}:${sortBy}:${limit}`;
 
-    const cached = await this.redis.get(cacheKey);
-    if (cached) {
-      return JSON.parse(cached);
-    }
-
-    const orderByField =
-      sortBy === 'revenue'
-        ? { totalRevenue: 'desc' as const }
-        : sortBy === 'orders'
-          ? { totalOrders: 'desc' as const }
-          : { acceptanceRate: 'desc' as const };
-
-    const topVendors = await this.prisma.vendorMetricsSnapshot.findMany({
-      where: {
-        snapshotType: SnapshotType.DAILY,
-      },
-      orderBy: orderByField,
-      take: limit,
-      include: {
-        vendor: {
-          select: {
-            id: true,
-            title: true,
-            logo: true,
-          },
-        },
-      },
-    });
-
-    const result = topVendors.map((v, index) => ({
-      rank: index + 1,
-      vendorId: v.vendorId,
-      vendorName: v.vendor.title,
-      vendorLogo: v.vendor.logo,
-      totalRevenue: Number(v.totalRevenue),
-      totalOrders: v.totalOrders,
-      completedOrders: v.completedOrders,
-      acceptanceRate: Number(v.acceptanceRate || 0),
-      averageOrderValue: Number(v.averageOrderValue),
-    }));
-
-    await this.redis.set(
+    return this.redis.getOrSet(
       cacheKey,
-      JSON.stringify(result),
+      async () => {
+        const orderByField =
+          sortBy === 'revenue'
+            ? { totalRevenue: 'desc' as const }
+            : sortBy === 'orders'
+              ? { totalOrders: 'desc' as const }
+              : { acceptanceRate: 'desc' as const };
+
+        const topVendors = await this.prisma.vendorMetricsSnapshot.findMany({
+          where: {
+            snapshotType: SnapshotType.DAILY,
+          },
+          orderBy: orderByField,
+          take: limit,
+          include: {
+            vendor: {
+              select: {
+                id: true,
+                title: true,
+                logo: true,
+              },
+            },
+          },
+        });
+
+        return topVendors.map((v, index) => ({
+          rank: index + 1,
+          vendorId: v.vendorId,
+          vendorName: v.vendor.title,
+          vendorLogo: v.vendor.logo,
+          totalRevenue: Number(v.totalRevenue),
+          totalOrders: v.totalOrders,
+          completedOrders: v.completedOrders,
+          acceptanceRate: Number(v.acceptanceRate || 0),
+          averageOrderValue: Number(v.averageOrderValue),
+        }));
+      },
       AnalyticsConfig.CACHE_TTL.VENDOR_RANKINGS,
     );
-
-    return result;
   }
 
   /**
@@ -317,54 +288,47 @@ export class AnalyticsQueryService {
   ) {
     const cacheKey = `${AnalyticsConfig.CACHE_KEYS.DRIVER_RANKINGS}:${sortBy}:${limit}`;
 
-    const cached = await this.redis.get(cacheKey);
-    if (cached) {
-      return JSON.parse(cached);
-    }
-
-    const orderByField =
-      sortBy === 'deliveries'
-        ? { completedDeliveries: 'desc' as const }
-        : sortBy === 'earnings'
-          ? { totalEarnings: 'desc' as const }
-          : { averageRating: 'desc' as const };
-
-    const topDrivers = await this.prisma.driverMetricsSnapshot.findMany({
-      where: {
-        snapshotType: SnapshotType.DAILY,
-      },
-      orderBy: orderByField,
-      take: limit,
-      include: {
-        driver: {
-          select: {
-            id: true,
-            firstName: true,
-            lastName: true,
-            profilePictureURL: true,
-          },
-        },
-      },
-    });
-
-    const result = topDrivers.map((d, index) => ({
-      rank: index + 1,
-      driverId: d.driverId,
-      driverName: `${d.driver.firstName} ${d.driver.lastName}`,
-      driverPhoto: d.driver.profilePictureURL,
-      completedDeliveries: d.completedDeliveries,
-      totalEarnings: Number(d.totalEarnings),
-      averageRating: Number(d.averageRating || 0),
-      averageDeliveryTime: d.averageDeliveryTime,
-    }));
-
-    await this.redis.set(
+    return this.redis.getOrSet(
       cacheKey,
-      JSON.stringify(result),
+      async () => {
+        const orderByField =
+          sortBy === 'deliveries'
+            ? { completedDeliveries: 'desc' as const }
+            : sortBy === 'earnings'
+              ? { totalEarnings: 'desc' as const }
+              : { averageRating: 'desc' as const };
+
+        const topDrivers = await this.prisma.driverMetricsSnapshot.findMany({
+          where: {
+            snapshotType: SnapshotType.DAILY,
+          },
+          orderBy: orderByField,
+          take: limit,
+          include: {
+            driver: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                profilePictureURL: true,
+              },
+            },
+          },
+        });
+
+        return topDrivers.map((d, index) => ({
+          rank: index + 1,
+          driverId: d.driverId,
+          driverName: `${d.driver.firstName} ${d.driver.lastName}`,
+          driverPhoto: d.driver.profilePictureURL,
+          completedDeliveries: d.completedDeliveries,
+          totalEarnings: Number(d.totalEarnings),
+          averageRating: Number(d.averageRating || 0),
+          averageDeliveryTime: d.averageDeliveryTime,
+        }));
+      },
       AnalyticsConfig.CACHE_TTL.DRIVER_RANKINGS,
     );
-
-    return result;
   }
 
   /**
@@ -375,38 +339,31 @@ export class AnalyticsQueryService {
   ) {
     const cacheKey = `${AnalyticsConfig.CACHE_KEYS.PRODUCT_RANKINGS}:${limit}`;
 
-    const cached = await this.redis.get(cacheKey);
-    if (cached) {
-      return JSON.parse(cached);
-    }
-
-    const topProducts = await this.prisma.productPerformanceMetrics.findMany({
-      where: {
-        snapshotType: SnapshotType.DAILY,
-      },
-      orderBy: {
-        totalRevenue: 'desc',
-      },
-      take: limit,
-    });
-
-    const result = topProducts.map((p, index) => ({
-      rank: index + 1,
-      productId: p.productId,
-      vendorId: p.vendorId,
-      totalOrders: p.totalOrders,
-      totalQuantitySold: p.totalQuantitySold,
-      totalRevenue: Number(p.totalRevenue),
-      conversionRate: Number(p.conversionRate || 0),
-    }));
-
-    await this.redis.set(
+    return this.redis.getOrSet(
       cacheKey,
-      JSON.stringify(result),
+      async () => {
+        const topProducts = await this.prisma.productPerformanceMetrics.findMany({
+          where: {
+            snapshotType: SnapshotType.DAILY,
+          },
+          orderBy: {
+            totalRevenue: 'desc',
+          },
+          take: limit,
+        });
+
+        return topProducts.map((p, index) => ({
+          rank: index + 1,
+          productId: p.productId,
+          vendorId: p.vendorId,
+          totalOrders: p.totalOrders,
+          totalQuantitySold: p.totalQuantitySold,
+          totalRevenue: Number(p.totalRevenue),
+          conversionRate: Number(p.conversionRate || 0),
+        }));
+      },
       AnalyticsConfig.CACHE_TTL.PRODUCT_RANKINGS,
     );
-
-    return result;
   }
 
   /**
@@ -458,54 +415,47 @@ export class AnalyticsQueryService {
   async getPlatformHealth() {
     const cacheKey = AnalyticsConfig.CACHE_KEYS.PLATFORM_SUMMARY;
 
-    const cached = await this.redis.get(cacheKey);
-    if (cached) {
-      return JSON.parse(cached);
-    }
-
-    const latestSummary = await this.prisma.platformMetricsSummary.findFirst({
-      where: {
-        summaryType: SnapshotType.DAILY,
-      },
-      orderBy: { summaryDate: 'desc' },
-    });
-
-    if (!latestSummary) {
-      return null;
-    }
-
-    const result = {
-      date: latestSummary.summaryDate,
-      gmv: Number(latestSummary.grossMerchandiseValue),
-      totalOrders: latestSummary.totalOrders,
-      completedOrders: latestSummary.completedOrders,
-      cancelledOrders: latestSummary.cancelledOrders,
-      completionRate:
-        latestSummary.totalOrders > 0
-          ? (latestSummary.completedOrders / latestSummary.totalOrders) * 100
-          : 0,
-      averageOrderValue: Number(latestSummary.averageOrderValue),
-      platformRevenue: Number(latestSummary.platformRevenue),
-      subscriptionRevenue: Number(latestSummary.subscriptionRevenue),
-      activeUsers: {
-        customers: latestSummary.activeCustomers,
-        vendors: latestSummary.activeVendors,
-        drivers: latestSummary.activeDrivers,
-      },
-      newSignups: {
-        customers: latestSummary.newCustomers,
-        vendors: latestSummary.newVendors,
-        drivers: latestSummary.newDrivers,
-      },
-    };
-
-    await this.redis.set(
+    return this.redis.getOrSet(
       cacheKey,
-      JSON.stringify(result),
+      async () => {
+        const latestSummary = await this.prisma.platformMetricsSummary.findFirst({
+          where: {
+            summaryType: SnapshotType.DAILY,
+          },
+          orderBy: { summaryDate: 'desc' },
+        });
+
+        if (!latestSummary) {
+          return null;
+        }
+
+        return {
+          date: latestSummary.summaryDate,
+          gmv: Number(latestSummary.grossMerchandiseValue),
+          totalOrders: latestSummary.totalOrders,
+          completedOrders: latestSummary.completedOrders,
+          cancelledOrders: latestSummary.cancelledOrders,
+          completionRate:
+            latestSummary.totalOrders > 0
+              ? (latestSummary.completedOrders / latestSummary.totalOrders) * 100
+              : 0,
+          averageOrderValue: Number(latestSummary.averageOrderValue),
+          platformRevenue: Number(latestSummary.platformRevenue),
+          subscriptionRevenue: Number(latestSummary.subscriptionRevenue),
+          activeUsers: {
+            customers: latestSummary.activeCustomers,
+            vendors: latestSummary.activeVendors,
+            drivers: latestSummary.activeDrivers,
+          },
+          newSignups: {
+            customers: latestSummary.newCustomers,
+            vendors: latestSummary.newVendors,
+            drivers: latestSummary.newDrivers,
+          },
+        };
+      },
       AnalyticsConfig.CACHE_TTL.PLATFORM_SUMMARY,
     );
-
-    return result;
   }
 
   /**
@@ -569,48 +519,41 @@ export class AnalyticsQueryService {
   async getZonePerformance(zoneId: string) {
     const cacheKey = AnalyticsConfig.CACHE_KEYS.ZONE_PERFORMANCE(zoneId);
 
-    const cached = await this.redis.get(cacheKey);
-    if (cached) {
-      return JSON.parse(cached);
-    }
-
-    const latestMetrics = await this.prisma.zonePerformanceMetrics.findFirst({
-      where: {
-        zoneId,
-        snapshotType: SnapshotType.DAILY,
-      },
-      orderBy: { snapshotDate: 'desc' },
-      include: {
-        zone: {
-          select: {
-            id: true,
-            englishName: true,
-          },
-        },
-      },
-    });
-
-    if (!latestMetrics) {
-      return null;
-    }
-
-    const result = {
-      zoneId,
-      zoneName: (latestMetrics as any).zone.englishName,
-      totalOrders: latestMetrics.totalOrders,
-      completedOrders: latestMetrics.completedOrders,
-      totalRevenue: Number(latestMetrics.totalRevenue),
-      averageDeliveryTime: latestMetrics.averageDeliveryTime,
-      activeVendors: latestMetrics.activeVendors,
-      activeDrivers: latestMetrics.activeDrivers,
-    };
-
-    await this.redis.set(
+    return this.redis.getOrSet(
       cacheKey,
-      JSON.stringify(result),
+      async () => {
+        const latestMetrics = await this.prisma.zonePerformanceMetrics.findFirst({
+          where: {
+            zoneId,
+            snapshotType: SnapshotType.DAILY,
+          },
+          orderBy: { snapshotDate: 'desc' },
+          include: {
+            zone: {
+              select: {
+                id: true,
+                englishName: true,
+              },
+            },
+          },
+        });
+
+        if (!latestMetrics) {
+          return null;
+        }
+
+        return {
+          zoneId,
+          zoneName: (latestMetrics as any).zone.englishName,
+          totalOrders: latestMetrics.totalOrders,
+          completedOrders: latestMetrics.completedOrders,
+          totalRevenue: Number(latestMetrics.totalRevenue),
+          averageDeliveryTime: latestMetrics.averageDeliveryTime,
+          activeVendors: latestMetrics.activeVendors,
+          activeDrivers: latestMetrics.activeDrivers,
+        };
+      },
       AnalyticsConfig.CACHE_TTL.ZONE_PERFORMANCE,
     );
-
-    return result;
   }
 }

@@ -17,35 +17,36 @@ export class SettingsService {
 
   async findAll() {
     // Try to get from cache first
-    const cached = await this.redis.get<Record<string, string>>(this.CACHE_KEY);
-    if (cached) return cached;
-
-    const settings = await this.prisma.setting.findMany();
-    const result = settings.reduce(
-      (acc, curr) => {
-        acc[curr.key] = curr.value;
-        return acc;
+    return this.redis.getOrSet(
+      this.CACHE_KEY,
+      async () => {
+        const settings = await this.prisma.setting.findMany();
+        return settings.reduce(
+          (acc, curr) => {
+            acc[curr.key] = curr.value;
+            return acc;
+          },
+          {} as Record<string, string>,
+        );
       },
-      {} as Record<string, string>,
+      3600, // 1 hour
+      60, // 60s for empty
     );
-
-    // Cache for 1 hour
-    await this.redis.set(this.CACHE_KEY, result, 3600);
-    return result;
   }
 
   async findOne(key: string) {
     const cacheKey = `${this.CACHE_KEY_INDIVIDUAL}${key}`;
-    const cached = await this.redis.get<string>(cacheKey);
-    if (cached) return cached;
-
-    const setting = await this.prisma.setting.findUnique({ where: { key } });
-    if (!setting) {
-      throw new NotFoundException('SETTING_NOT_FOUND');
-    }
-
-    await this.redis.set(cacheKey, setting.value, 3600); // 1 hour
-    return setting.value;
+    return this.redis.getOrSet(
+      cacheKey,
+      async () => {
+        const setting = await this.prisma.setting.findUnique({ where: { key } });
+        if (!setting) {
+          throw new NotFoundException('SETTING_NOT_FOUND');
+        }
+        return setting.value;
+      },
+      3600,
+    );
   }
 
   async update(key: string, value: string) {
