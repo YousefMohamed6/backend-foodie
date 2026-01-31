@@ -7,6 +7,7 @@ import {
   UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { FileInterceptor } from '@nestjs/platform-express';
 import {
   ApiBearerAuth,
@@ -16,6 +17,7 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import type { Request } from 'express';
+import { EnvKeys } from '../../common/constants/env-keys.constants';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { multerImageOptions, multerOptions } from './config/multer.config';
 import { UploadService } from './upload.service';
@@ -23,14 +25,26 @@ import { UploadService } from './upload.service';
 @ApiTags('Upload')
 @Controller('upload')
 export class UploadController {
-  constructor(private readonly uploadService: UploadService) { }
+  constructor(
+    private readonly uploadService: UploadService,
+    private readonly configService: ConfigService,
+  ) { }
 
   /**
-   * Constructs the base URL from the incoming request.
-   * Uses req.protocol and req.get('host') to build the URL dynamically.
-   * This ensures URLs work on real devices, ngrok, and different networks.
+   * Constructs the base URL for file URLs.
+   * In production, uses APP_BASE_URL from environment config.
+   * Falls back to request-based URL construction for development.
+   * The trust proxy setting in main.ts ensures correct protocol detection behind Nginx.
    */
   private getBaseUrl(req: Request): string {
+    // Use APP_BASE_URL from config if available (recommended for production)
+    const configuredBaseUrl = this.configService.get<string>(EnvKeys.APP_BASE_URL);
+    if (configuredBaseUrl && configuredBaseUrl !== 'http://localhost:3000') {
+      // Remove trailing slash if present
+      return configuredBaseUrl.replace(/\/$/, '');
+    }
+
+    // Fallback to request-based URL (works with trust proxy enabled)
     return `${req.protocol}://${req.get('host')}`;
   }
 

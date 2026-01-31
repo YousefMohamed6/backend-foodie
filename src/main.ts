@@ -33,6 +33,11 @@ async function bootstrap() {
       : ['error', 'warn', 'log', 'debug'],
   });
 
+  // Trust proxy headers (Nginx) for correct protocol/host detection
+  // This is essential for proper URL generation when behind a reverse proxy
+  const expressApp = app.getHttpAdapter().getInstance();
+  expressApp.set('trust proxy', 1);
+
   const configService = app.get(ConfigService);
   const port = configService.get<number>('app.port') || SecurityConstants.DEFAULT_PORT;
 
@@ -85,8 +90,8 @@ async function bootstrap() {
 
   if (!isProduction) {
     const config = new DocumentBuilder()
-      .setTitle('Talqah API')
-      .setDescription('Talqah API')
+      .setTitle('Lux Station API')
+      .setDescription('Lux Station API')
       .setVersion('1.0')
       .addBearerAuth()
       .addSecurity('JWT', {

@@ -2,11 +2,14 @@ import { HttpException, HttpStatus } from '@nestjs/common';
 import { Request } from 'express';
 import { existsSync, mkdirSync } from 'fs';
 import { diskStorage } from 'multer';
-import { extname } from 'path';
+import { extname, join } from 'path';
 import { v4 as uuid } from 'uuid';
 
+// Use absolute path for upload directory to ensure consistent behavior on VPS
+const UPLOADS_BASE_DIR = join(process.cwd(), 'uploads');
+
 export const multerConfig = {
-  dest: './uploads/images',
+  dest: join(UPLOADS_BASE_DIR, 'images'),
 };
 
 export const multerOptions = {
@@ -40,7 +43,9 @@ export const multerOptions = {
       cb: (error: Error | null, destination: string) => void,
     ) => {
       const isVideo = file.mimetype.match(/\/(mp4|mov|avi|wmv)$/);
-      const uploadPath = isVideo ? './uploads/videos' : './uploads/images';
+      const uploadPath = isVideo
+        ? join(UPLOADS_BASE_DIR, 'videos')
+        : join(UPLOADS_BASE_DIR, 'images');
       // Create folder if doesn't exist
       if (!existsSync(uploadPath)) {
         mkdirSync(uploadPath, { recursive: true });
